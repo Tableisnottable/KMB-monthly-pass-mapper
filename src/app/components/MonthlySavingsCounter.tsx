@@ -19,7 +19,11 @@ const demoRoutes: DemoRoute[] = [
   }
 ];
 
-export default function MonthlySavingsCounter() {
+interface MonthlySavingsCounterProps {
+  savingPerTrip?: number;
+}
+
+export default function MonthlySavingsCounter({ savingPerTrip = 0 }: MonthlySavingsCounterProps) {
   const stops = demoRoutes.flatMap((route: DemoRoute) =>
     route.legs.flatMap((leg: Leg) => [leg.originStop, leg.destinationStop])
   );
@@ -27,6 +31,7 @@ export default function MonthlySavingsCounter() {
   return (
     <div style={{ padding: '12px', backgroundColor: '#1e1e1e', color: '#fff', borderRadius: '8px' }}>
       <span>覆蓋車站數量: {stops.length}</span>
+      {savingPerTrip > 0 ? <span style={{ marginLeft: '12px' }}>每程節省: HK$ {savingPerTrip.toFixed(2)}</span> : null}
     </div>
   );
 }

@@ -33,7 +33,7 @@ export function getMonthlyPassInsight(
 
   const coveredFare = route.legs
     .filter((leg) => leg.operator === 'KMB' || leg.operator === 'LWB')
-    .reduce((total, leg) => total + leg.fare, 0);
+    .reduce((total, leg) => total + (leg.fare ?? 0), 0);
   const uncoveredFare = Math.max(0, route.discountedFare - coveredFare);
   const singleTripFare = route.discountedFare;
 

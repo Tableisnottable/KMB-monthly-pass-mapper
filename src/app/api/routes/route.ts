@@ -9,7 +9,7 @@ const mockApiRoutes: Route[] = [
 ];
 
 function getMonthlyPassInsight(route: Route) {
-  const hasKmb = route.segments.some(s => s.operator === 'KMB');
+  const hasKmb = (route.segments ?? route.legs ?? []).some(s => s.operator === 'KMB');
   return hasKmb ? '100% 適用九巴月票' : '按程收費';
 }
 
