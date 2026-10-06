@@ -1,8 +1,8 @@
 import { scoreRoutes, type RouteOption, type TransitLeg } from '../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight } from '../domain/monthlyPass';
-import { MonthlySavingsCounter } from './components/MonthlySavingsCounter';
+import MonthlySavingsCounter from './components/MonthlySavingsCounter';
 import { CalendarAndPlaces } from './components/CalendarAndPlaces';
-import { TrafficHeatmap } from './components/TrafficHeatmap';
+import TrafficHeatmap from './components/TrafficHeatmap';
 import { GoogleMapPanel } from './components/GoogleMapPanel';
 import { getTrafficSourceCatalog } from '../data/hkTrafficSources';
 import { getAlertsForRoutes } from '../data/trafficAlerts';
@@ -271,15 +271,17 @@ export default function Home() {
                 <h2 className="text-2xl font-semibold text-slate-900">{bestRoute.legs.length > 1 ? '最佳路線' : '直達路線'}</h2>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-slate-900">{bestRoute.legs.reduce((total, leg) => total + leg.journeyTimeMinutes, 0) + bestRoute.walkTransferTimeMinutes} min</div>
+                <div className="text-3xl font-bold text-slate-900">{bestRoute.legs.reduce((total, leg) => total + (leg.journeyTimeMinutes ?? 0), 0) + bestRoute.walkTransferTimeMinutes} min</div>
                 <div className="text-sm text-slate-500">{bestRoute.transferCount} 次轉乘</div>
               </div>
             </div>
 
             {scoredRoutes.map((route, index) => {
               const isBest = index === 0;
-              const routeAlerts = getAlertsForRoutes(route.legs.map((leg) => leg.routeNumber));
-              const totalMinutes = route.legs.reduce((total, leg) => total + leg.journeyTimeMinutes, 0) + route.walkTransferTimeMinutes;
+              const routeAlerts = getAlertsForRoutes(
+                route.legs.flatMap((leg) => (leg.routeNumber ? [leg.routeNumber] : [])),
+              );
+              const totalMinutes = route.legs.reduce((total, leg) => total + (leg.journeyTimeMinutes ?? 0), 0) + route.walkTransferTimeMinutes;
               return (
                 <article
                   key={route.id}
@@ -322,11 +324,11 @@ export default function Home() {
                             <div className="text-sm text-slate-500">{leg.mode === 'SUBWAY' ? '港鐵' : leg.mode === 'BUS' ? '巴士' : leg.mode === 'WALK' ? '步行' : '渡輪'}</div>
                           </div>
                           <div className="mt-1 text-sm text-slate-600">
-                            {leg.originStop.name} → {leg.destinationStop.name}
+                            {leg.originStop?.name ?? '起點'} → {leg.destinationStop?.name ?? '目的地'}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold text-slate-900">{leg.journeyTimeMinutes} min</div>
+                          <div className="font-semibold text-slate-900">{leg.journeyTimeMinutes ?? 0} min</div>
                           <div className="text-xs text-slate-500">
                             {leg.realtimeEta ? `${leg.realtimeEta.etaMinutes} min live` : `${leg.scheduledIntervalMinutes} min scheduled`}
                           </div>
@@ -388,7 +390,7 @@ export default function Home() {
               <div className="mt-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">總時間</span>
-                  <strong>{formatDuration(bestRoute.legs.reduce((total, leg) => total + leg.journeyTimeMinutes, 0) + bestRoute.walkTransferTimeMinutes)}</strong>
+                  <strong>{formatDuration(bestRoute.legs.reduce((total, leg) => total + (leg.journeyTimeMinutes ?? 0), 0) + bestRoute.walkTransferTimeMinutes)}</strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">最低車費</span>
@@ -402,7 +404,7 @@ export default function Home() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">班次間隔</span>
-                  <strong>{bestRoute.legs[0].scheduledIntervalMinutes} min</strong>
+                  <strong>{bestRoute.legs[0].scheduledIntervalMinutes ?? 0} min</strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">營辦商組合</span>
