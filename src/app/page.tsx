@@ -155,12 +155,12 @@ function formatDuration(minutes: number) {
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#eef7ed] text-slate-900">
-      <div className="min-h-screen bg-[linear-gradient(135deg,#eef7ed_0%,#d9f0d5_45%,#f7fbf5_100%)]">
-        <header className="border-b border-[#176b2c]/20 bg-[#176b2c] text-white">
+    <main className="min-h-screen bg-[#eef1f4] text-slate-900">
+      <div className="min-h-screen">
+        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#176b2c] shadow-lg" aria-label="Transit Compass HK">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#176b2c] text-white shadow-sm" aria-label="Transit Compass HK">
               <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 32 32" fill="none">
                 <path d="M8 23.5 12.5 9h7L24 23.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="8" cy="23.5" r="3" fill="#f97316" />
@@ -169,41 +169,52 @@ export default function Home() {
               </svg>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-green-100">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
                 Transit Compass HK
               </p>
-              <h1 className="text-xl font-bold">香港出行地圖</h1>
+              <h1 className="text-lg font-bold">香港出行</h1>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <a className="hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 sm:inline-flex" href="/updates">路線更新</a>
-            <a className="hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 sm:inline-flex" href="/traffic">交通事件</a>
-            <a className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20" href="/en">
+            <a className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 sm:inline-flex" href="/updates">路線更新</a>
+            <a className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 sm:inline-flex" href="/traffic">交通事件</a>
+            <a className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" href="/en">
               English 版
             </a>
-            <button className="hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20 sm:block">
-              已儲存地點
-            </button>
-            <button className="rounded-xl bg-white px-3 py-2 text-sm font-bold text-[#176b2c] shadow-sm">
-              定位我
+            <button className="rounded-xl bg-[#176b2c] px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#0f5422]">
+              定位
             </button>
           </div>
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <JourneyPlaceSearch />
-        <section id="live-search" className="mb-5 rounded-[28px] bg-white p-4 shadow-soft ring-1 ring-[#176b2c]/15">
-          <div className="mb-4 flex flex-wrap gap-2">
-            {['多模式交通', '附近站點', '最快', '最平', '即時到站'].map((chip) => (
-              <span className="rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-[#176b2c]" key={chip}>{chip}</span>
-            ))}
+        <div className="mx-auto max-w-7xl px-3 py-3 sm:px-6 lg:px-8">
+        <div className="grid gap-3 lg:grid-cols-[minmax(380px,0.86fr)_minmax(0,1.14fr)] lg:items-start">
+          <div className="space-y-3">
+            <JourneyPlaceSearch />
+            <section id="live-search" className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+              <div className="mb-3 flex flex-wrap gap-2">
+                {['全部', '巴士', '港鐵', '最快', '最平'].map((chip, index) => (
+                  <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${index === 0 ? 'bg-[#176b2c] text-white' : 'bg-slate-100 text-slate-600'}`} key={chip}>{chip}</span>
+                ))}
+              </div>
+              <LiveTransitSearch />
+            </section>
           </div>
-          <LiveTransitSearch />
-        </section>
+          <div className="overflow-hidden rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-[76px]">
+            <div className="mb-2 flex items-center justify-between px-2 pt-1">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">地圖</p>
+                <h2 className="text-base font-bold text-slate-800">附近交通網絡</h2>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">香港</span>
+            </div>
+            <GoogleMapPanel />
+          </div>
+        </div>
 
-        <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-white/80 p-2 shadow-sm ring-1 ring-[#176b2c]/10 sm:grid-cols-4">
+        <div className="my-3 grid grid-cols-2 gap-2 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200 sm:grid-cols-4">
           {[
             ['🚌', '巴士', '按資料比較'],
             ['🚶', '步行', '附近車站'],
@@ -368,21 +379,8 @@ export default function Home() {
               <a className="rounded-2xl bg-white p-3 text-center text-sm font-semibold text-[#176b2c] shadow-sm ring-1 ring-[#176b2c]/15 hover:bg-green-50" href="/traffic">交通事件<br /><span className="text-xs font-normal text-slate-500">事故及擠塞</span></a>
             </div>
             <CalendarAndPlaces />
-            <div id="map" className="overflow-hidden rounded-[28px] bg-white p-4 shadow-soft ring-1 ring-[#176b2c]/15">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">地圖</p>
-                  <h3 className="text-xl font-semibold">交通網絡</h3>
-                </div>
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                  排班資料
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                <GoogleMapPanel />
-                <TrafficHeatmap />
-              </div>
+            <div id="map" className="overflow-hidden rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+              <TrafficHeatmap />
             </div>
 
             <div className="rounded-[28px] bg-[#176b2c] p-5 text-white shadow-soft">
@@ -455,6 +453,19 @@ export default function Home() {
         </div>
       </footer>
       </div>
+      <nav className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-4 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-xl backdrop-blur sm:hidden">
+        {[
+          ['⌕', '搜尋', '#live-search'],
+          ['⌖', '地圖', '#map'],
+          ['⚠', '交通', '/traffic'],
+          ['☰', '更多', '/updates'],
+        ].map(([icon, label, href]) => (
+          <a className="flex flex-col items-center rounded-xl px-2 py-2 text-[10px] font-semibold text-slate-600 hover:bg-green-50 hover:text-[#176b2c]" href={href} key={label}>
+            <span className="text-base leading-4">{icon}</span>
+            <span className="mt-1">{label}</span>
+          </a>
+        ))}
+      </nav>
     </main>
   );
 }
