@@ -9,6 +9,8 @@ import { getAlertsForRoutes } from '../data/trafficAlerts';
 import { LiveTransitSearch } from './components/LiveTransitSearch';
 import { JourneyPlaceSearch } from './components/JourneyPlaceSearch';
 
+const DEMO_AS_OF = new Date('2026-09-13T18:25:00+08:00');
+
 const stop = (
   id: string,
   name: string,
@@ -41,7 +43,15 @@ const makeLeg = (
   destinationStop: to,
   journeyTimeMinutes,
   scheduledIntervalMinutes,
-  realtimeEta: null,
+  realtimeEta:
+    eta === null
+      ? null
+      : {
+          etaMinutes: eta,
+          dataTime: DEMO_AS_OF.toISOString(),
+          isLive: true,
+          source: 'DATAGOVHK',
+        },
   fare,
 });
 
@@ -129,7 +139,7 @@ const routes: RouteOption[] = [
   },
 ];
 
-const scoredRoutes = scoreRoutes(routes, new Date('2026-09-13T18:25:00+08:00')).sort(
+const scoredRoutes = scoreRoutes(routes, DEMO_AS_OF).sort(
   (a, b) => a.finalScore - b.finalScore,
 );
 
@@ -259,7 +269,7 @@ export default function Home() {
                     HK$ {bestPassInsight.passPrice}
                   </div>
                   <div className="mt-1 text-xs text-green-100">
-                    回本：{bestPassInsight.breakEvenTrips} 程
+                    回本：{bestPassInsight.breakEvenTrips === null ? '—' : `${bestPassInsight.breakEvenTrips} 程`}
                   </div>
                 </div>
               </div>

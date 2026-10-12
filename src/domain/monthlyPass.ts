@@ -16,10 +16,25 @@ export interface MonthlyPassInsight {
   uncoveredFare: number;
   singleTripFare: number;
   savingThisTrip: number;
-  breakEvenTrips: number;
+  breakEvenTrips: number | null;
   coveredLegCount: number;
   uncoveredLegCount: number;
   isFullyCovered: boolean;
+}
+
+function isKmbCovered(operator: string): boolean {
+  return operator === 'KMB' || operator === 'LWB';
+}
+
+function prorateBbiDiscount(route: ScoredRoute): number {
+  const coveredFare = route.legs
+    .filter((leg) => isKmbCovered(leg.operator))
+    .reduce((total, leg) => total + (leg.fare ?? 0), 0);
+  const rawFare = route.legs.reduce((total, leg) => total + (leg.fare ?? 0), 0);
+  if (rawFare <= 0) {
+    return 0;
+  }
+  return (route.bbiDiscountApplied * coveredFare) / rawFare;
 }
 
 export function getMonthlyPassInsight(
@@ -32,28 +47,26 @@ export function getMonthlyPassInsight(
   }
 
   const coveredFare = route.legs
-    .filter((leg) => leg.operator === 'KMB' || leg.operator === 'LWB')
+    .filter((leg) => isKmbCovered(leg.operator))
     .reduce((total, leg) => total + (leg.fare ?? 0), 0);
-  const uncoveredFare = Math.max(0, route.discountedFare - coveredFare);
+  const coveredFareAfterBbi = coveredFare - prorateBbiDiscount(route);
+  const uncoveredFare = Math.max(0, route.discountedFare - coveredFareAfterBbi);
   const singleTripFare = route.discountedFare;
 
   return {
     passType,
     passPrice,
-    coveredFare: roundCurrency(coveredFare),
+    coveredFare: roundCurrency(coveredFareAfterBbi),
     uncoveredFare: roundCurrency(uncoveredFare),
     singleTripFare: roundCurrency(singleTripFare),
-    savingThisTrip: roundCurrency(coveredFare),
-    breakEvenTrips: Math.ceil(passPrice / Math.max(coveredFare, 0.01)),
-    coveredLegCount: route.legs.filter(
-      (leg) => leg.operator === 'KMB' || leg.operator === 'LWB',
-    ).length,
-    uncoveredLegCount: route.legs.filter(
-      (leg) => leg.operator !== 'KMB' && leg.operator !== 'LWB',
-    ).length,
-    isFullyCovered: route.legs.every(
-      (leg) => leg.operator === 'KMB' || leg.operator === 'LWB',
-    ),
+    savingThisTrip: roundCurrency(coveredFareAfterBbi),
+    breakEvenTrips:
+      coveredFareAfterBbi > 0
+        ? Math.ceil(passPrice / coveredFareAfterBbi)
+        : null,
+    coveredLegCount: route.legs.filter((leg) => isKmbCovered(leg.operator)).length,
+    uncoveredLegCount: route.legs.filter((leg) => !isKmbCovered(leg.operator)).length,
+    isFullyCovered: route.legs.every((leg) => isKmbCovered(leg.operator)),
   };
 }
 
