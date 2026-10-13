@@ -12,9 +12,11 @@ html {
 
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #f3f4f6;
-  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Noto Sans HK", "PingFang HK", "Microsoft JhengHei", sans-serif;
+  background: #f2f4f3;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -26,5 +28,17 @@ button {
 }
 
 ::selection {
-  background: rgba(59, 130, 246, 0.16);
+  background: rgba(0, 213, 99, 0.25);
+}
+
+@layer components {
+  .cm-card {
+    @apply rounded-2xl bg-white shadow-card ring-1 ring-cm-line;
+  }
+  .cm-pill {
+    @apply inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-extrabold leading-5 text-white;
+  }
+  .cm-chip {
+    @apply rounded-full px-3 py-1.5 text-xs font-bold;
+  }
 }
