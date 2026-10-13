@@ -34,7 +34,7 @@ export function GoogleMapPanel() {
       <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 text-xs font-semibold text-slate-700 shadow">
         <span>OpenStreetMap · 地圖資料由貢獻者提供</span>
         <a
-          className="font-bold text-[#176b2c] underline"
+          className="font-bold text-cm-greenDark underline"
           href={googleMapsUrl}
           rel="noreferrer"
           target="_blank"

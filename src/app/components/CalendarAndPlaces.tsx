@@ -33,15 +33,15 @@ export function CalendarAndPlaces() {
   }, [destination, origin]);
 
   return (
-    <div id="places" className="rounded-[28px] bg-white p-4 shadow-soft ring-1 ring-[#176b2c]/15 sm:p-5">
+    <div id="places" className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-cm-line sm:p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#176b2c]">
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-cm-greenDark">
             已儲存地點
           </p>
-          <h3 className="mt-1 text-xl font-bold">下一個行程</h3>
+          <h3 className="mt-1 text-xl font-extrabold">下一個行程</h3>
         </div>
-        <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-[#176b2c]">
+        <span className="rounded-full bg-cm-green/10 px-3 py-1 text-xs font-extrabold text-cm-greenDark">
           繁中（香港）
         </span>
       </div>
@@ -51,8 +51,8 @@ export function CalendarAndPlaces() {
           <button
             className={`rounded-2xl p-3 text-left transition ${
               selectedPlace === place.id
-                ? 'bg-[#176b2c] text-white'
-                : 'bg-green-50 text-slate-800 hover:bg-green-100'
+                ? 'bg-cm-green text-white'
+                : 'bg-cm-paper text-cm-ink hover:bg-cm-green/10'
             }`}
             key={place.id}
             onClick={() => {
@@ -61,15 +61,15 @@ export function CalendarAndPlaces() {
             }}
             type="button"
           >
-            <div className="text-sm font-bold">{place.label}</div>
+            <div className="text-sm font-extrabold">{place.label}</div>
             <div className={`mt-1 truncate text-xs ${
-              selectedPlace === place.id ? 'text-green-100' : 'text-slate-500'
+              selectedPlace === place.id ? 'text-white/80' : 'text-cm-muted'
             }`}>
               {place.address}
             </div>
           </button>
         )) : (
-          <p className="col-span-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-500">
+          <p className="col-span-3 rounded-2xl bg-cm-paper p-3 text-sm text-cm-muted">
             尚未儲存地點；完成搜尋後可在此加入。
           </p>
         )}
@@ -77,7 +77,7 @@ export function CalendarAndPlaces() {
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <PlaceAutocomplete
-          colorClass="bg-[#2e8b57]"
+          colorClass="bg-cm-green"
           label="起點"
           onChange={(value) => {
             setOrigin(value);
@@ -87,7 +87,7 @@ export function CalendarAndPlaces() {
           value={origin}
         />
         <PlaceAutocomplete
-          colorClass="bg-orange-500"
+          colorClass="bg-cm-lwb"
           label="終點"
           onChange={(value) => {
             setDestination(value);
@@ -99,14 +99,14 @@ export function CalendarAndPlaces() {
       </div>
 
       {(originPlace || destinationPlace) && (
-        <div className="mt-3 rounded-xl bg-green-50 px-3 py-2 text-xs text-slate-600">
+        <div className="mt-3 rounded-xl bg-cm-green/10 px-3 py-2 text-xs text-cm-ink">
           {originPlace && `起點座標：${originPlace.lat.toFixed(5)}, ${originPlace.lng.toFixed(5)}`}
           {originPlace && destinationPlace && ' · '}
           {destinationPlace && `終點座標：${destinationPlace.lat.toFixed(5)}, ${destinationPlace.lng.toFixed(5)}`}
         </div>
       )}
       <a
-        className="mt-4 flex items-center justify-center rounded-2xl bg-[#2e8b57] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#176b2c]"
+        className="mt-4 flex items-center justify-center rounded-2xl bg-cm-green px-4 py-3 text-sm font-extrabold text-white transition hover:bg-cm-greenDark"
         href={calendarUrl}
         rel="noreferrer"
         target="_blank"
@@ -117,7 +117,7 @@ export function CalendarAndPlaces() {
         <div className="mt-2 flex gap-2">
           {[originPlace, destinationPlace].filter((place): place is PlaceResult => Boolean(place)).map((place) => (
             <a
-              className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              className="flex-1 rounded-xl bg-cm-paper px-3 py-2 text-center text-xs font-bold text-cm-ink hover:bg-cm-green/10"
               href={place.googleMapsUrl}
               key={place.id}
               rel="noreferrer"
@@ -128,7 +128,7 @@ export function CalendarAndPlaces() {
           ))}
         </div>
       )}
-      <p className="mt-2 text-center text-xs text-slate-500">
+      <p className="mt-2 text-center text-xs text-cm-muted">
         會預填起點、終點、地點和下一個工作日行程。
       </p>
     </div>

@@ -48,7 +48,7 @@ export function AlertList({
             <p className="mt-2 text-sm leading-6 text-slate-500">{item.details}</p>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
               <span>{'affectedRouteNumbers' in item ? `受影響：${item.affectedRouteNumbers.join(', ')}` : `生效：${new Date(item.effectiveFrom).toLocaleString('zh-HK')}`}</span>
-              <a className="font-semibold text-[#176b2c] underline" href={item.sourceUrl} rel="noreferrer" target="_blank">來源：{item.sourceName}</a>
+              <a className="font-bold text-cm-greenDark underline" href={item.sourceUrl} rel="noreferrer" target="_blank">來源：{item.sourceName}</a>
             </div>
           </article>
         ))}
