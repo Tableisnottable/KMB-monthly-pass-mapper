@@ -3,6 +3,7 @@ import { getTrafficSourceCatalog } from '../data/hkTrafficSources';
 import { GoogleMapPanel } from './components/GoogleMapPanel';
 import { LiveTransitSearch } from './components/LiveTransitSearch';
 import { JourneyPlaceSearch } from './components/JourneyPlaceSearch';
+import { LocateButton } from './components/LocateButton';
 import { PlannerBoard } from './components/PlannerBoard';
 
 const DEMO_AS_OF = new Date('2026-09-13T18:25:00+08:00');
@@ -168,9 +169,7 @@ export default function Home() {
             <a className="rounded-full px-3 py-2 text-sm font-bold text-cm-muted hover:bg-cm-paper hover:text-cm-ink" href="/en">
               EN
             </a>
-            <button className="rounded-full bg-cm-ink px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-black">
-              定位
-            </button>
+            <LocateButton />
           </div>
           </div>
         </header>
@@ -183,7 +182,7 @@ export default function Home() {
               <LiveTransitSearch />
             </section>
           </div>
-          <div className="overflow-hidden rounded-3xl bg-white p-2 shadow-card ring-1 ring-cm-line lg:sticky lg:top-[68px]">
+          <div className="overflow-hidden rounded-3xl bg-white p-2 shadow-card ring-1 ring-cm-line lg:sticky lg:top-[68px]" id="map">
             <div className="mb-2 flex items-center justify-between px-2 pt-1">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cm-muted">地圖</p>

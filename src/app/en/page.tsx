@@ -29,7 +29,7 @@ export default function EnglishHome() {
         <section className="mt-5 grid gap-4 sm:grid-cols-3">
           {[
             ['Search routes', 'Plan journeys with scheduled service information and fare comparisons.'],
-            ['Use GPS', 'Find your nearest mapped stop in the browser without uploading your location.'],
+            ['Use GPS', 'Find yourself on the Hong Kong map in the browser; your location never leaves the device.'],
             ['Check alerts', 'See route changes and traffic events that may affect your journey.'],
           ].map(([title, description]) => (
             <article className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-cm-line" key={title}>
