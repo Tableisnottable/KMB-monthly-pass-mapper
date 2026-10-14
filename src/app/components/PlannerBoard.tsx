@@ -10,6 +10,9 @@ import { RouteMinimap } from './RouteMinimap';
 
 type SortKey = 'all' | 'bus' | 'rail' | 'fastest' | 'cheapest';
 
+// Demo "now" matching the demo route ETAs (18:25 HKT)
+const DEMO_NOW = new Date('2026-09-13T18:25:00+08:00');
+
 const SORT_CHIPS: { key: SortKey; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'bus', label: '巴士' },
@@ -45,6 +48,40 @@ function legColor(operator: string): string {
 
 function modeName(leg: Segment): string {
   return modeLabel[leg.mode ?? ''] ?? leg.mode ?? '交通';
+}
+
+/**
+ * Compute the next few departure times for a leg, based on a live ETA
+ * (when present) or the scheduled headway. Returns "HH:MM" strings.
+ */
+function nextDepartures(
+  leg: Segment,
+  now: Date,
+  count = 4,
+): { time: string; isLive: boolean }[] {
+  const headway = leg.scheduledIntervalMinutes ?? 12;
+  const baseMinutes = leg.realtimeEta?.isLive
+    ? leg.realtimeEta.etaMinutes
+    : undefined;
+  const results: { time: string; isLive: boolean }[] = [];
+  if (baseMinutes !== undefined) {
+    for (let i = 0; i < count; i += 1) {
+      const d = new Date(now.getTime() + (baseMinutes + i * headway) * 60000);
+      results.push({
+        time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+        isLive: i === 0,
+      });
+    }
+    return results;
+  }
+  // No live ETA: estimate departures from the next whole headway slot
+  const nextSlot = Math.ceil(now.getMinutes() / headway) * headway;
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(now);
+    d.setMinutes(nextSlot + i * headway, 0, 0);
+    results.push({ time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`, isLive: false });
+  }
+  return results;
 }
 
 function totalMinutes(route: ScoredRoute): number {
@@ -93,7 +130,9 @@ function buildDirections(route: ScoredRoute, transferWalkMinutes: number): Direc
       title: `乘搭 ${leg.routeNumber}（${modeName(leg)}）`,
       detail: `${leg.originStop?.name ?? '上車站'} → ${leg.destinationStop?.name ?? '下車站'} · ${leg.journeyTimeMinutes ?? 0} 分鐘${
         leg.realtimeEta ? ` · ${leg.realtimeEta.etaMinutes} 分到站` : ` · 每 ${leg.scheduledIntervalMinutes} 分一班`
-      }`,
+      } · 班次 ${nextDepartures(leg, DEMO_NOW)
+        .map((d) => d.time)
+        .join(' / ')}`,
       color: legColor(leg.operator),
     });
     if (index < route.legs.length - 1) {
@@ -327,10 +366,27 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
                             </div>
                             <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold text-cm-muted">
                               <span>{leg.journeyTimeMinutes ?? 0} 分鐘</span>
-                              <span className={leg.realtimeEta ? 'text-cm-greenDark' : ''}>
-                                {leg.realtimeEta
-                                  ? `· ${leg.realtimeEta.etaMinutes} 分到站`
-                                  : `· 每 ${leg.scheduledIntervalMinutes} 分一班`}
+                              {leg.realtimeEta ? (
+                                <span className="text-cm-greenDark">· {leg.realtimeEta.etaMinutes} 分到站</span>
+                              ) : (
+                                <span>· 每 {leg.scheduledIntervalMinutes} 分一班</span>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              {nextDepartures(leg, DEMO_NOW).map((dep, i) => (
+                                <span
+                                  className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums ${
+                                    dep.isLive
+                                      ? 'bg-cm-green text-white'
+                                      : 'bg-cm-paper text-cm-ink ring-1 ring-cm-line'
+                                  }`}
+                                  key={`${leg.id}-dep-${i}`}
+                                >
+                                  {dep.time}
+                                </span>
+                              ))}
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-cm-muted">
+                                {leg.realtimeEta ? '實時' : '預計'}
                               </span>
                             </div>
                           </div>
