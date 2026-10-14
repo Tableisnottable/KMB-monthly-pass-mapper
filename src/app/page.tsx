@@ -180,11 +180,6 @@ export default function Home() {
           <div className="space-y-3">
             <JourneyPlaceSearch />
             <section id="live-search" className="cm-card p-3">
-              <div className="mb-3 flex flex-wrap gap-2">
-                {['全部', '巴士', '港鐵', '最快', '最平'].map((chip, index) => (
-                  <span className={`cm-chip ${index === 0 ? 'bg-cm-green text-white' : 'bg-cm-paper text-cm-muted'}`} key={chip}>{chip}</span>
-                ))}
-              </div>
               <LiveTransitSearch />
             </section>
           </div>
