@@ -37,6 +37,25 @@ export interface KmbEtaRecord {
   rmk_tc: string;
 }
 
+export interface KmbStopEtaRecord {
+  route: string;
+  dir: string;
+  seq: number;
+  dest_tc: string;
+  dest_en: string;
+  eta: string | null;
+  rmk_tc: string;
+}
+
+export interface CitybusRouteStopRecord {
+  co: string;
+  route: string;
+  dir: string;
+  seq: number;
+  stop: string;
+  data_timestamp: string;
+}
+
 export interface CitybusEtaRecord {
   co: string;
   route: string;
@@ -45,6 +64,14 @@ export interface CitybusEtaRecord {
   dest_tc: string;
   eta: string | null;
   remarks_tc: string;
+}
+
+export interface CitybusStopEtaRecord extends CitybusEtaRecord {
+  stop: string;
+  dest_en: string;
+  eta_seq: number;
+  rmk_tc: string;
+  data_timestamp: string;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -103,9 +130,75 @@ export async function getKmbEta(stopId: string, route: string) {
   return payload.data;
 }
 
+export async function getKmbStopEta(stopId: string) {
+  const payload = await fetchJson<{ data: KmbStopEtaRecord[] }>(
+    `${HK_TRANSIT_API.kmb}/stop-eta/${encodeURIComponent(stopId)}`,
+  );
+  return payload.data;
+}
+
 export async function getCitybusEta(stopId: string, route: string) {
   const payload = await fetchJson<{ data: CitybusEtaRecord[] }>(
     `${HK_TRANSIT_API.citybus}/eta/CTB/${encodeURIComponent(stopId)}/${encodeURIComponent(route)}`,
+  );
+  return payload.data;
+}
+
+export async function getCitybusStopEta(stopId: string) {
+  // Citybus has no stop-level ETA endpoint: resolve the stop to its
+  // (route, dir) pairs via route-stop, then fan out to per-route ETA.
+  // Bounded: max routes scanned, small concurrency, early exit once found.
+  const routes = await getCitybusRoutes();
+  const seen = new Set<string>();
+  const pairs: { route: string; dir: string }[] = [];
+  const routeNumbers = Array.from(new Set(routes.map((r) => r.route)));
+  const CONCURRENCY = 6;
+  const MAX_SCAN = 120;
+  let scanned = 0;
+  let foundStop = false;
+
+  async function scanRoute(route: string) {
+    if (foundStop || scanned >= MAX_SCAN) return;
+    scanned += 1;
+    for (const dir of ['inbound', 'outbound'] as const) {
+      if (foundStop) return;
+      const key = `${route}|${dir}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      try {
+        const stops = await getCitybusRouteStops(route, dir);
+        if (stops.some((s) => s.stop === stopId)) {
+          pairs.push({ route, dir: dir === 'inbound' ? 'I' : 'O' });
+          foundStop = true;
+        }
+      } catch {
+        // route has no such direction; skip
+      }
+    }
+  }
+
+  // First pass: scan up to MAX_SCAN routes with bounded concurrency.
+  for (let i = 0; i < Math.min(routeNumbers.length, MAX_SCAN); i += CONCURRENCY) {
+    const batch = routeNumbers.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map((route) => scanRoute(route)));
+    if (foundStop) break;
+  }
+
+  const results: CitybusEtaRecord[] = [];
+  for (const pair of pairs.slice(0, 12)) {
+    try {
+      const etas = await getCitybusEta(stopId, pair.route);
+      results.push(...etas.filter((e) => e.dir === pair.dir));
+    } catch {
+      // ETA unavailable for this route; skip
+    }
+  }
+  return results;
+}
+
+export async function getCitybusRouteStops(route: string, dir: 'inbound' | 'outbound') {
+  const payload = await fetchJson<{ data: CitybusRouteStopRecord[] }>(
+    `${HK_TRANSIT_API.citybus}/route-stop/CTB/${encodeURIComponent(route)}/${dir}`,
   );
   return payload.data;
 }

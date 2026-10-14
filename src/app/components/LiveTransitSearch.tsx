@@ -19,6 +19,23 @@ interface TransitStop {
   long: number;
 }
 
+interface StopEtaEntry {
+  route: string;
+  dir?: string;
+  dest_tc?: string;
+  dest_en?: string;
+  eta: string | null;
+  eta_seq?: number;
+}
+
+interface StopDepartures {
+  stopId: string;
+  stopName: string;
+  entries: { route: string; dest: string; minutes: number[] }[];
+  fetchedAt: string;
+  error?: string;
+}
+
 export function LiveTransitSearch() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -27,6 +44,9 @@ export function LiveTransitSearch() {
   const [stops, setStops] = useState<TransitStop[]>([]);
   const [selectedFrom, setSelectedFrom] = useState<TransitStop | null>(null);
   const [selectedTo, setSelectedTo] = useState<TransitStop | null>(null);
+  const [fromDepartures, setFromDepartures] = useState<StopDepartures | null>(null);
+  const [toDepartures, setToDepartures] = useState<StopDepartures | null>(null);
+  const [etaLoading, setEtaLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('輸入起點及目的地後按搜尋');
 
@@ -97,10 +117,116 @@ export function LiveTransitSearch() {
     if (target === 'from') {
       setFrom(stop.name_tc || stop.name_en);
       setSelectedFrom(stop);
+      setFromDepartures(null);
+      void fetchStopDepartures(stop, 'from');
     } else {
       setTo(stop.name_tc || stop.name_en);
       setSelectedTo(stop);
+      setToDepartures(null);
+      void fetchStopDepartures(stop, 'to');
     }
+  }
+
+  async function fetchStopDepartures(stop: TransitStop, target: 'from' | 'to') {
+    setEtaLoading(true);
+    try {
+      const response = await fetch(
+        `/api/transit?operator=${operator}&resource=stop-eta&stop=${encodeURIComponent(stop.stop)}`,
+        { cache: 'no-store' },
+      );
+      const payload = (await response.json()) as {
+        data?: StopEtaEntry[] | Record<string, unknown>;
+        error?: string;
+      };
+      if (!response.ok || !payload.data || Array.isArray(payload.data) === false) {
+        throw new Error(payload.error ?? '實時班次暫時未能使用');
+      }
+      const entries_raw = payload.data as StopEtaEntry[];
+      const now = Date.now();
+      const grouped = new Map<string, { route: string; dest: string; minutes: number[] }>();
+      for (const entry of entries_raw) {
+        if (!entry.eta) continue;
+        const minutes = Math.max(0, Math.round((new Date(entry.eta).getTime() - now) / 60000));
+        const key = `${entry.route}|${entry.dest_tc ?? entry.dest_en ?? ''}`;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.minutes.push(minutes);
+        } else {
+          grouped.set(key, {
+            route: entry.route,
+            dest: entry.dest_tc ?? entry.dest_en ?? '',
+            minutes: [minutes],
+          });
+        }
+      }
+      const entries = Array.from(grouped.values())
+        .map((group) => ({
+          ...group,
+          minutes: Array.from(new Set(group.minutes)).sort((a, b) => a - b).slice(0, 3),
+        }))
+        .sort((a, b) => (a.minutes[0] ?? 999) - (b.minutes[0] ?? 999))
+        .slice(0, 6);
+      const result: StopDepartures = {
+        stopId: stop.stop,
+        stopName: stop.name_tc || stop.name_en,
+        entries,
+        fetchedAt: new Date().toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' }),
+      };
+      if (target === 'from') {
+        setFromDepartures(result);
+      } else {
+        setToDepartures(result);
+      }
+    } catch (error) {
+      const result: StopDepartures = {
+        stopId: stop.stop,
+        stopName: stop.name_tc || stop.name_en,
+        entries: [],
+        fetchedAt: '',
+        error: error instanceof Error ? error.message : '讀取實時班次失敗',
+      };
+      if (target === 'from') {
+        setFromDepartures(result);
+      } else {
+        setToDepartures(result);
+      }
+    } finally {
+      setEtaLoading(false);
+    }
+  }
+
+  function renderDepartures(departures: StopDepartures | null, label: string) {
+    if (!departures) return null;
+    return (
+      <div className="mt-2 rounded-xl bg-cm-paper/70 p-2">
+        <p className="mb-1 text-xs font-bold text-cm-greenDark">
+          {label}實時班次
+          {departures.fetchedAt ? (
+            <span className="ml-2 font-normal text-cm-muted">更新於 {departures.fetchedAt}</span>
+          ) : null}
+        </p>
+        {departures.error ? (
+          <p className="text-xs text-cm-muted">{departures.error}</p>
+        ) : departures.entries.length === 0 ? (
+          <p className="text-xs text-cm-muted">暫時沒有即將到站的班次</p>
+        ) : (
+          <ul className="space-y-1">
+            {departures.entries.map((entry) => (
+              <li
+                className="flex items-center justify-between gap-2 text-xs"
+                key={`${departures.stopId}-${entry.route}-${entry.dest}`}
+              >
+                <span className="font-extrabold text-cm-greenDark">{entry.route}</span>
+                <span className="flex-1 truncate text-cm-muted">{entry.dest}</span>
+                <span className="font-bold text-cm-ink">
+                  {entry.minutes.map((m) => (m <= 0 ? '即將到站' : `${m} 分`)).join(' · ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -157,6 +283,10 @@ export function LiveTransitSearch() {
                 {stop.name_tc} <span className="text-cm-muted">{stop.name_en}</span>
               </button>
             ))}
+            {selectedFrom && renderDepartures(fromDepartures, '起點')}
+            {etaLoading && !fromDepartures && selectedFrom && (
+              <p className="mt-1 text-xs text-cm-muted">載入實時班次中...</p>
+            )}
           </div>
           <div className="rounded-xl bg-white p-2">
             <p className="mb-1 text-xs font-bold text-cm-muted">目的地站點</p>
@@ -172,6 +302,10 @@ export function LiveTransitSearch() {
                 {stop.name_tc} <span className="text-cm-muted">{stop.name_en}</span>
               </button>
             ))}
+            {selectedTo && renderDepartures(toDepartures, '目的地')}
+            {etaLoading && !toDepartures && selectedTo && (
+              <p className="mt-1 text-xs text-cm-muted">載入實時班次中...</p>
+            )}
           </div>
         </div>
       )}

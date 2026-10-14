@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getCitybusEta,
   getCitybusRoutes,
+  getCitybusStopEta,
   getCitybusStops,
   getKmbEta,
   getKmbRoutes,
+  getKmbStopEta,
   getKmbStops,
 } from '../../../data/hkTransitApi';
 import { getRateLimiter } from '../../../lib/cloudflare';
@@ -42,11 +44,29 @@ export async function GET(request: NextRequest) {
   if ((stop && stop.length > 64) || (route && route.length > 32)) {
     return badRequest('stop or route is too long.');
   }
-  if (resource !== 'routes' && resource !== 'stops') {
-    return badRequest('resource must be routes or stops.');
+  if (resource !== 'routes' && resource !== 'stops' && resource !== 'stop-eta') {
+    return badRequest('resource must be routes, stops, or stop-eta.');
   }
 
   try {
+    if (resource === 'stop-eta') {
+      if (!stop) {
+        return badRequest('stop is required for resource=stop-eta.');
+      }
+      const data =
+        operator === 'KMB'
+          ? await getKmbStopEta(stop)
+          : await getCitybusStopEta(stop);
+      return NextResponse.json({
+        data,
+        meta: {
+          operator,
+          source: operator === 'KMB' ? 'KMB stop-eta API' : 'Citybus stop-eta API',
+          live: true,
+        },
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     if (stop && route) {
       const data =
         operator === 'KMB'
