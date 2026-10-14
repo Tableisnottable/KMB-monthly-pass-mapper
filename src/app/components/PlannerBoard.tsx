@@ -126,6 +126,7 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
   const [sortKey, setSortKey] = useState<SortKey>('all');
   const [selectedId, setSelectedId] = useState<string>(routes[0]?.id ?? '');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [navigating, setNavigating] = useState(false);
 
   const visibleRoutes = useMemo(() => {
     let list = [...routes];
@@ -148,9 +149,10 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
   const directions = selected
     ? buildDirections(selected, selected.walkTransferTimeMinutes)
     : [];
+  const navigationRoute = navigating ? selected : null;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(360px,1.12fr)]">
+    <div className="grid gap-5 pb-24 sm:pb-20 xl:grid-cols-[minmax(0,0.88fr)_minmax(360px,1.12fr)]">
       <section id="routes" className="space-y-4">
         <MonthlySavingsCounter savingPerTrip={passInsight?.savingThisTrip ?? 0} />
 
@@ -412,7 +414,9 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
                       className="rounded-full bg-cm-green px-5 py-2 text-sm font-extrabold text-white hover:bg-cm-greenDark"
                       onClick={(event) => {
                         event.stopPropagation();
+                        setSelectedId(route.id);
                         setExpandedId(null);
+                        setNavigating(true);
                       }}
                       type="button"
                     >
@@ -530,6 +534,151 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
           </div>
         </div>
       </aside>
+
+      {selected && (
+        <div className="fixed inset-x-3 bottom-20 z-40 sm:bottom-3 lg:inset-x-auto lg:right-[max(1.5rem,calc((100vw-80rem)/2))] lg:max-w-md">
+          <div className="flex items-center justify-between gap-3 rounded-3xl bg-cm-ink px-4 py-3 text-white shadow-pop">
+            <button
+              className="min-w-0 flex-1 text-left"
+              onClick={() => setNavigating(true)}
+              type="button"
+            >
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+                {selected.id === routes[0]?.id ? '推薦路線' : '所選路線'}
+              </div>
+              <div className="mt-0.5 flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold leading-none">
+                  {totalMinutes(selected)}
+                </span>
+                <span className="text-xs font-bold text-white/60">min</span>
+                <span className="text-sm font-bold text-cm-green">
+                  HK$ {selected.discountedFare.toFixed(1)}
+                </span>
+              </div>
+            </button>
+            <button
+              className="shrink-0 rounded-full bg-cm-green px-5 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-cm-greenDark"
+              onClick={() => setNavigating(true)}
+              type="button"
+            >
+              出發
+            </button>
+          </div>
+        </div>
+      )}
+
+      {navigationRoute && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-cm-paper">
+          <header className="flex items-center gap-3 border-b border-cm-line bg-cm-ink px-4 py-3 text-white">
+            <button
+              aria-label="結束導航"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg hover:bg-white/20"
+              onClick={() => setNavigating(false)}
+              type="button"
+            >
+              ✕
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+                導航中
+              </div>
+              <div className="truncate text-sm font-extrabold">
+                {navigationRoute.legs[0]?.originStop?.name ?? '起點'} →{' '}
+                {navigationRoute.legs[navigationRoute.legs.length - 1]?.destinationStop?.name ?? '目的地'}
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="text-xl font-extrabold leading-none">
+                {formatDuration(totalMinutes(navigationRoute))}
+              </div>
+              <div className="text-[10px] font-bold text-cm-green">
+                HK$ {navigationRoute.discountedFare.toFixed(2)}
+              </div>
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <ol className="mx-auto max-w-xl space-y-2.5">
+              {buildDirections(navigationRoute, navigationRoute.walkTransferTimeMinutes).map(
+                (step, index, all) => (
+                  <li
+                    className={`flex gap-3 rounded-2xl p-4 shadow-card ring-1 ${
+                      index === 0 ? 'bg-cm-ink text-white ring-cm-ink' : 'bg-white ring-cm-line'
+                    }`}
+                    key={step.key}
+                  >
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm"
+                      style={{
+                        backgroundColor: index === 0 ? '#00d563' : step.color,
+                        color: '#ffffff',
+                      }}
+                    >
+                      {step.kind === 'ride' ? index : step.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`text-sm font-extrabold ${
+                          index === 0 ? 'text-white' : 'text-cm-ink'
+                        }`}
+                      >
+                        {step.title}
+                      </div>
+                      <div
+                        className={`mt-1 text-xs font-semibold ${
+                          index === 0 ? 'text-white/70' : 'text-cm-muted'
+                        }`}
+                      >
+                        {step.detail}
+                      </div>
+                    </div>
+                    {index === 0 && (
+                      <span className="shrink-0 self-center rounded-full bg-cm-green px-2.5 py-1 text-[10px] font-extrabold text-white">
+                        現在
+                      </span>
+                    )}
+                    {index === all.length - 1 && (
+                      <span className="shrink-0 self-center rounded-full bg-cm-ink/10 px-2.5 py-1 text-[10px] font-extrabold text-cm-ink">
+                        終點
+                      </span>
+                    )}
+                  </li>
+                ),
+              )}
+            </ol>
+
+            <div className="mx-auto mt-4 max-w-xl rounded-2xl bg-white p-4 shadow-card ring-1 ring-cm-line">
+              <div className="flex items-center justify-between text-xs font-bold text-cm-muted">
+                <span>行程摘要</span>
+                <span>
+                  {navigationRoute.transferCount} 次轉乘 · 步行{' '}
+                  {navigationRoute.walkTransferTimeMinutes} 分鐘
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {navigationRoute.legs.map((leg) => (
+                  <span
+                    className={`cm-pill ${operatorPillClasses[leg.operator] ?? 'bg-slate-500 text-white'}`}
+                    key={leg.id}
+                  >
+                    {leg.routeNumber}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <footer className="border-t border-cm-line bg-white px-4 py-3">
+            <button
+              className="mx-auto block w-full max-w-xl rounded-2xl bg-cm-ink py-3 text-sm font-extrabold text-white transition hover:bg-black"
+              onClick={() => setNavigating(false)}
+              type="button"
+            >
+              結束導航
+            </button>
+          </footer>
+        </div>
+      )}
     </div>
   );
 }
