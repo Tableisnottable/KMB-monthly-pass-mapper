@@ -57,7 +57,7 @@ function modeName(leg: Segment): string {
 function nextDepartures(
   leg: Segment,
   now: Date,
-  count = 4,
+  count = 5,
 ): { time: string; isLive: boolean }[] {
   const headway = leg.scheduledIntervalMinutes ?? 12;
   const baseMinutes = leg.realtimeEta?.isLive
