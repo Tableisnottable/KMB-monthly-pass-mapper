@@ -130,7 +130,7 @@ function buildDirections(route: ScoredRoute, transferWalkMinutes: number): Direc
       title: `乘搭 ${leg.routeNumber}（${modeName(leg)}）`,
       detail: `${leg.originStop?.name ?? '上車站'} → ${leg.destinationStop?.name ?? '下車站'} · ${leg.journeyTimeMinutes ?? 0} 分鐘${
         leg.realtimeEta ? ` · ${leg.realtimeEta.etaMinutes} 分到站` : ` · 每 ${leg.scheduledIntervalMinutes} 分一班`
-      } · 班次 ${nextDepartures(leg, DEMO_NOW)
+      } · ${leg.realtimeEta ? '實時班次' : '班表班次'} ${nextDepartures(leg, DEMO_NOW)
         .map((d) => d.time)
         .join(' / ')}`,
       color: legColor(leg.operator),
@@ -378,15 +378,21 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
                                   className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums ${
                                     dep.isLive
                                       ? 'bg-cm-green text-white'
-                                      : 'bg-cm-paper text-cm-ink ring-1 ring-cm-line'
+                                      : 'border border-dashed border-amber-500 bg-amber-50 text-amber-800'
                                   }`}
                                   key={`${leg.id}-dep-${i}`}
                                 >
                                   {dep.time}
                                 </span>
                               ))}
-                              <span className="text-[9px] font-bold uppercase tracking-wide text-cm-muted">
-                                {leg.realtimeEta ? '實時' : '預計'}
+                              <span
+                                className={`rounded px-1 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${
+                                  leg.realtimeEta
+                                    ? 'bg-cm-green/10 text-cm-greenDark'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {leg.realtimeEta ? '實時' : '班表'}
                               </span>
                             </div>
                           </div>
