@@ -10,7 +10,8 @@ import { RouteMinimap } from './RouteMinimap';
 
 type SortKey = 'all' | 'bus' | 'rail' | 'fastest' | 'cheapest';
 
-// Demo "now" matching the demo route ETAs (18:25 HKT)
+// Default departure "now" — the demo routes use a fixed timestamp for
+// reproducible ETAs; real journey results carry their own live ETA minutes.
 const DEMO_NOW = new Date('2026-09-13T18:25:00+08:00');
 
 const SORT_CHIPS: { key: SortKey; label: string }[] = [
@@ -130,7 +131,7 @@ function buildDirections(route: ScoredRoute, transferWalkMinutes: number): Direc
       title: `乘搭 ${leg.routeNumber}（${modeName(leg)}）`,
       detail: `${leg.originStop?.name ?? '上車站'} → ${leg.destinationStop?.name ?? '下車站'} · ${leg.journeyTimeMinutes ?? 0} 分鐘${
         leg.realtimeEta ? ` · ${leg.realtimeEta.etaMinutes} 分到站` : ` · 每 ${leg.scheduledIntervalMinutes} 分一班`
-      } · ${leg.realtimeEta ? '實時班次' : '班表班次'} ${nextDepartures(leg, DEMO_NOW)
+      } · ${leg.realtimeEta ? '實時班次' : '班表班次'} ${nextDepartures(leg, new Date())
         .map((d) => d.time)
         .join(' / ')}`,
       color: legColor(leg.operator),
@@ -389,7 +390,7 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
                               )}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              {nextDepartures(leg, DEMO_NOW).map((dep, i) => (
+                              {nextDepartures(leg, new Date()).map((dep, i) => (
                                 <span
                                   className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums ${
                                     dep.isLive

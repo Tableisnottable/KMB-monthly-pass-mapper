@@ -222,7 +222,9 @@ export async function GET(request: NextRequest) {
                     isLive: true,
                     source: 'DATAGOVHK',
                   },
-            fare: 0,
+            // KMB urban flat fare estimate (adult Octopus). Actual fare
+            // depends on route/distance; kept as a stable estimate.
+            fare: 6.8,
           },
         ],
       });
