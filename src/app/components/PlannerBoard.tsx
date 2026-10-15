@@ -162,7 +162,7 @@ function buildDirections(route: ScoredRoute, transferWalkMinutes: number): Direc
   return steps;
 }
 
-export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
+export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emptyHint?: string }) {
   const [sortKey, setSortKey] = useState<SortKey>('all');
   const [selectedId, setSelectedId] = useState<string>(routes[0]?.id ?? '');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -203,10 +203,14 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
       <section id="routes" className="space-y-4">
         {routes.length === 0 ? (
           <div className="rounded-3xl bg-white p-6 text-center shadow-card ring-1 ring-cm-line">
-            <p className="text-lg font-extrabold text-cm-ink">找不到直達路線</p>
-            <p className="mt-2 text-sm text-cm-muted">
-              這兩個地點之間沒有一程直達的九巴路線。試試選擇較近主要道路的地點，或使用上方的官方交通搜尋查看轉乘組合。
-            </p>
+            <p className="text-lg font-extrabold text-cm-ink">{
+              emptyHint ?? '找不到直達路線'
+            }</p>
+            {!emptyHint && (
+              <p className="mt-2 text-sm text-cm-muted">
+                這兩個地點之間沒有一程直達的九巴路線。試試選擇較近主要道路的地點，或使用上方的官方交通搜尋查看轉乘組合。
+              </p>
+            )}
           </div>
         ) : (
           <>

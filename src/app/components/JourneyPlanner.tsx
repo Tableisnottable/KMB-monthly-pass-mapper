@@ -82,7 +82,7 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
           )}
         </div>
       )}
-      <PlannerBoard routes={routes} />
+      <PlannerBoard routes={routes} emptyHint="輸入起點和目的地，搜尋真實巴士路線。" />
     </>
   );
 }
