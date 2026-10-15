@@ -1,145 +1,9 @@
-import { scoreRoutes, type RouteOption, type TransitLeg } from '../engine/UpgradedScoringEngine';
 import { getTrafficSourceCatalog } from '../data/hkTrafficSources';
 import { GoogleMapPanel } from './components/GoogleMapPanel';
 import { LiveTransitSearch } from './components/LiveTransitSearch';
 import { LocateButton } from './components/LocateButton';
 import { JourneyPlanner } from './components/JourneyPlanner';
 
-const DEMO_AS_OF = new Date('2026-09-13T18:25:00+08:00');
-
-const stop = (
-  id: string,
-  name: string,
-  lat: number,
-  lng: number,
-): { id: string; name: string; lat: number; lng: number } => ({
-  id,
-  name,
-  lat,
-  lng,
-});
-
-const makeLeg = (
-  id: string,
-  operator: RouteOption['legs'][number]['operator'],
-  mode: RouteOption['legs'][number]['mode'],
-  routeNumber: string,
-  from: { id: string; name: string; lat: number; lng: number },
-  to: { id: string; name: string; lat: number; lng: number },
-  journeyTimeMinutes: number,
-  scheduledIntervalMinutes: number,
-  fare: number,
-  eta: number | null,
-): TransitLeg => ({
-  id,
-  operator,
-  mode,
-  routeNumber,
-  originStop: from,
-  destinationStop: to,
-  journeyTimeMinutes,
-  scheduledIntervalMinutes,
-  realtimeEta:
-    eta === null
-      ? null
-      : {
-          etaMinutes: eta,
-          dataTime: DEMO_AS_OF.toISOString(),
-          isLive: true,
-          source: 'DATAGOVHK',
-        },
-  fare,
-});
-
-const routes: RouteOption[] = [
-  {
-    id: 'route-best',
-    walkTransferTimeMinutes: 4,
-    transferCount: 1,
-    legs: [
-      makeLeg(
-        'leg-1',
-        'KMB',
-        'BUS',
-        '5',
-        stop('s1', 'Jordan', 22.3044, 114.1718),
-        stop('s2', 'Central', 22.2819, 114.1581),
-        18,
-        9,
-        18.5,
-        7,
-      ),
-      makeLeg(
-        'leg-2',
-        'MTR',
-        'SUBWAY',
-        'Island Line',
-        stop('s3', 'Central', 22.2819, 114.1581),
-        stop('s4', 'Tsim Sha Tsui', 22.2971, 114.1742),
-        13,
-        6,
-        20,
-        6,
-      ),
-    ],
-  },
-  {
-    id: 'route-faster',
-    walkTransferTimeMinutes: 2,
-    transferCount: 0,
-    legs: [
-      makeLeg(
-        'leg-3',
-        'MTR',
-        'SUBWAY',
-        'Tsuen Wan Line',
-        stop('s5', 'Jordan', 22.3044, 114.1718),
-        stop('s6', 'Tsim Sha Tsui', 22.2971, 114.1742),
-        27,
-        5,
-        22.5,
-        11,
-      ),
-    ],
-  },
-  {
-    id: 'route-cheap',
-    walkTransferTimeMinutes: 8,
-    transferCount: 2,
-    legs: [
-      makeLeg(
-        'leg-4',
-        'CTB',
-        'BUS',
-        '970',
-        stop('s7', 'Jordan', 22.3044, 114.1718),
-        stop('s8', 'Causeway Bay', 22.2795, 114.1839),
-        23,
-        12,
-        19.5,
-        10,
-      ),
-      makeLeg(
-        'leg-5',
-        'CTB',
-        'BUS',
-        '37A',
-        stop('s9', 'Causeway Bay', 22.2795, 114.1839),
-        stop('s10', 'Tsim Sha Tsui', 22.2971, 114.1742),
-        16,
-        10,
-        17,
-        null,
-      ),
-    ],
-  },
-];
-
-const scoredRoutes = scoreRoutes(routes, DEMO_AS_OF).sort(
-  (a, b) => a.finalScore - b.finalScore,
-);
-
-const bestRoute = scoredRoutes[0];
 const trafficSources = getTrafficSourceCatalog();
 
 export default function Home() {
@@ -207,7 +71,7 @@ export default function Home() {
           ))}
         </div>
 
-        <JourneyPlanner initialRoutes={scoredRoutes} />
+        <JourneyPlanner initialRoutes={[]} />
         </div>
 
       <footer className="mx-auto mt-6 max-w-7xl border-t border-cm-line px-4 py-6 text-xs text-cm-muted sm:px-6 lg:px-8">
