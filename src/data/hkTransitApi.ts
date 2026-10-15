@@ -130,6 +130,21 @@ export async function getKmbEta(stopId: string, route: string) {
   return payload.data;
 }
 
+export interface KmbRouteStopRecord {
+  route: string;
+  bound: string;
+  service_type: string;
+  seq: string;
+  stop: string;
+}
+
+export async function getKmbRouteStops(route: string, bound: 'inbound' | 'outbound', serviceType = '1') {
+  const payload = await fetchJson<{ data: KmbRouteStopRecord[] }>(
+    `${HK_TRANSIT_API.kmb}/route-stop/${encodeURIComponent(route)}/${bound}/${encodeURIComponent(serviceType)}`,
+  );
+  return payload.data;
+}
+
 export async function getKmbStopEta(stopId: string) {
   const payload = await fetchJson<{ data: KmbStopEtaRecord[] }>(
     `${HK_TRANSIT_API.kmb}/stop-eta/${encodeURIComponent(stopId)}`,

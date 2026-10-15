@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { PlaceAutocomplete, type PlaceResult } from './PlaceAutocomplete';
 
-export function JourneyPlaceSearch() {
+export function JourneyPlaceSearch({
+  onSearch,
+  searching = false,
+}: {
+  onSearch?: (origin: PlaceResult, destination: PlaceResult) => void;
+  searching?: boolean;
+}) {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [originPlace, setOriginPlace] = useState<PlaceResult | null>(null);
@@ -15,6 +21,8 @@ export function JourneyPlaceSearch() {
     setOriginPlace(destinationPlace);
     setDestinationPlace(originPlace);
   }
+
+  const canSearch = originPlace !== null && destinationPlace !== null && !searching;
 
   return (
     <section className="mb-5 rounded-3xl bg-white p-4 shadow-card ring-1 ring-cm-line">
@@ -54,12 +62,16 @@ export function JourneyPlaceSearch() {
           onSelect={setDestinationPlace}
           value={destination}
         />
-        <a
-          className="rounded-2xl bg-cm-green px-6 py-3 text-center text-sm font-extrabold text-white transition hover:bg-cm-greenDark"
-          href="#live-search"
+        <button
+          className="rounded-2xl bg-cm-green px-6 py-3 text-center text-sm font-extrabold text-white transition hover:bg-cm-greenDark disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canSearch}
+          onClick={() => {
+            if (originPlace && destinationPlace) onSearch?.(originPlace, destinationPlace);
+          }}
+          type="button"
         >
-          搜尋
-        </a>
+          {searching ? '搜尋中…' : '搜尋'}
+        </button>
       </div>
       {(originPlace || destinationPlace) && (
         <p className="mt-3 text-xs text-cm-muted">

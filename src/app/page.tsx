@@ -2,9 +2,8 @@ import { scoreRoutes, type RouteOption, type TransitLeg } from '../engine/Upgrad
 import { getTrafficSourceCatalog } from '../data/hkTrafficSources';
 import { GoogleMapPanel } from './components/GoogleMapPanel';
 import { LiveTransitSearch } from './components/LiveTransitSearch';
-import { JourneyPlaceSearch } from './components/JourneyPlaceSearch';
 import { LocateButton } from './components/LocateButton';
-import { PlannerBoard } from './components/PlannerBoard';
+import { JourneyPlanner } from './components/JourneyPlanner';
 
 const DEMO_AS_OF = new Date('2026-09-13T18:25:00+08:00');
 
@@ -177,7 +176,6 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-3 py-3 sm:px-6 lg:px-8">
         <div className="grid gap-3 lg:grid-cols-[minmax(380px,0.86fr)_minmax(0,1.14fr)] lg:items-start">
           <div className="space-y-3">
-            <JourneyPlaceSearch />
             <section id="live-search" className="cm-card p-3">
               <LiveTransitSearch />
             </section>
@@ -209,7 +207,7 @@ export default function Home() {
           ))}
         </div>
 
-        <PlannerBoard routes={scoredRoutes} />
+        <JourneyPlanner initialRoutes={scoredRoutes} />
         </div>
 
       <footer className="mx-auto mt-6 max-w-7xl border-t border-cm-line px-4 py-6 text-xs text-cm-muted sm:px-6 lg:px-8">

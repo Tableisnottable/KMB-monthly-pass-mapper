@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ScoredRoute, Segment, TransitLeg } from '../../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight } from '../../domain/monthlyPass';
 import { getAlertsForRoutes } from '../../data/trafficAlerts';
@@ -182,6 +182,13 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
   }, [routes, sortKey]);
 
   const rankedIds = useMemo(() => routes.map((route) => route.id), [routes]);
+
+  useEffect(() => {
+    setSelectedId(routes[0]?.id ?? '');
+    setExpandedId(null);
+    setNavigating(false);
+  }, [routes]);
+
   const selected =
     routes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? routes[0];
   const passInsight = selected ? getMonthlyPassInsight(selected) : null;
@@ -193,7 +200,16 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
   return (
     <div className="grid gap-5 pb-24 sm:pb-20 xl:grid-cols-[minmax(0,0.88fr)_minmax(360px,1.12fr)]">
       <section id="routes" className="space-y-4">
-        <MonthlySavingsCounter savingPerTrip={passInsight?.savingThisTrip ?? 0} />
+        {routes.length === 0 ? (
+          <div className="rounded-3xl bg-white p-6 text-center shadow-card ring-1 ring-cm-line">
+            <p className="text-lg font-extrabold text-cm-ink">找不到直達路線</p>
+            <p className="mt-2 text-sm text-cm-muted">
+              這兩個地點之間沒有一程直達的九巴路線。試試選擇較近主要道路的地點，或使用上方的官方交通搜尋查看轉乘組合。
+            </p>
+          </div>
+        ) : (
+          <>
+            <MonthlySavingsCounter savingPerTrip={passInsight?.savingThisTrip ?? 0} />
 
         {selected && passInsight && (
           <div className="rounded-3xl bg-gradient-to-br from-cm-green to-cm-greenDeep p-5 text-white shadow-card">
@@ -517,6 +533,8 @@ export function PlannerBoard({ routes }: { routes: ScoredRoute[] }) {
             </article>
           );
         })}
+          </>
+        )}
       </section>
 
       <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
