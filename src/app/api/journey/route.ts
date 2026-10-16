@@ -54,6 +54,25 @@ function etaMinutes(eta: string | null): number | null {
   return minutes < 0 ? 0 : minutes;
 }
 
+// Average urban bus speed in km/min used to estimate in-vehicle time
+// from the straight-line distance between boarding and alighting stops.
+const BUS_SPEED_KM_MIN = 0.3; // ~18 km/h including stops and traffic
+
+function estimateRideMinutes(
+  from: TransitStopRecord,
+  to: TransitStopRecord,
+): number {
+  const km = haversineKm(
+    Number(from.lat),
+    Number(from.long),
+    Number(to.lat),
+    Number(to.long),
+  );
+  // Straight-line distance underestimates road distance; apply a 1.35
+  // winding factor, then convert to minutes at bus speed.
+  return Math.max(4, Math.round((km * 1.35) / BUS_SPEED_KM_MIN));
+}
+
 export async function GET(request: NextRequest) {
   const ipAddress =
     request.headers.get('cf-connecting-ip') ??
@@ -211,7 +230,7 @@ export async function GET(request: NextRequest) {
               lat: Number(candidate.toStop.lat),
               lng: Number(candidate.toStop.long),
             },
-            journeyTimeMinutes: 20,
+            journeyTimeMinutes: estimateRideMinutes(candidate.fromStop, candidate.toStop),
             scheduledIntervalMinutes: 10,
             realtimeEta:
               firstEta === null
