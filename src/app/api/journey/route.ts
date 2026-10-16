@@ -73,6 +73,23 @@ function estimateRideMinutes(
   return Math.max(4, Math.round((km * 1.35) / BUS_SPEED_KM_MIN));
 }
 
+// KMB urban fare estimate by distance (adult Octopus). Actual fares vary
+// by route and distance band; this approximates the official fare table.
+function estimateFare(from: TransitStopRecord, to: TransitStopRecord): number {
+  const km = haversineKm(
+    Number(from.lat),
+    Number(from.long),
+    Number(to.lat),
+    Number(to.long),
+  );
+  const roadKm = km * 1.35;
+  if (roadKm <= 3.5) return 5.8; // short urban
+  if (roadKm <= 7) return 6.8; // mid urban
+  if (roadKm <= 12) return 8.7; // cross-district
+  if (roadKm <= 20) return 12.5; // long haul
+  return 15.5; // inter-district / new territories
+}
+
 export async function GET(request: NextRequest) {
   const ipAddress =
     request.headers.get('cf-connecting-ip') ??
@@ -254,9 +271,8 @@ export async function GET(request: NextRequest) {
                     isLive: true,
                     source: 'DATAGOVHK',
                   },
-            // KMB urban flat fare estimate (adult Octopus). Actual fare
-            // depends on route/distance; kept as a stable estimate.
-            fare: 6.8,
+            // KMB distance-based fare estimate (adult Octopus).
+            fare: estimateFare(candidate.fromStop, candidate.toStop),
           },
         ],
       });
