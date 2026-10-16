@@ -199,12 +199,25 @@ export async function GET(request: NextRequest) {
     const journeyRoutes: Route[] = [];
     for (const candidate of candidates.slice(0, MAX_RESULTS * 2)) {
       let firstEta: number | null = null;
+      let headway = 10; // default scheduled interval (minutes)
       try {
         const etas = await getKmbStopEta(candidate.fromStop.stop);
-        const match = etas.find(
-          (e) => e.route === candidate.route && e.eta,
-        );
-        firstEta = etaMinutes(match?.eta ?? null);
+        const routeEtas = etas
+          .filter((e) => e.route === candidate.route && e.eta)
+          .map((e) => etaMinutes(e.eta))
+          .filter((m): m is number => m !== null)
+          .sort((a, b) => a - b);
+        if (routeEtas.length > 0) {
+          firstEta = routeEtas[0];
+        }
+        // Derive headway from consecutive ETAs when at least two are known.
+        if (routeEtas.length >= 2) {
+          const gaps = routeEtas.slice(1).map((m, i) => m - routeEtas[i]);
+          const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+          if (avgGap >= 1 && avgGap <= 60) {
+            headway = Math.round(avgGap);
+          }
+        }
       } catch {
         firstEta = null;
       }
@@ -231,7 +244,7 @@ export async function GET(request: NextRequest) {
               lng: Number(candidate.toStop.long),
             },
             journeyTimeMinutes: estimateRideMinutes(candidate.fromStop, candidate.toStop),
-            scheduledIntervalMinutes: 10,
+            scheduledIntervalMinutes: headway,
             realtimeEta:
               firstEta === null
                 ? null
