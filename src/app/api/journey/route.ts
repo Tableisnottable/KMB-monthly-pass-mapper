@@ -212,6 +212,247 @@ export async function GET(request: NextRequest) {
       await scanFromStops(wideFromStops);
     }
 
+    // Transfer routes: when direct options are limited, find one-transfer
+    // journeys via a common intermediate stop served by both an origin-side
+    // route and a destination-side route.
+    const transferCandidates: {
+      routeA: string;
+      boundA: string;
+      fromStop: TransitStopRecord;
+      transferStop: TransitStopRecord;
+      routeB: string;
+      boundB: string;
+      toStop: TransitStopRecord;
+      fromWalk: number;
+      toWalk: number;
+    }[] = [];
+
+    if (candidates.length < MAX_RESULTS) {
+      const MAX_TRANSFER_ROUTES = 8;
+      // Routes serving origin stops (from stop-eta).
+      const originRoutes = new Map<string, Set<string>>(); // stopId -> routes
+      for (const entry of fromStops) {
+        try {
+          const etas = await getKmbStopEta(entry.stop.stop);
+          const rs = new Set(etas.map((e) => e.route));
+          if (rs.size > 0) originRoutes.set(entry.stop.stop, rs);
+        } catch {
+          continue;
+        }
+      }
+      // Routes serving destination stops: use stop-eta for each nearby
+      // destination stop (same approach as origin side).
+      const destRoutes = new Map<string, Set<string>>();
+      for (const entry of toStops.slice(0, 8)) {
+        try {
+          const etas = await getKmbStopEta(entry.stop.stop);
+          const rs = new Set(etas.map((e) => e.route));
+          if (rs.size > 0) destRoutes.set(entry.stop.stop, rs);
+        } catch {
+          continue;
+        }
+      }
+
+      // Build stop->routes index for origin-side routes (via route-stop).
+      // Store BOTH bounds so transfer search can find the right direction.
+      const originRouteStops = new Map<string, Map<string, number>>(); // route|bound -> stop->seq
+      let scanned = 0;
+      for (const [stopId, rs] of Array.from(originRoutes)) {
+        for (const route of Array.from(rs)) {
+          if (scanned >= MAX_TRANSFER_ROUTES * 2) break;
+          for (const bound of ['outbound', 'inbound'] as const) {
+            const key = `${route}|${bound}`;
+            if (originRouteStops.has(key)) continue;
+            try {
+              const rows = await getKmbRouteStops(route, bound, '1');
+              if (!rows || rows.length === 0) continue;
+              const m = new Map<string, number>();
+              rows.forEach((row, i) => {
+                if (!m.has(row.stop)) m.set(row.stop, i);
+              });
+              originRouteStops.set(key, m);
+              scanned++;
+            } catch {
+              continue;
+            }
+          }
+        }
+        if (scanned >= MAX_TRANSFER_ROUTES * 2) break;
+      }
+
+      // Find transfer points: stops on an origin route that are also on a
+      // destination route.
+      // Find transfer points: stops on an origin route that are also on a
+      // destination route. Pre-fetch destination route stop sequences once.
+      const destRouteStops = new Map<string, Map<string, number>>(); // route|bound -> stop->seq
+      let destScanned = 0;
+      for (const [destStopId, destRs] of Array.from(destRoutes)) {
+        for (const routeB of Array.from(destRs)) {
+          if (destScanned >= MAX_TRANSFER_ROUTES * 16) break;
+          for (const boundB of ['outbound', 'inbound'] as const) {
+            const keyB = `${routeB}|${boundB}`;
+            if (destRouteStops.has(keyB)) continue;
+            try {
+              const rowsB = await getKmbRouteStops(routeB, boundB, '1');
+              if (!rowsB || rowsB.length === 0) continue;
+              const m = new Map<string, number>();
+              rowsB.forEach((row, i) => {
+                if (!m.has(row.stop)) m.set(row.stop, i);
+              });
+              destRouteStops.set(keyB, m);
+              destScanned++;
+            } catch {
+              continue;
+            }
+          }
+        }
+        if (destScanned >= MAX_TRANSFER_ROUTES * 16) break;
+      }
+
+      // Build a global stop->routes index for destination routes so we can
+      // find transfer points that are common to both sides.
+      const destStopIndex = new Map<string, string[]>(); // stopId -> route|bound[]
+      for (const [keyB, seqB] of Array.from(destRouteStops)) {
+        for (const stopId of Array.from(seqB.keys())) {
+          const arr = destStopIndex.get(stopId) ?? [];
+          arr.push(keyB);
+          destStopIndex.set(stopId, arr);
+        }
+      }
+      const seq113Out = destRouteStops.get('113|outbound');
+      const seq948In = destRouteStops.get('948|inbound');
+      for (const transferId of ['F851B0B122F38CCC', '1E58DF8CAD59712E', 'FD45CEE7D2E4A9BF']) {
+        const keys = destStopIndex.get(transferId) ?? [];
+      }
+      for (const transferId of ['D446D1EA79502BF2']) {
+        const keys = destStopIndex.get(transferId) ?? [];
+      }
+      const seq936In = destRouteStops.get('936|inbound');
+      const seq936AIn = destRouteStops.get('936A|inbound');
+      const seq948In2 = destRouteStops.get('948|inbound');
+      const seq601PIn = destRouteStops.get('601P|inbound');
+      const seq948In3 = destRouteStops.get('948|inbound');
+      for (const transferId of ['221A18C37331E6FD', '3C50188583DABFC8']) {
+        const keys = destStopIndex.get(transferId) ?? [];
+      }
+      const seq111PIn = destRouteStops.get('111P|inbound');
+      const seq111In = destRouteStops.get('111|inbound');
+      const seq101In = destRouteStops.get('101|inbound');
+      const seqN121In = destRouteStops.get('N121|inbound');
+      const seq104In = destRouteStops.get('104|inbound');
+
+      // Also index origin-side stops so we can find routes serving them.
+      const originStopIndex = new Map<string, string[]>(); // stopId -> route|bound[]
+      for (const [key, seq] of Array.from(originRouteStops)) {
+        for (const stopId of Array.from(seq.keys())) {
+          const arr = originStopIndex.get(stopId) ?? [];
+          arr.push(key);
+          originStopIndex.set(stopId, arr);
+        }
+      }
+
+      const seenTransfers = new Set<string>();
+      // Find transfer points: stops served by both an origin-side route and
+      // a destination-side route.
+      const commonStops = new Set<string>();
+      for (const stopId of Array.from(originStopIndex.keys())) {
+        if (destStopIndex.has(stopId)) commonStops.add(stopId);
+      }
+      for (const stopId of Array.from(commonStops)) {
+        const oKeys = originStopIndex.get(stopId) ?? [];
+        const dKeys = destStopIndex.get(stopId) ?? [];
+      }
+      for (const [key, seq] of Array.from(originRouteStops)) {
+        let fromStop: TransitStopRecord | null = null;
+        let fromIdx = Number.POSITIVE_INFINITY;
+        for (const entry of fromStops) {
+          const idx = seq.get(entry.stop.stop);
+          if (idx !== undefined && idx < fromIdx) {
+            fromIdx = idx;
+            fromStop = entry.stop;
+          }
+        }
+        // Count how many stops on this route are in destStopIndex
+        let destOverlap = 0;
+        for (const stopId of Array.from(seq.keys())) {
+          if (destStopIndex.has(stopId)) destOverlap++;
+        }
+      }
+
+      for (const transferId of Array.from(commonStops)) {
+        if (transferCandidates.length >= MAX_CANDIDATE_ROUTES) break;
+        const originKeys = originStopIndex.get(transferId) ?? [];
+        const destKeys = destStopIndex.get(transferId) ?? [];
+        for (const key of originKeys) {
+          if (transferCandidates.length >= MAX_CANDIDATE_ROUTES) break;
+          const [routeA, boundA] = key.split('|');
+          const stopSeq = originRouteStops.get(key);
+          if (!stopSeq) continue;
+          // Boarding stop on routeA before transfer.
+          let fromStop: TransitStopRecord | null = null;
+          let fromIdx = Number.POSITIVE_INFINITY;
+          for (const entry of fromStops) {
+            const idx = stopSeq.get(entry.stop.stop);
+            if (idx !== undefined && idx < fromIdx) {
+              fromIdx = idx;
+              fromStop = entry.stop;
+            }
+          }
+          if (!fromStop) {
+            continue;
+          }
+          const transferIdx = stopSeq.get(transferId);
+          if (transferIdx === undefined || transferIdx <= fromIdx) {
+            continue;
+          }
+
+          for (const keyB of destKeys) {
+            if (transferCandidates.length >= MAX_CANDIDATE_ROUTES) break;
+            const [routeB, boundB] = keyB.split('|');
+            if (routeB === routeA) continue;
+            const seqB = destRouteStops.get(keyB);
+            if (!seqB) {
+              continue;
+            }
+            const tIdxB = seqB.get(transferId);
+            if (tIdxB === undefined) {
+              continue;
+            }
+            // Destination stop on routeB after transfer.
+            let destStop: TransitStopRecord | null = null;
+            let destIdx = Number.POSITIVE_INFINITY;
+            for (const entry of toStops) {
+              const idx = seqB.get(entry.stop.stop);
+              if (idx !== undefined && idx > tIdxB && idx < destIdx) {
+                destIdx = idx;
+                destStop = entry.stop;
+              }
+            }
+            if (!destStop) {
+              continue;
+            }
+            const transferStop = stops.find((s) => s.stop === transferId);
+            if (!transferStop) continue;
+            const pairKey = `${routeA}|${transferId}|${routeB}|${destStop.stop}`;
+            if (seenTransfers.has(pairKey)) continue;
+            seenTransfers.add(pairKey);
+            transferCandidates.push({
+              routeA,
+              boundA,
+              fromStop,
+              transferStop,
+              routeB,
+              boundB,
+              toStop: destStop,
+              fromWalk: fromStops.find((e) => e.stop.stop === fromStop!.stop)?.walkMinutes ?? 0,
+              toWalk: toStops.find((e) => e.stop.stop === destStop.stop)?.walkMinutes ?? 0,
+            });
+            break; // one transfer per route pair is enough
+          }
+        }
+      }
+    }
+
     // Attach live ETA for the boarding stop of each candidate.
     const journeyRoutes: Route[] = [];
     for (const candidate of candidates.slice(0, MAX_RESULTS * 2)) {
@@ -279,6 +520,117 @@ export async function GET(request: NextRequest) {
     }
 
     const scored = scoreRoutes(journeyRoutes).slice(0, MAX_RESULTS);
+
+    // Build transfer (1-transfer) journey routes when direct results are few.
+    if (scored.length < MAX_RESULTS && transferCandidates.length > 0) {
+      const transferRoutes: Route[] = [];
+      for (const tc of transferCandidates.slice(0, MAX_RESULTS - scored.length)) {
+        let etaA: number | null = null;
+        let headwayA = 10;
+        try {
+          const etas = await getKmbStopEta(tc.fromStop.stop);
+          const routeEtas = etas
+            .filter((e) => e.route === tc.routeA && e.eta)
+            .map((e) => etaMinutes(e.eta))
+            .filter((m): m is number => m !== null)
+            .sort((a, b) => a - b);
+          if (routeEtas.length > 0) etaA = routeEtas[0];
+          if (routeEtas.length >= 2) {
+            const gaps = routeEtas.slice(1).map((m, i) => m - routeEtas[i]);
+            const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+            if (avg >= 1 && avg <= 60) headwayA = Math.round(avg);
+          }
+        } catch {
+          etaA = null;
+        }
+
+        const rideA = estimateRideMinutes(tc.fromStop, tc.transferStop);
+        const rideB = estimateRideMinutes(tc.transferStop, tc.toStop);
+        const transferWalk = 3; // assumed transfer walk at interchange
+
+        transferRoutes.push({
+          id: `journey-t-${tc.routeA}-${tc.routeB}-${tc.transferStop.stop}`,
+          walkTransferTimeMinutes: tc.fromWalk + tc.toWalk + transferWalk,
+          transferCount: 1,
+          legs: [
+            {
+              id: `leg-a-${tc.routeA}`,
+              operator: 'KMB',
+              mode: 'BUS',
+              routeNumber: tc.routeA,
+              originStop: {
+                id: tc.fromStop.stop,
+                name: tc.fromStop.name_tc || tc.fromStop.name_en,
+                lat: Number(tc.fromStop.lat),
+                lng: Number(tc.fromStop.long),
+              },
+              destinationStop: {
+                id: tc.transferStop.stop,
+                name: tc.transferStop.name_tc || tc.transferStop.name_en,
+                lat: Number(tc.transferStop.lat),
+                lng: Number(tc.transferStop.long),
+              },
+              journeyTimeMinutes: rideA,
+              scheduledIntervalMinutes: headwayA,
+              realtimeEta:
+                etaA === null
+                  ? null
+                  : { etaMinutes: etaA, dataTime: new Date().toISOString(), isLive: true, source: 'DATAGOVHK' },
+              fare: estimateFare(tc.fromStop, tc.transferStop),
+            },
+            {
+              id: `leg-b-${tc.routeB}`,
+              operator: 'KMB',
+              mode: 'BUS',
+              routeNumber: tc.routeB,
+              originStop: {
+                id: tc.transferStop.stop,
+                name: tc.transferStop.name_tc || tc.transferStop.name_en,
+                lat: Number(tc.transferStop.lat),
+                lng: Number(tc.transferStop.long),
+              },
+              destinationStop: {
+                id: tc.toStop.stop,
+                name: tc.toStop.name_tc || tc.toStop.name_en,
+                lat: Number(tc.toStop.lat),
+                lng: Number(tc.toStop.long),
+              },
+              journeyTimeMinutes: rideB,
+              scheduledIntervalMinutes: 10,
+              realtimeEta: null,
+              fare: estimateFare(tc.transferStop, tc.toStop),
+            },
+          ],
+        });
+      }
+      const scoredTransfers = scoreRoutes(transferRoutes);
+      const merged = [...scored, ...scoredTransfers]
+        .sort((a, b) => a.finalScore - b.finalScore)
+        .slice(0, MAX_RESULTS);
+      return NextResponse.json(
+        {
+          data: merged,
+          meta: {
+            source: 'KMB route/stop/ETA APIs',
+            live: true,
+            candidates: candidates.length,
+            transfers: transferCandidates.length,
+            fromStops: fromStops.map((s) => ({
+              stop: s.stop.stop,
+              name: s.stop.name_tc || s.stop.name_en,
+              walkMinutes: s.walkMinutes,
+            })),
+            toStops: toStops.map((s) => ({
+              stop: s.stop.stop,
+              name: s.stop.name_tc || s.stop.name_en,
+              walkMinutes: s.walkMinutes,
+            })),
+          },
+        },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     return NextResponse.json(
       {
         data: scored,
