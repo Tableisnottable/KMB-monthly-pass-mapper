@@ -217,3 +217,10 @@ export async function getCitybusRouteStops(route: string, dir: 'inbound' | 'outb
   );
   return payload.data;
 }
+
+export async function getCitybusStop(stopId: string) {
+  const payload = await fetchJson<{
+    data: { stop: string; name_tc: string; name_en: string; lat: string; long: string };
+  }>(`${HK_TRANSIT_API.citybus}/stop/${encodeURIComponent(stopId)}`);
+  return payload.data;
+}

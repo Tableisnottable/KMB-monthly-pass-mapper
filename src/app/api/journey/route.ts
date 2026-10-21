@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  getCitybusEta,
+  getCitybusRouteStops,
+  getCitybusRoutes,
+  getCitybusStop,
   getKmbRouteStops,
   getKmbStopEta,
   getKmbStops,
@@ -125,16 +129,127 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [, stops] = await Promise.all([Promise.resolve(), getKmbStops()]);
+    const [stops, citybusRoutes] = await Promise.all([
+      getKmbStops(),
+      getCitybusRoutes(),
+    ]);
     const fromStops = nearestStops(stops, fromLat, fromLon, NEARBY_STOP_LIMIT);
     // Destination stops use a wider radius: the alighting stop is often
     // further from the destination point than the boarding stop is from
-    // the origin (e.g. Central ferry piers vs the stop cluster).
+    // the origin.
     const toStops = nearestStops(stops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
-    // Candidate routes: for each nearby origin stop, ask the stop-eta API
-    // which routes serve it (1 call per stop), then confirm the route actually
-    // reaches a destination stop via route-stop (1 call per candidate route).
+    // Citybus has no bulk stop-list endpoint (returns an empty object), so
+    // derive nearby Citybus stops from cross-harbour route-stop sequences:
+    // collect stop IDs from a bounded set of routes, fetch their coordinates,
+    // then pick the nearest ones by geographic distance.
+    const CROSS_HARBOUR_ROUTES = ['101', '104', '111', '113', '170', '182', '970', '973'];
+    const citybusStopIds = new Set<string>();
+    const collectCitybusStopIds = async () => {
+      for (const routeNum of CROSS_HARBOUR_ROUTES) {
+        for (const bound of ['outbound', 'inbound'] as const) {
+          try {
+            const rows = await getCitybusRouteStops(routeNum, bound);
+            for (const row of rows) citybusStopIds.add(row.stop);
+            break;
+          } catch {
+            continue;
+          }
+        }
+      }
+    };
+    await collectCitybusStopIds();
+
+    const citybusStops: TransitStopRecord[] = [];
+    for (const stopId of Array.from(citybusStopIds).slice(0, 211)) {
+      try {
+        const data = await getCitybusStop(stopId);
+        if (data && data.stop) {
+          citybusStops.push({
+            stop: data.stop,
+            name_tc: data.name_tc,
+            name_en: data.name_en,
+            lat: Number(data.lat),
+            long: Number(data.long),
+          });
+        }
+      } catch {
+        continue;
+      }
+    }
+    const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
+    const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
+
+    const citybusCandidates: {
+      route: string;
+      bound: 'inbound' | 'outbound';
+      fromStop: TransitStopRecord;
+      toStop: TransitStopRecord;
+      fromWalk: number;
+      toWalk: number;
+    }[] = [];
+    const seenCitybus = new Set<string>();
+    const scanCitybusStops = async () => {
+      // For each cross-harbour route, find origin/destination stops in order
+      // using geographic distance from the origin/destination points.
+      let scanCount = 0;
+      for (const routeNum of CROSS_HARBOUR_ROUTES) {
+        if (citybusCandidates.length >= MAX_CANDIDATE_ROUTES) break;
+        for (const bound of ['outbound', 'inbound'] as const) {
+          try {
+            const rows = await getCitybusRouteStops(routeNum, bound);
+            scanCount++;
+            // Find origin stop (nearest to origin point).
+            let fromMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
+            for (const row of rows) {
+              const stop = citybusStops.find((s) => s.stop === row.stop);
+              if (!stop) continue;
+              const km = haversineKm(fromLat, fromLon, Number(stop.lat), Number(stop.long));
+              const walk = Math.round(km / WALK_KM_PER_MIN);
+              if (walk > MAX_WALK_MINUTES) continue;
+              const idx = rows.findIndex((r) => r.stop === row.stop);
+              if (!fromMatch || walk < fromMatch.walk) {
+                fromMatch = { entry: stop, index: idx, walk };
+              }
+            }
+            if (!fromMatch) continue;
+            // Find destination stop after origin.
+            let toMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
+            for (const row of rows) {
+              const idx = rows.findIndex((r) => r.stop === row.stop);
+              if (idx <= fromMatch.index) continue;
+              const stop = citybusStops.find((s) => s.stop === row.stop);
+              if (!stop) continue;
+              const km = haversineKm(toLat, toLon, Number(stop.lat), Number(stop.long));
+              const walk = Math.round(km / WALK_KM_PER_MIN);
+              if (walk > MAX_WALK_MINUTES) continue;
+              if (!toMatch || walk < toMatch.walk) {
+                toMatch = { entry: stop, index: idx, walk };
+              }
+            }
+            if (!toMatch) continue;
+            const key = `${routeNum}|${bound}|${fromMatch.entry.stop}|${toMatch.entry.stop}`;
+            if (seenCitybus.has(key)) continue;
+            seenCitybus.add(key);
+            citybusCandidates.push({
+              route: routeNum,
+              bound,
+              fromStop: fromMatch.entry,
+              toStop: toMatch.entry,
+              fromWalk: fromMatch.walk,
+              toWalk: toMatch.walk,
+            });
+            break;
+          } catch {
+            continue;
+          }
+        }
+      }
+    };
+    await scanCitybusStops();
+
+    const toIds = new Set(toStops.map((s) => s.stop.stop));
+    const toStopById = new Map(toStops.map((s) => [s.stop.stop, s]));
     const candidates: {
       route: string;
       bound: string;
@@ -145,9 +260,6 @@ export async function GET(request: NextRequest) {
       toWalk: number;
     }[] = [];
     const seenPairs = new Set<string>();
-
-    const toIds = new Set(toStops.map((s) => s.stop.stop));
-    const toStopById = new Map(toStops.map((s) => [s.stop.stop, s]));
 
     const scanFromStops = async (
       pool: { stop: TransitStopRecord; walkMinutes: number }[],
@@ -359,7 +471,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Attach live ETA for the boarding stop of each candidate.
+    // Build direct KMB journey routes.
     const journeyRoutes: Route[] = [];
     for (const candidate of candidates.slice(0, MAX_RESULTS * 2)) {
       let firstEta: number | null = null;
@@ -419,6 +531,50 @@ export async function GET(request: NextRequest) {
                     source: 'DATAGOVHK',
                   },
             // KMB distance-based fare estimate (adult Octopus).
+            fare: estimateFare(candidate.fromStop, candidate.toStop),
+          },
+        ],
+      });
+    }
+
+    // Build direct Citybus journey routes for cross-harbour coverage.
+    for (const candidate of citybusCandidates.slice(0, MAX_RESULTS * 2)) {
+      let firstEta: number | null = null;
+      try {
+        const etas = await getCitybusEta(candidate.fromStop.stop, candidate.route);
+        const match = etas.find((e) => e.eta);
+        firstEta = etaMinutes(match?.eta ?? null);
+      } catch {
+        firstEta = null;
+      }
+      journeyRoutes.push({
+        id: `journey-ctb-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
+        walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
+        transferCount: 0,
+        legs: [
+          {
+            id: `leg-ctb-${candidate.route}`,
+            operator: 'CTB',
+            mode: 'BUS',
+            routeNumber: candidate.route,
+            originStop: {
+              id: candidate.fromStop.stop,
+              name: candidate.fromStop.name_tc || candidate.fromStop.name_en,
+              lat: Number(candidate.fromStop.lat),
+              lng: Number(candidate.fromStop.long),
+            },
+            destinationStop: {
+              id: candidate.toStop.stop,
+              name: candidate.toStop.name_tc || candidate.toStop.name_en,
+              lat: Number(candidate.toStop.lat),
+              lng: Number(candidate.toStop.long),
+            },
+            journeyTimeMinutes: estimateRideMinutes(candidate.fromStop, candidate.toStop),
+            scheduledIntervalMinutes: 10,
+            realtimeEta:
+              firstEta === null
+                ? null
+                : { etaMinutes: firstEta, dataTime: new Date().toISOString(), isLive: true, source: 'DATAGOVHK' },
             fare: estimateFare(candidate.fromStop, candidate.toStop),
           },
         ],
