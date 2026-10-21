@@ -161,21 +161,33 @@ export async function GET(request: NextRequest) {
     await collectCitybusStopIds();
 
     const citybusStops: TransitStopRecord[] = [];
-    for (const stopId of Array.from(citybusStopIds).slice(0, 211)) {
-      try {
-        const data = await getCitybusStop(stopId);
-        if (data && data.stop) {
-          citybusStops.push({
-            stop: data.stop,
-            name_tc: data.name_tc,
-            name_en: data.name_en,
-            lat: Number(data.lat),
-            long: Number(data.long),
-          });
+    const stopIdList = Array.from(citybusStopIds);
+    const CONCURRENCY = 6;
+    for (let i = 0; i < stopIdList.length; i += CONCURRENCY) {
+      const batch = stopIdList.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map((stopId) => getCitybusStop(stopId)),
+      );
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value && result.value.stop) {
+          const data = result.value;
+          const lat = Number(data.lat);
+          const lng = Number(data.long);
+          // Only keep stops near origin or destination (within 8km).
+          const nearFrom = haversineKm(fromLat, fromLon, lat, lng) <= 8;
+          const nearTo = haversineKm(toLat, toLon, lat, lng) <= 8;
+          if (nearFrom || nearTo) {
+            citybusStops.push({
+              stop: data.stop,
+              name_tc: data.name_tc,
+              name_en: data.name_en,
+              lat,
+              long: lng,
+            });
+          }
         }
-      } catch {
-        continue;
       }
+      if (citybusStops.length >= 40) break;
     }
     const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
     const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
