@@ -175,22 +175,22 @@ export async function GET(request: NextRequest) {
     // derive nearby Citybus stops from cross-harbour route-stop sequences:
     // collect stop IDs from a bounded set of routes, fetch their coordinates,
     // then pick the nearest ones by geographic distance.
-    const CROSS_HARBOUR_ROUTES = ['101', '104', '111', '113', '170', '182', '970', '973'];
-    const citybusStopIds = new Set<string>();
-    const collectCitybusStopIds = async () => {
-      for (const routeNum of CROSS_HARBOUR_ROUTES) {
-        for (const bound of ['outbound', 'inbound'] as const) {
+    const CROSS_HARBOUR_ROUTES = ['970', '973', '101', '104', '111', '113', '170', '182'];
+    const citybusRouteRows = await Promise.all(
+      CROSS_HARBOUR_ROUTES.flatMap((routeNum) =>
+        (['outbound', 'inbound'] as const).map(async (bound) => {
           try {
-            const rows = await getCitybusRouteStops(routeNum, bound);
-            for (const row of rows) citybusStopIds.add(row.stop);
-            break;
+            return { routeNum, bound, rows: await getCitybusRouteStops(routeNum, bound) };
           } catch {
-            continue;
+            return { routeNum, bound, rows: [] };
           }
-        }
-      }
-    };
-    await collectCitybusStopIds();
+        }),
+      ),
+    );
+    const citybusStopIds = new Set<string>();
+    for (const result of citybusRouteRows) {
+      for (const row of result.rows) citybusStopIds.add(row.stop);
+    }
 
     const citybusStops: TransitStopRecord[] = [];
     const stopIdList = Array.from(citybusStopIds);
@@ -236,57 +236,45 @@ export async function GET(request: NextRequest) {
       // For each cross-harbour route, find origin/destination stops in order
       // using geographic distance from the origin/destination points.
       let scanCount = 0;
-      for (const routeNum of CROSS_HARBOUR_ROUTES) {
+      for (const result of citybusRouteRows) {
         if (citybusCandidates.length >= MAX_CANDIDATE_ROUTES) break;
-        for (const bound of ['outbound', 'inbound'] as const) {
-          try {
-            const rows = await getCitybusRouteStops(routeNum, bound);
-            scanCount++;
-            // Find origin stop (nearest to origin point).
-            let fromMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
-            for (const row of rows) {
-              const stop = citybusStops.find((s) => s.stop === row.stop);
-              if (!stop) continue;
-              const km = haversineKm(fromLat, fromLon, Number(stop.lat), Number(stop.long));
-              const walk = Math.round(km / WALK_KM_PER_MIN);
-              if (walk > MAX_WALK_MINUTES) continue;
-              const idx = rows.findIndex((r) => r.stop === row.stop);
-              if (!fromMatch || walk < fromMatch.walk) {
-                fromMatch = { entry: stop, index: idx, walk };
-              }
-            }
-            if (!fromMatch) continue;
-            // Find destination stop after origin.
-            let toMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
-            for (const row of rows) {
-              const idx = rows.findIndex((r) => r.stop === row.stop);
-              if (idx <= fromMatch.index) continue;
-              const stop = citybusStops.find((s) => s.stop === row.stop);
-              if (!stop) continue;
-              const km = haversineKm(toLat, toLon, Number(stop.lat), Number(stop.long));
-              const walk = Math.round(km / WALK_KM_PER_MIN);
-              if (walk > MAX_WALK_MINUTES) continue;
-              if (!toMatch || walk < toMatch.walk) {
-                toMatch = { entry: stop, index: idx, walk };
-              }
-            }
-            if (!toMatch) continue;
-            const key = `${routeNum}|${bound}|${fromMatch.entry.stop}|${toMatch.entry.stop}`;
-            if (seenCitybus.has(key)) continue;
-            seenCitybus.add(key);
-            citybusCandidates.push({
-              route: routeNum,
-              bound,
-              fromStop: fromMatch.entry,
-              toStop: toMatch.entry,
-              fromWalk: fromMatch.walk,
-              toWalk: toMatch.walk,
-            });
-            break;
-          } catch {
-            continue;
+        const { routeNum, bound, rows } = result;
+        if (!rows || rows.length === 0) continue;
+        const fromMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = (() => {
+          let best: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
+          for (const row of rows) {
+            const stop = citybusStops.find((s) => s.stop === row.stop);
+            if (!stop) continue;
+            const walk = Math.round(haversineKm(fromLat, fromLon, Number(stop.lat), Number(stop.long)) / WALK_KM_PER_MIN);
+            if (walk > MAX_WALK_MINUTES) continue;
+            const index = rows.findIndex((r) => r.stop === row.stop);
+            if (!best || walk < best.walk) best = { entry: stop, index, walk };
           }
+          return best;
+        })();
+        if (!fromMatch) continue;
+        let toMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
+        for (const row of rows) {
+          const index = rows.findIndex((r) => r.stop === row.stop);
+          if (index <= fromMatch.index) continue;
+          const stop = citybusStops.find((s) => s.stop === row.stop);
+          if (!stop) continue;
+          const walk = Math.round(haversineKm(toLat, toLon, Number(stop.lat), Number(stop.long)) / WALK_KM_PER_MIN);
+          if (walk > MAX_WALK_MINUTES) continue;
+          if (!toMatch || walk < toMatch.walk) toMatch = { entry: stop, index, walk };
         }
+        if (!toMatch) continue;
+        const key = `${routeNum}|${bound}|${fromMatch.entry.stop}|${toMatch.entry.stop}`;
+        if (seenCitybus.has(key)) continue;
+        seenCitybus.add(key);
+        citybusCandidates.push({
+          route: routeNum,
+          bound,
+          fromStop: fromMatch.entry,
+          toStop: toMatch.entry,
+          fromWalk: fromMatch.walk,
+          toWalk: toMatch.walk,
+        });
       }
     };
     await scanCitybusStops();
