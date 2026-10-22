@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
 
     const citybusStops: TransitStopRecord[] = [];
     const stopIdList = Array.from(citybusStopIds);
-    const CONCURRENCY = 6;
+    const CONCURRENCY = 30;
     for (let i = 0; i < stopIdList.length; i += CONCURRENCY) {
       const batch = stopIdList.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
@@ -187,7 +187,6 @@ export async function GET(request: NextRequest) {
           }
         }
       }
-      if (citybusStops.length >= 40) break;
     }
     const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
     const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);

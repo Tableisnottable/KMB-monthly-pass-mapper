@@ -5,6 +5,11 @@ export const HK_TRANSIT_API = {
 
 const REQUEST_TIMEOUT_MS = 5000;
 
+// Module-level Citybus stop cache: the provider has no bulk stop endpoint,
+// so keep resolved coordinates across requests for a short period.
+const citybusStopCache = new Map<string, { data: { stop: string; name_tc: string; name_en: string; lat: string; long: string }; expiresAt: number }>();
+const citybusRouteStopCache = new Map<string, { data: CitybusRouteStopRecord[]; expiresAt: number }>();
+
 export interface KmbRouteRecord {
   route: string;
   bound: string;
@@ -212,15 +217,26 @@ export async function getCitybusStopEta(stopId: string) {
 }
 
 export async function getCitybusRouteStops(route: string, dir: 'inbound' | 'outbound') {
+  const key = `${route}|${dir}`;
+  const cached = citybusRouteStopCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
   const payload = await fetchJson<{ data: CitybusRouteStopRecord[] }>(
     `${HK_TRANSIT_API.citybus}/route-stop/CTB/${encodeURIComponent(route)}/${dir}`,
   );
+  citybusRouteStopCache.set(key, { data: payload.data, expiresAt: Date.now() + 10 * 60 * 1000 });
   return payload.data;
 }
 
 export async function getCitybusStop(stopId: string) {
+  const cached = citybusStopCache.get(stopId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
   const payload = await fetchJson<{
     data: { stop: string; name_tc: string; name_en: string; lat: string; long: string };
   }>(`${HK_TRANSIT_API.citybus}/stop/${encodeURIComponent(stopId)}`);
+  citybusStopCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 10 * 60 * 1000 });
   return payload.data;
 }
