@@ -58,6 +58,30 @@ function etaMinutes(eta: string | null): number | null {
   return minutes < 0 ? 0 : minutes;
 }
 
+function directionCode(bound: 'inbound' | 'outbound'): 'I' | 'O' {
+  return bound === 'outbound' ? 'O' : 'I';
+}
+
+function routeEtaMinutes(
+  etas: { route: string; dir: string; eta: string | null }[],
+  route: string,
+  bound: 'inbound' | 'outbound',
+): number[] {
+  const dir = directionCode(bound);
+  return etas
+    .filter((entry) => entry.route === route && entry.dir === dir && entry.eta)
+    .map((entry) => etaMinutes(entry.eta))
+    .filter((minutes): minutes is number => minutes !== null)
+    .sort((a, b) => a - b);
+}
+
+function deriveHeadway(minutes: number[], fallback = 10): number {
+  if (minutes.length < 2) return fallback;
+  const gaps = minutes.slice(1).map((minutesAt, index) => minutesAt - minutes[index]);
+  const averageGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+  return averageGap >= 1 && averageGap <= 60 ? Math.round(averageGap) : fallback;
+}
+
 // Average urban bus speed in km/min used to estimate in-vehicle time
 // from the straight-line distance between boarding and alighting stops.
 const BUS_SPEED_KM_MIN = 0.3; // ~18 km/h including stops and traffic
@@ -111,10 +135,17 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  const fromLat = Number(params.get('fromLat'));
-  const fromLon = Number(params.get('fromLon'));
-  const toLat = Number(params.get('toLat'));
-  const toLon = Number(params.get('toLon'));
+  const rawFromLat = params.get('fromLat');
+  const rawFromLon = params.get('fromLon');
+  const rawToLat = params.get('toLat');
+  const rawToLon = params.get('toLon');
+  if (!rawFromLat || !rawFromLon || !rawToLat || !rawToLon) {
+    return badRequest('fromLat, fromLon, toLat and toLon are required.');
+  }
+  const fromLat = Number(rawFromLat);
+  const fromLon = Number(rawFromLon);
+  const toLat = Number(rawToLat);
+  const toLon = Number(rawToLon);
   if (
     !Number.isFinite(fromLat) ||
     !Number.isFinite(fromLon) ||
@@ -489,22 +520,15 @@ export async function GET(request: NextRequest) {
       let headway = 10; // default scheduled interval (minutes)
       try {
         const etas = await getKmbStopEta(candidate.fromStop.stop);
-        const routeEtas = etas
-          .filter((e) => e.route === candidate.route && e.eta)
-          .map((e) => etaMinutes(e.eta))
-          .filter((m): m is number => m !== null)
-          .sort((a, b) => a - b);
+        const routeEtas = routeEtaMinutes(
+          etas,
+          candidate.route,
+          candidate.bound as 'inbound' | 'outbound',
+        );
         if (routeEtas.length > 0) {
           firstEta = routeEtas[0];
         }
-        // Derive headway from consecutive ETAs when at least two are known.
-        if (routeEtas.length >= 2) {
-          const gaps = routeEtas.slice(1).map((m, i) => m - routeEtas[i]);
-          const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-          if (avgGap >= 1 && avgGap <= 60) {
-            headway = Math.round(avgGap);
-          }
-        }
+        headway = deriveHeadway(routeEtas);
       } catch {
         firstEta = null;
       }
@@ -553,8 +577,8 @@ export async function GET(request: NextRequest) {
       let firstEta: number | null = null;
       try {
         const etas = await getCitybusEta(candidate.fromStop.stop, candidate.route);
-        const match = etas.find((e) => e.eta);
-        firstEta = etaMinutes(match?.eta ?? null);
+        const routeEtas = routeEtaMinutes(etas, candidate.route, candidate.bound);
+        firstEta = routeEtas[0] ?? null;
       } catch {
         firstEta = null;
       }
@@ -602,17 +626,9 @@ export async function GET(request: NextRequest) {
         let headwayA = 10;
         try {
           const etas = await getKmbStopEta(tc.fromStop.stop);
-          const routeEtas = etas
-            .filter((e) => e.route === tc.routeA && e.eta)
-            .map((e) => etaMinutes(e.eta))
-            .filter((m): m is number => m !== null)
-            .sort((a, b) => a - b);
+          const routeEtas = routeEtaMinutes(etas, tc.routeA, tc.boundA as 'inbound' | 'outbound');
           if (routeEtas.length > 0) etaA = routeEtas[0];
-          if (routeEtas.length >= 2) {
-            const gaps = routeEtas.slice(1).map((m, i) => m - routeEtas[i]);
-            const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-            if (avg >= 1 && avg <= 60) headwayA = Math.round(avg);
-          }
+          headwayA = deriveHeadway(routeEtas);
         } catch {
           etaA = null;
         }
