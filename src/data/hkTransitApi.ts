@@ -8,6 +8,7 @@ const REQUEST_TIMEOUT_MS = 5000;
 // Module-level Citybus stop cache: the provider has no bulk stop endpoint,
 // so keep resolved coordinates across requests for a short period.
 const citybusStopCache = new Map<string, { data: { stop: string; name_tc: string; name_en: string; lat: string; long: string }; expiresAt: number }>();
+const citybusStopInflight = new Map<string, Promise<{ stop: string; name_tc: string; name_en: string; lat: string; long: string }>>();
 const citybusRouteStopCache = new Map<string, { data: CitybusRouteStopRecord[]; expiresAt: number }>();
 
 export interface KmbRouteRecord {
@@ -234,9 +235,20 @@ export async function getCitybusStop(stopId: string) {
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
-  const payload = await fetchJson<{
+  const inflight = citybusStopInflight.get(stopId);
+  if (inflight) {
+    return inflight;
+  }
+  const request = fetchJson<{
     data: { stop: string; name_tc: string; name_en: string; lat: string; long: string };
-  }>(`${HK_TRANSIT_API.citybus}/stop/${encodeURIComponent(stopId)}`);
-  citybusStopCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 10 * 60 * 1000 });
-  return payload.data;
+  }>(`${HK_TRANSIT_API.citybus}/stop/${encodeURIComponent(stopId)}`)
+    .then((payload) => {
+      citybusStopCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 10 * 60 * 1000 });
+      return payload.data;
+    })
+    .finally(() => {
+      citybusStopInflight.delete(stopId);
+    });
+  citybusStopInflight.set(stopId, request);
+  return request;
 }
