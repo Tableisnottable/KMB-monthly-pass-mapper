@@ -26,6 +26,11 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
   async function handleSearch(origin: PlaceResult, destination: PlaceResult) {
     setSearching(true);
     setError(null);
+    setRoutes([]);
+    setMeta(null);
+    setSearched(false);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const params = new URLSearchParams({
         fromLat: String(origin.lat),
@@ -35,6 +40,7 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
       });
       const response = await fetch(`/api/journey?${params.toString()}`, {
         cache: 'no-store',
+        signal: controller.signal,
       });
       const payload = (await response.json()) as {
         data?: ScoredRoute[];
@@ -49,8 +55,15 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
       setSearched(true);
       document.getElementById('routes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '路線規劃失敗');
+      const message =
+        err instanceof DOMException && err.name === 'AbortError'
+          ? '官方路線搜尋超時，請稍後再試或縮小搜尋範圍。'
+          : err instanceof Error
+            ? err.message
+            : '路線規劃失敗';
+      setError(message);
     } finally {
+      window.clearTimeout(timeout);
       setSearching(false);
     }
   }
