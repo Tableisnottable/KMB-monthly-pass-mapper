@@ -160,6 +160,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const journeyStartedAt = Date.now();
     const [stops, citybusRoutes] = await Promise.all([
       getKmbStops(),
       getCitybusRoutes(),
@@ -700,8 +701,9 @@ export async function GET(request: NextRequest) {
         {
           data: merged,
           meta: {
-            source: 'KMB route/stop/ETA APIs',
+            source: 'KMB/Citybus route/stop/ETA APIs',
             live: true,
+            durationMs: Date.now() - journeyStartedAt,
             candidates: candidates.length,
             transfers: transferCandidates.length,
             fromStops: fromStops.map((s) => ({
@@ -724,8 +726,9 @@ export async function GET(request: NextRequest) {
       {
         data: scored,
         meta: {
-          source: 'KMB route/stop/ETA APIs',
+          source: 'KMB/Citybus route/stop/ETA APIs',
           live: true,
+          durationMs: Date.now() - journeyStartedAt,
           candidates: candidates.length,
           fromStops: fromStops.map((s) => ({
             stop: s.stop.stop,

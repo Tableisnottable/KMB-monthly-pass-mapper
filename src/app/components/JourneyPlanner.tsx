@@ -10,6 +10,8 @@ interface JourneyMeta {
   source?: string;
   live?: boolean;
   candidates?: number;
+  transfers?: number;
+  durationMs?: number;
   fromStops?: { stop: string; name: string; walkMinutes: number }[];
   toStops?: { stop: string; name: string; walkMinutes: number }[];
 }
@@ -56,6 +58,12 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
   return (
     <>
       <JourneyPlaceSearch onSearch={handleSearch} searching={searching} />
+      {searching && (
+        <div className="flex items-center gap-3 rounded-2xl bg-cm-ink p-4 text-sm font-bold text-white shadow-card">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-cm-green" />
+          <span>正在讀取 KMB、Citybus 官方路線、站點及實時班次…</span>
+        </div>
+      )}
       {error && (
         <div className="rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700 ring-1 ring-red-200">
           {error}
@@ -70,6 +78,10 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
             找到 {routes.length} 條路線
             {typeof meta.candidates === 'number' ? `（候選 ${meta.candidates} 條）` : ''}
           </span>
+          {typeof meta.durationMs === 'number' && (
+            <span>官方資料耗時 {Math.max(1, Math.round(meta.durationMs / 1000))} 秒</span>
+          )}
+          {meta.source && <span>{meta.source}</span>}
           {meta.fromStops?.[0] && (
             <span>
               上車：{meta.fromStops[0].name}（步行 {meta.fromStops[0].walkMinutes} 分）
