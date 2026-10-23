@@ -8,7 +8,7 @@ import {
   getKmbStops,
   type TransitStopRecord,
 } from '../../../data/hkTransitApi';
-import { getStaticCitybusStops, STATIC_CITYBUS_ROUTES } from '../../../data/citybusStopsStatic';
+import { getStaticCitybusRouteStops, getStaticCitybusStops, STATIC_CITYBUS_ROUTES } from '../../../data/citybusStopsStatic';
 import { scoreRoutes, type Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 
@@ -156,18 +156,14 @@ export async function GET(request: NextRequest) {
     const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
     const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
-    // Fetch cross-harbour route-stop sequences live (they change less often
-    // and are cached in-memory by the data module).
-    const citybusRouteRows = await Promise.all(
-      STATIC_CITYBUS_ROUTES.flatMap((routeNum) =>
-        (['outbound', 'inbound'] as const).map(async (bound) => {
-          try {
-            return { routeNum, bound, rows: await getCitybusRouteStops(routeNum, bound) };
-          } catch {
-            return { routeNum, bound, rows: [] };
-          }
-        }),
-      ),
+    // Fetch cross-harbour route-stop sequences from the static catalog
+    // (fetched by scripts/fetch-citybus-route-stops.mjs).
+    const citybusRouteRows = STATIC_CITYBUS_ROUTES.flatMap((routeNum) =>
+      (['outbound', 'inbound'] as const).map((bound) => ({
+        routeNum,
+        bound,
+        rows: getStaticCitybusRouteStops(routeNum, bound) ?? [],
+      })),
     );
 
     const citybusCandidates: {

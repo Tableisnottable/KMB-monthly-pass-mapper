@@ -1,4 +1,5 @@
 import citybusStopsJson from './citybusStops.json';
+import citybusRouteStopsJson from './citybusRouteStops.json';
 import type { TransitStopRecord } from './hkTransitApi';
 
 export interface CitybusStopEntry {
@@ -30,3 +31,20 @@ export function getStaticCitybusStops(): TransitStopRecord[] {
 
 export const STATIC_CITYBUS_ROUTES = citybusStopsJson.routes;
 export const STATIC_CITYBUS_GENERATED_AT = citybusStopsJson.generatedAt;
+
+export interface CitybusRouteStopEntry {
+  seq: number;
+  stop: string;
+}
+
+const routeStopByKey = new Map<string, CitybusRouteStopEntry[]>();
+for (const route of citybusRouteStopsJson.routes) {
+  routeStopByKey.set(`${route.route}|${route.bound}`, route.stops);
+}
+
+export function getStaticCitybusRouteStops(
+  route: string,
+  bound: 'inbound' | 'outbound',
+): CitybusRouteStopEntry[] | undefined {
+  return routeStopByKey.get(`${route}|${bound}`);
+}
