@@ -1,0 +1,2704 @@
+{
+  "generatedAt": "2026-10-23T07:24:46.783Z",
+  "routes": [
+    "970",
+    "973",
+    "101",
+    "104",
+    "111",
+    "113",
+    "170",
+    "182"
+  ],
+  "count": 384,
+  "stops": [
+    {
+      "stop": "002392",
+      "name_tc": "數碼港",
+      "name_en": "Cyberport",
+      "lat": "22.261985192091",
+      "long": "114.13067185053"
+    },
+    {
+      "stop": "002393",
+      "name_tc": "數碼港三座, 數碼港道",
+      "name_en": "Cyberport 3, Cyberport Road",
+      "lat": "22.259657562091",
+      "long": "114.13261742053"
+    },
+    {
+      "stop": "002394",
+      "name_tc": "貝沙灣, 數碼港道",
+      "name_en": "Residence Bel-Air, Cyberport Road",
+      "lat": "22.256625312091",
+      "long": "114.13276861053"
+    },
+    {
+      "stop": "002697",
+      "name_tc": "貝沙灣南灣, 數碼港道",
+      "name_en": "Bel-Air on the Peak, Cyberport Road",
+      "lat": "22.255283702091",
+      "long": "114.13365031053"
+    },
+    {
+      "stop": "002680",
+      "name_tc": "華翠街, 域多利道",
+      "name_en": "Wah Chui Street, Victoria Road",
+      "lat": "22.255138602091",
+      "long": "114.13607730053"
+    },
+    {
+      "stop": "002338",
+      "name_tc": "華富 (北)",
+      "name_en": "Wah Fu (North)",
+      "lat": "22.254020442091",
+      "long": "114.13638734053"
+    },
+    {
+      "stop": "002339",
+      "name_tc": "華富邨華生樓, 華富道",
+      "name_en": "Wah Sang House Wah Fu Estate, Wah Fu Road",
+      "lat": "22.252877362091",
+      "long": "114.13596269053"
+    },
+    {
+      "stop": "002340",
+      "name_tc": "華富邨華泰樓, 華富道",
+      "name_en": "Wah Tai House Wah Fu Estate, Wah Fu Road",
+      "lat": "22.251814702091",
+      "long": "114.13621962053"
+    },
+    {
+      "stop": "002342",
+      "name_tc": "華富邨華安樓, 華富道",
+      "name_en": "Wah On House Wah Fu Estate, Wah Fu Road",
+      "lat": "22.251818402091",
+      "long": "114.13866375053"
+    },
+    {
+      "stop": "002226",
+      "name_tc": "余振強紀念第二中學, 薄扶林道",
+      "name_en": "Yu Chun Keung Memorial College No.2, Pok Fu Lam Road",
+      "lat": "22.256090272091",
+      "long": "114.13753478053"
+    },
+    {
+      "stop": "002227",
+      "name_tc": "薄扶林村, 薄扶林道",
+      "name_en": "Pok Fu Lam Village, Pok Fu Lam Road",
+      "lat": "22.260643072091",
+      "long": "114.13612199053"
+    },
+    {
+      "stop": "002228",
+      "name_tc": "薄扶林水塘道, 薄扶林道",
+      "name_en": "Pok Fu Lam Reservoir Road, Pok Fu Lam Road",
+      "lat": "22.262870012091",
+      "long": "114.13490606053"
+    },
+    {
+      "stop": "002229",
+      "name_tc": "嘉林閣, 薄扶林道",
+      "name_en": "Woodbury Court, Pok Fu Lam Road",
+      "lat": "22.264648112091",
+      "long": "114.13328494053"
+    },
+    {
+      "stop": "002230",
+      "name_tc": "心光學校, 薄扶林道",
+      "name_en": "Ebenezer School, Pok Fu Lam Road",
+      "lat": "22.267096712091",
+      "long": "114.13213924053"
+    },
+    {
+      "stop": "002231",
+      "name_tc": "瑪麗醫院, 薄扶林道",
+      "name_en": "Queen Mary Hospital, Pok Fu Lam Road",
+      "lat": "22.269072732091",
+      "long": "114.13063329053"
+    },
+    {
+      "stop": "002232",
+      "name_tc": "香港華人基督教聯會薄扶林道墳場, 薄扶林道",
+      "name_en": "HKCCCU Pok Fu Lam Road Cemetery, Pok Fu Lam Road",
+      "lat": "22.274060082091",
+      "long": "114.12987976053"
+    },
+    {
+      "stop": "001109",
+      "name_tc": "摩星嶺道, 薄扶林道",
+      "name_en": "Mount Davis Road, Pok Fu Lam Road",
+      "lat": "22.278376602091",
+      "long": "114.13095479053"
+    },
+    {
+      "stop": "001110",
+      "name_tc": "富林苑, 薄扶林道",
+      "name_en": "Fulham Garden, Pok Fu Lam Road",
+      "lat": "22.279835062091",
+      "long": "114.13126545053"
+    },
+    {
+      "stop": "001111",
+      "name_tc": "蒲飛路, 薄扶林道",
+      "name_en": "Pokfield Road, Pok Fu Lam Road",
+      "lat": "22.282022522091",
+      "long": "114.13223321053"
+    },
+    {
+      "stop": "001112",
+      "name_tc": "何東夫人堂, 薄扶林道",
+      "name_en": "Lady Ho Tung Hall, Pok Fu Lam Road",
+      "lat": "22.283611332091",
+      "long": "114.13295982053"
+    },
+    {
+      "stop": "001113",
+      "name_tc": "香港大學百周年校園, 薄扶林道",
+      "name_en": "HKU Centennial Campus, Pok Fu Lam Road",
+      "lat": "22.284286232091",
+      "long": "114.13491292053"
+    },
+    {
+      "stop": "001114",
+      "name_tc": "聖士提反堂中學, 薄扶林道",
+      "name_en": "St. Stephen's Church College, Pok Fu Lam Road",
+      "lat": "22.285287532091",
+      "long": "114.13837291053"
+    },
+    {
+      "stop": "002758",
+      "name_tc": "西營盤郵政局, 薄扶林道",
+      "name_en": "Sai Ying Pun Post Office, Pok Fu Lam Road",
+      "lat": "22.286095832091",
+      "long": "114.13992978053"
+    },
+    {
+      "stop": "001190",
+      "name_tc": "水街",
+      "name_en": "Water Street",
+      "lat": "22.287790952091",
+      "long": "114.13863698053"
+    },
+    {
+      "stop": "001628",
+      "name_tc": "西區海底隧道巴士轉乘站",
+      "name_en": "Western Harbour Crossing Bus-Bus Interchange",
+      "lat": "22.305020162091",
+      "long": "114.15920401053"
+    },
+    {
+      "stop": "002862",
+      "name_tc": "柯士甸站, 佐敦道",
+      "name_en": "Austin Station, Jordan Road",
+      "lat": "22.306182772091",
+      "long": "114.16629719053"
+    },
+    {
+      "stop": "001483",
+      "name_tc": "上海街, 佐敦道",
+      "name_en": "Shanghai Street, Jordan Road",
+      "lat": "22.305642122091",
+      "long": "114.16884751053"
+    },
+    {
+      "stop": "001546",
+      "name_tc": "南京街, 彌敦道",
+      "name_en": "Nanking Street, Nathan Road",
+      "lat": "22.306137342091",
+      "long": "114.17144709053"
+    },
+    {
+      "stop": "001547",
+      "name_tc": "眾坊街, 彌敦道",
+      "name_en": "Public Square Street, Nathan Road",
+      "lat": "22.310731692091",
+      "long": "114.17098889053"
+    },
+    {
+      "stop": "001548",
+      "name_tc": "登打士街, 彌敦道",
+      "name_en": "Dundas Street, Nathan Road",
+      "lat": "22.314815892091",
+      "long": "114.17018718053"
+    },
+    {
+      "stop": "001552",
+      "name_tc": "山東街, 彌敦道",
+      "name_en": "Shantung Street, Nathan Road",
+      "lat": "22.316744762091",
+      "long": "114.16978326053"
+    },
+    {
+      "stop": "001554",
+      "name_tc": "弼街, 彌敦道",
+      "name_en": "Bute Street, Nathan Road",
+      "lat": "22.321742152091",
+      "long": "114.16875665053"
+    },
+    {
+      "stop": "001555",
+      "name_tc": "太子站, 彌敦道",
+      "name_en": "Prince Edward Station, Nathan Road",
+      "lat": "22.325582342091",
+      "long": "114.16796635053"
+    },
+    {
+      "stop": "001426",
+      "name_tc": "楓樹街, 長沙灣道",
+      "name_en": "Maple Street, Cheung Sha Wan Road",
+      "lat": "22.328057822091",
+      "long": "114.16552576053"
+    },
+    {
+      "stop": "001429",
+      "name_tc": "北河街, 長沙灣道",
+      "name_en": "Pei Ho Street, Cheung Sha Wan Road",
+      "lat": "22.330763912091",
+      "long": "114.16206981053"
+    },
+    {
+      "stop": "002810",
+      "name_tc": "怡靖苑, 長沙灣道",
+      "name_en": "Yee Ching Court, Cheung Sha Wan Road",
+      "lat": "22.332577492091",
+      "long": "114.15971148053"
+    },
+    {
+      "stop": "001602",
+      "name_tc": "長沙灣站, 東京街",
+      "name_en": "Cheung Sha Wan Station, Tonkin Street",
+      "lat": "22.335338642091",
+      "long": "114.15779444053"
+    },
+    {
+      "stop": "002813",
+      "name_tc": "寶熙苑, 保安道",
+      "name_en": "Po Hei Court, Po On Road",
+      "lat": "22.337610622091",
+      "long": "114.15910393053"
+    },
+    {
+      "stop": "002808",
+      "name_tc": "蘇屋邨海棠樓, 長發街",
+      "name_en": "Begonia House So Uk Estate, Cheung Fat Street",
+      "lat": "22.339874002091",
+      "long": "114.15736545053"
+    },
+    {
+      "stop": "002836",
+      "name_tc": "蘇屋邨",
+      "name_en": "So Uk Estate",
+      "lat": "22.340784972091",
+      "long": "114.15881631053"
+    },
+    {
+      "stop": "002812",
+      "name_tc": "聖公會基愛小學, 廣利道",
+      "name_en": "SKH Kei Oi Primary School, Kwong Lee Road",
+      "lat": "22.339316482091",
+      "long": "114.16060382053"
+    },
+    {
+      "stop": "002814",
+      "name_tc": "順寧道, 東京街",
+      "name_en": "Shun Ning Road, Tonkin Street",
+      "lat": "22.336921292091",
+      "long": "114.15955582053"
+    },
+    {
+      "stop": "001405",
+      "name_tc": "營盤街, 青山道",
+      "name_en": "Camp Street, Castle Peak Road",
+      "lat": "22.335460892091",
+      "long": "114.16022133053"
+    },
+    {
+      "stop": "002815",
+      "name_tc": "福榮街, 欽州街",
+      "name_en": "Fuk Wing Street, Yen Chow Street",
+      "lat": "22.332772872091",
+      "long": "114.16201740053"
+    },
+    {
+      "stop": "001444",
+      "name_tc": "北河街, 長沙灣道",
+      "name_en": "Pei Ho Street, Cheung Sha Wan Road",
+      "lat": "22.330910012091",
+      "long": "114.16219576053"
+    },
+    {
+      "stop": "001447",
+      "name_tc": "楓樹街, 長沙灣道",
+      "name_en": "Maple Street, Cheung Sha Wan Road",
+      "lat": "22.328333182091",
+      "long": "114.16552917053"
+    },
+    {
+      "stop": "001556",
+      "name_tc": "太子站, 彌敦道",
+      "name_en": "Prince Edward Station, Nathan Road",
+      "lat": "22.325863322091",
+      "long": "114.16808965053"
+    },
+    {
+      "stop": "001557",
+      "name_tc": "聯合廣場, 彌敦道",
+      "name_en": "Allied Plaza, Nathan Road",
+      "lat": "22.323454062091",
+      "long": "114.16858963053"
+    },
+    {
+      "stop": "001775",
+      "name_tc": "旺角中心, 彌敦道",
+      "name_en": "Argyle Centre, Nathan Road",
+      "lat": "22.319681842091",
+      "long": "114.16936520053"
+    },
+    {
+      "stop": "001559",
+      "name_tc": "銀行中心, 彌敦道",
+      "name_en": "Bank Centre, Nathan Road",
+      "lat": "22.318424162091",
+      "long": "114.16962058053"
+    },
+    {
+      "stop": "001562",
+      "name_tc": "登打士街, 彌敦道",
+      "name_en": "Dundas Street, Nathan Road",
+      "lat": "22.314748642091",
+      "long": "114.17037382053"
+    },
+    {
+      "stop": "001564",
+      "name_tc": "文明里, 彌敦道",
+      "name_en": "Man Ming Lane, Nathan Road",
+      "lat": "22.312210192091",
+      "long": "114.17088450053"
+    },
+    {
+      "stop": "001567",
+      "name_tc": "彌敦酒店, 彌敦道",
+      "name_en": "Nathan Hotel, Nathan Road",
+      "lat": "22.307183152091",
+      "long": "114.17152353053"
+    },
+    {
+      "stop": "002811",
+      "name_tc": "白加士街, 佐敦道",
+      "name_en": "Parkes Street, Jordan Road",
+      "lat": "22.305164142091",
+      "long": "114.17031406053"
+    },
+    {
+      "stop": "001482",
+      "name_tc": "炮台街, 佐敦道",
+      "name_en": "Battery Street, Jordan Road",
+      "lat": "22.305531742091",
+      "long": "114.16858691053"
+    },
+    {
+      "stop": "001586",
+      "name_tc": "柯士甸站, 佐敦道",
+      "name_en": "Austin Station, Jordan Road",
+      "lat": "22.306177902091",
+      "long": "114.16467618053"
+    },
+    {
+      "stop": "001629",
+      "name_tc": "西區海底隧道巴士轉乘站",
+      "name_en": "Western Harbour Crossing Bus-Bus Interchange",
+      "lat": "22.304233652091",
+      "long": "114.15979682053"
+    },
+    {
+      "stop": "001191",
+      "name_tc": "高樂花園, 干諾道西",
+      "name_en": "Connaught Garden, Connaught Road West",
+      "lat": "22.288542812091",
+      "long": "114.14171663053"
+    },
+    {
+      "stop": "001119",
+      "name_tc": "李陞小學, 薄扶林道",
+      "name_en": "Li Sing Primary School, Pok Fu Lam Road",
+      "lat": "22.285487302091",
+      "long": "114.13994098053"
+    },
+    {
+      "stop": "001116",
+      "name_tc": "香港大學西閘, 薄扶林道",
+      "name_en": "HKU West Gate, Pok Fu Lam Road",
+      "lat": "22.283588212091",
+      "long": "114.13569933053"
+    },
+    {
+      "stop": "001117",
+      "name_tc": "何東夫人堂, 薄扶林道",
+      "name_en": "Lady Ho Tung Hall, Pok Fu Lam Road",
+      "lat": "22.283819002091",
+      "long": "114.13341793053"
+    },
+    {
+      "stop": "001120",
+      "name_tc": "蒲飛路, 薄扶林道",
+      "name_en": "Pokfield Road, Pok Fu Lam Road",
+      "lat": "22.281996732091",
+      "long": "114.13241370053"
+    },
+    {
+      "stop": "001118",
+      "name_tc": "薄扶林道遊樂場, 薄扶林道",
+      "name_en": "Pok Fu Lam Road Playground, Pok Fu Lam Road",
+      "lat": "22.278417902091",
+      "long": "114.13115417053"
+    },
+    {
+      "stop": "002234",
+      "name_tc": "香港華人基督教聯會薄扶林道墳場, 薄扶林道",
+      "name_en": "HKCCCU Pok Fu Lam Road Cemetery, Pok Fu Lam Road",
+      "lat": "22.273395592091",
+      "long": "114.13030688053"
+    },
+    {
+      "stop": "002236",
+      "name_tc": "瑪麗醫院, 薄扶林道",
+      "name_en": "Queen Mary Hospital, Pok Fu Lam Road",
+      "lat": "22.269871512091",
+      "long": "114.13046423053"
+    },
+    {
+      "stop": "002237",
+      "name_tc": "心光學校, 薄扶林道",
+      "name_en": "Ebenezer School, Pok Fu Lam Road",
+      "lat": "22.266653792091",
+      "long": "114.13277936053"
+    },
+    {
+      "stop": "002238",
+      "name_tc": "明德村, 薄扶林道",
+      "name_en": "Middleton Towers, Pok Fu Lam Road",
+      "lat": "22.264310562091",
+      "long": "114.13374006053"
+    },
+    {
+      "stop": "002239",
+      "name_tc": "薄扶林水塘道, 薄扶林道",
+      "name_en": "Pok Fu Lam Reservoir Road, Pok Fu Lam Road",
+      "lat": "22.262572552091",
+      "long": "114.13555996053"
+    },
+    {
+      "stop": "002240",
+      "name_tc": "薄扶林村, 薄扶林道",
+      "name_en": "Pok Fu Lam Village, Pok Fu Lam Road",
+      "lat": "22.260617742091",
+      "long": "114.13650277053"
+    },
+    {
+      "stop": "002233",
+      "name_tc": "余振強紀念第二中學, 薄扶林道",
+      "name_en": "Yu Chun Keung Memorial College No.2, Pok Fu Lam Road",
+      "lat": "22.255951482091",
+      "long": "114.13779932053"
+    },
+    {
+      "stop": "002333",
+      "name_tc": "華富邨華樂樓, 華富道",
+      "name_en": "Wah Lok House Wah Fu Estate, Wah Fu Road",
+      "lat": "22.251701562091",
+      "long": "114.13854444053"
+    },
+    {
+      "stop": "002334",
+      "name_tc": "華富商場, 華富道",
+      "name_en": "Wah Fu Commercial Complex, Wah Fu Road",
+      "lat": "22.250930762091",
+      "long": "114.13735096053"
+    },
+    {
+      "stop": "002335",
+      "name_tc": "華富邨華清樓, 華富道",
+      "name_en": "Wah Ching House Wah Fu Estate, Wah Fu Road",
+      "lat": "22.251955682091",
+      "long": "114.13602424053"
+    },
+    {
+      "stop": "002336",
+      "name_tc": "培英中學, 華富道",
+      "name_en": "Pui Ying Secondary School, Wah Fu Road",
+      "lat": "22.253517212091",
+      "long": "114.13564735053"
+    },
+    {
+      "stop": "002320",
+      "name_tc": "華翠街, 域多利道",
+      "name_en": "Wah Chui Street, Victoria Road",
+      "lat": "22.255022552091",
+      "long": "114.13613662053"
+    },
+    {
+      "stop": "002329",
+      "name_tc": "域多利道分區電力站, 域多利道",
+      "name_en": "Victoria Road Zone Sub-station, Victoria Road",
+      "lat": "22.256229222091",
+      "long": "114.13441163053"
+    },
+    {
+      "stop": "002696",
+      "name_tc": "貝沙灣南灣, 數碼港道",
+      "name_en": "Bel-Air on the Peak, Cyberport Road",
+      "lat": "22.255717912091",
+      "long": "114.13371182053"
+    },
+    {
+      "stop": "002391",
+      "name_tc": "貝沙灣, 數碼港道",
+      "name_en": "Residence Bel-Air, Cyberport Road",
+      "lat": "22.258219982091",
+      "long": "114.13291952053"
+    },
+    {
+      "stop": "001540",
+      "name_tc": "尖沙咀 (麼地道)",
+      "name_en": "Tsim Sha Tsui (Mody Road)",
+      "lat": "22.296062822091",
+      "long": "114.17577963053"
+    },
+    {
+      "stop": "001589",
+      "name_tc": "尖東站, 梳士巴利道",
+      "name_en": "East Tsim Sha Tsui Station, Salisbury Road",
+      "lat": "22.294751692091",
+      "long": "114.17402893053"
+    },
+    {
+      "stop": "001588",
+      "name_tc": "尖沙咀 (天星碼頭)",
+      "name_en": "Tsim Sha Tsui (Star Ferry)",
+      "lat": "22.294426412091",
+      "long": "114.16919361053"
+    },
+    {
+      "stop": "001398",
+      "name_tc": "中港城, 廣東道",
+      "name_en": "China Hong Kong City, Canton Road",
+      "lat": "22.300509172091",
+      "long": "114.16811720053"
+    },
+    {
+      "stop": "001399",
+      "name_tc": "柯士甸站, 廣東道",
+      "name_en": "Austin Station, Canton Road",
+      "lat": "22.303839682091",
+      "long": "114.16770178053"
+    },
+    {
+      "stop": "003762",
+      "name_tc": "M+, 博物館道",
+      "name_en": "M+, Museum Drive",
+      "lat": "22.301941372091",
+      "long": "114.15888968053"
+    },
+    {
+      "stop": "003763",
+      "name_tc": "香港故宮文化博物館, 博物館道",
+      "name_en": "Hong Kong Palace Museum, Museum Drive",
+      "lat": "22.301774042091",
+      "long": "114.15640056053"
+    },
+    {
+      "stop": "002260",
+      "name_tc": "華富道, 石排灣道",
+      "name_en": "Wah Fu Road, Shek Pai Wan Road",
+      "lat": "22.252239472091",
+      "long": "114.14080510053"
+    },
+    {
+      "stop": "002388",
+      "name_tc": "田灣街, 石排灣道",
+      "name_en": "Tin Wan Street, Shek Pai Wan Road",
+      "lat": "22.248937592091",
+      "long": "114.14912956053"
+    },
+    {
+      "stop": "002157",
+      "name_tc": "聖伯多祿堂, 香港仔大道",
+      "name_en": "St. Peter's Church, Aberdeen Main Road",
+      "lat": "22.249804272091",
+      "long": "114.15368046053"
+    },
+    {
+      "stop": "002158",
+      "name_tc": "漁暉道, 香港仔大道",
+      "name_en": "Yue Fai Road, Aberdeen Main Road",
+      "lat": "22.248585702091",
+      "long": "114.15575506053"
+    },
+    {
+      "stop": "002159",
+      "name_tc": "業漁大廈, 香港仔大道",
+      "name_en": "Yip Yee Mansion, Aberdeen Main Road",
+      "lat": "22.247578892091",
+      "long": "114.15849066053"
+    },
+    {
+      "stop": "002344",
+      "name_tc": "甄沾記大廈, 黃竹坑道",
+      "name_en": "Yan's Tower, Wong Chuk Hang Road",
+      "lat": "22.248523252091",
+      "long": "114.16362493053"
+    },
+    {
+      "stop": "002383",
+      "name_tc": "業興街, 黃竹坑道",
+      "name_en": "Yip Hing Street, Wong Chuk Hang Road",
+      "lat": "22.249540662091",
+      "long": "114.16811154053"
+    },
+    {
+      "stop": "002399",
+      "name_tc": "香港醫學專科學院, 海洋公園道",
+      "name_en": "Hong Kong Academy of Medicine, Ocean Park Road",
+      "lat": "22.251177632091",
+      "long": "114.17062008053"
+    },
+    {
+      "stop": "002225",
+      "name_tc": "海洋公園",
+      "name_en": "Ocean Park",
+      "lat": "22.247392812091",
+      "long": "114.17392013053"
+    },
+    {
+      "stop": "002345",
+      "name_tc": "黃竹坑遊樂場, 黃竹坑道",
+      "name_en": "Wong Chuk Hang Recreation Ground, Wong Chuk Hang Road",
+      "lat": "22.250546142091",
+      "long": "114.17056977053"
+    },
+    {
+      "stop": "002346",
+      "name_tc": "葛量洪醫院, 黃竹坑道",
+      "name_en": "Grantham Hospital, Wong Chuk Hang Road",
+      "lat": "22.250382182091",
+      "long": "114.17309770053"
+    },
+    {
+      "stop": "002350",
+      "name_tc": "黃竹坑新圍, 黃竹坑道",
+      "name_en": "Wong Chuk Hang San Wai, Wong Chuk Hang Road",
+      "lat": "22.248619242091",
+      "long": "114.17631296053"
+    },
+    {
+      "stop": "002351",
+      "name_tc": "鄉村俱樂部, 黃竹坑道",
+      "name_en": "Hong Kong Country Club, Wong Chuk Hang Road",
+      "lat": "22.245760442091",
+      "long": "114.17873256053"
+    },
+    {
+      "stop": "002201",
+      "name_tc": "深水灣, 香島道",
+      "name_en": "Deep Water Bay, Island Road",
+      "lat": "22.244497912091",
+      "long": "114.18806928053"
+    },
+    {
+      "stop": "002199",
+      "name_tc": "蒲苑, 香島道",
+      "name_en": "Deepdene, Island Road",
+      "lat": "22.240244572091",
+      "long": "114.18727546053"
+    },
+    {
+      "stop": "002200",
+      "name_tc": "香島小築, 香島道",
+      "name_en": "Island Club, Island Road",
+      "lat": "22.237696722091",
+      "long": "114.18950240053"
+    },
+    {
+      "stop": "002247",
+      "name_tc": "麗景道, 淺水灣道",
+      "name_en": "Belleview Drive, Repulse Bay Road",
+      "lat": "22.238413782091",
+      "long": "114.19300890053"
+    },
+    {
+      "stop": "002252",
+      "name_tc": "淺水灣海灘, 淺水灣道",
+      "name_en": "Repulse Bay Beach, Repulse Bay Road",
+      "lat": "22.238611492091",
+      "long": "114.19526796053"
+    },
+    {
+      "stop": "002248",
+      "name_tc": "保華大廈, 淺水灣道",
+      "name_en": "Repulse Bay Towers, Repulse Bay Road",
+      "lat": "22.238416412091",
+      "long": "114.19875982053"
+    },
+    {
+      "stop": "002256",
+      "name_tc": "淺水灣道 127 號, 淺水灣道",
+      "name_en": "127 Repulse Bay Road, Repulse Bay Road",
+      "lat": "22.236745832091",
+      "long": "114.19939985053"
+    },
+    {
+      "stop": "002267",
+      "name_tc": "赫蘭道, 淺水灣道",
+      "name_en": "Headland Road, Repulse Bay Road",
+      "lat": "22.226579762091",
+      "long": "114.20295050053"
+    },
+    {
+      "stop": "002191",
+      "name_tc": "舂磡角道 11 號, 舂磡角道",
+      "name_en": "11 Chung Hom Kok Road, Chung Hom Kok Road",
+      "lat": "22.223997212091",
+      "long": "114.20374227053"
+    },
+    {
+      "stop": "002193",
+      "name_tc": "舂坎角消防局, 舂磡角道",
+      "name_en": "Chung Hom Kok Fire Station, Chung Hom Kok Road",
+      "lat": "22.219895052091",
+      "long": "114.20346523053"
+    },
+    {
+      "stop": "002195",
+      "name_tc": "環角道, 舂磡角道",
+      "name_en": "Cape Road, Chung Hom Kok Road",
+      "lat": "22.218023062091",
+      "long": "114.20475752053"
+    },
+    {
+      "stop": "002176",
+      "name_tc": "環角徑, 環角道",
+      "name_en": "Cape Drive, Cape Road",
+      "lat": "22.217324122091",
+      "long": "114.20515101053"
+    },
+    {
+      "stop": "002179",
+      "name_tc": "赤柱觀音寺, 環角道",
+      "name_en": "Kwun Yum Buddhist Monastery, Cape Road",
+      "lat": "22.218833832091",
+      "long": "114.20668864053"
+    },
+    {
+      "stop": "002181",
+      "name_tc": "龍欣苑龍騰閣, 環角道",
+      "name_en": "Lung Tan House Lung Yan Court, Cape Road",
+      "lat": "22.220932832091",
+      "long": "114.20546270053"
+    },
+    {
+      "stop": "002386",
+      "name_tc": "馬坑邨駿馬樓, 環角道",
+      "name_en": "Chun Ma House Ma Hang Estate, Cape Road",
+      "lat": "22.222240822091",
+      "long": "114.20664854053"
+    },
+    {
+      "stop": "002378",
+      "name_tc": "赤柱廣場",
+      "name_en": "Stanley Plaza",
+      "lat": "22.220223252091",
+      "long": "114.20920230053"
+    },
+    {
+      "stop": "002277",
+      "name_tc": "赤柱村",
+      "name_en": "Stanley Village",
+      "lat": "22.219212682091",
+      "long": "114.21300366053"
+    },
+    {
+      "stop": "002387",
+      "name_tc": "馬坑邨駿馬樓, 環角道",
+      "name_en": "Chun Ma House Ma Hang Estate, Cape Road",
+      "lat": "22.222205242091",
+      "long": "114.20584898053"
+    },
+    {
+      "stop": "002175",
+      "name_tc": "馬坑邨觀馬樓, 環角道",
+      "name_en": "Koon Ma House Ma Hang Estate, Cape Road",
+      "lat": "22.220581052091",
+      "long": "114.20669370053"
+    },
+    {
+      "stop": "002180",
+      "name_tc": "赤柱觀音寺, 環角道",
+      "name_en": "Kwun Yum Buddhist Monastery, Cape Road",
+      "lat": "22.218424852091",
+      "long": "114.20682598053"
+    },
+    {
+      "stop": "002178",
+      "name_tc": "柏濤小築, 環角道",
+      "name_en": "Cypresswaver Villas, Cape Road",
+      "lat": "22.217403942091",
+      "long": "114.20637101053"
+    },
+    {
+      "stop": "002177",
+      "name_tc": "環角徑, 環角道",
+      "name_en": "Cape Drive, Cape Road",
+      "lat": "22.217298792091",
+      "long": "114.20508929053"
+    },
+    {
+      "stop": "002397",
+      "name_tc": "海天徑, 舂磡角道",
+      "name_en": "Horizon Drive, Chung Hom Kok Road",
+      "lat": "22.218475062091",
+      "long": "114.20470134053"
+    },
+    {
+      "stop": "002194",
+      "name_tc": "舂坎角消防局, 舂磡角道",
+      "name_en": "Chung Hom Kok Fire Station, Chung Hom Kok Road",
+      "lat": "22.220322062091",
+      "long": "114.20322613053"
+    },
+    {
+      "stop": "002192",
+      "name_tc": "舂磡角道 11 號, 舂磡角道",
+      "name_en": "11 Chung Hom Kok Road, Chung Hom Kok Road",
+      "lat": "22.223190412091",
+      "long": "114.20293698053"
+    },
+    {
+      "stop": "002272",
+      "name_tc": "赫蘭道, 淺水灣道",
+      "name_en": "Headland Road, Repulse Bay Road",
+      "lat": "22.225869452091",
+      "long": "114.20314234053"
+    },
+    {
+      "stop": "002380",
+      "name_tc": "淺水灣道 102 號, 淺水灣道",
+      "name_en": "102 Repulse Bay Road, Repulse Bay Road",
+      "lat": "22.233938732091",
+      "long": "114.20093324053"
+    },
+    {
+      "stop": "002242",
+      "name_tc": "淺水灣道 90 號, 淺水灣道",
+      "name_en": "90 Repulse Bay Road, Repulse Bay Road",
+      "lat": "22.235555362091",
+      "long": "114.19964630053"
+    },
+    {
+      "stop": "002257",
+      "name_tc": "淺水灣別墅, 淺水灣道",
+      "name_en": "Repulse Bay Villas, Repulse Bay Road",
+      "lat": "22.238098772091",
+      "long": "114.19806596053"
+    },
+    {
+      "stop": "002241",
+      "name_tc": "淺水灣海灘, 淺水灣道",
+      "name_en": "Repulse Bay Beach, Repulse Bay Road",
+      "lat": "22.238580522091",
+      "long": "114.19490222053"
+    },
+    {
+      "stop": "002251",
+      "name_tc": "麗景道, 淺水灣道",
+      "name_en": "Belleview Drive, Repulse Bay Road",
+      "lat": "22.237393012091",
+      "long": "114.19266000053"
+    },
+    {
+      "stop": "002196",
+      "name_tc": "香島小築, 香島道",
+      "name_en": "Island Club, Island Road",
+      "lat": "22.237708532091",
+      "long": "114.18936421053"
+    },
+    {
+      "stop": "002198",
+      "name_tc": "蒲苑, 香島道",
+      "name_en": "Deepdene, Island Road",
+      "lat": "22.239979112091",
+      "long": "114.18722259053"
+    },
+    {
+      "stop": "002197",
+      "name_tc": "深水灣, 香島道",
+      "name_en": "Deep Water Bay, Island Road",
+      "lat": "22.245675382091",
+      "long": "114.18657401053"
+    },
+    {
+      "stop": "002349",
+      "name_tc": "鄉村俱樂部, 黃竹坑道",
+      "name_en": "Hong Kong Country Club, Wong Chuk Hang Road",
+      "lat": "22.246031282091",
+      "long": "114.17789029053"
+    },
+    {
+      "stop": "002352",
+      "name_tc": "海洋公園站, 黃竹坑道",
+      "name_en": "Ocean Park Station, Wong Chuk Hang Road",
+      "lat": "22.248829442091",
+      "long": "114.17559659053"
+    },
+    {
+      "stop": "002354",
+      "name_tc": "黃竹坑體育館, 黃竹坑道",
+      "name_en": "Wong Chuk Hang Sports Centre, Wong Chuk Hang Road",
+      "lat": "22.249915342091",
+      "long": "114.17331087053"
+    },
+    {
+      "stop": "002355",
+      "name_tc": "黃竹坑遊樂場, 黃竹坑道",
+      "name_en": "Wong Chuk Hang Recreation Ground, Wong Chuk Hang Road",
+      "lat": "22.250122902091",
+      "long": "114.16985106053"
+    },
+    {
+      "stop": "002222",
+      "name_tc": "陳白沙紀念中學, 南朗山道",
+      "name_en": "Chan Pak Sha School, Nam Long Shan Road",
+      "lat": "22.245721242091",
+      "long": "114.16673015053"
+    },
+    {
+      "stop": "002389",
+      "name_tc": "深灣",
+      "name_en": "Sham Wan",
+      "lat": "22.243326112091",
+      "long": "114.16413796053"
+    },
+    {
+      "stop": "002390",
+      "name_tc": "南朗山道熟食市場, 南朗山道",
+      "name_en": "Nam Long Shan Road Cooked Food Market, Nam Long Shan Road",
+      "lat": "22.247128452091",
+      "long": "114.16638027053"
+    },
+    {
+      "stop": "002357",
+      "name_tc": "南朗山道, 黃竹坑道",
+      "name_en": "Nam Long Shan Road, Wong Chuk Hang Road",
+      "lat": "22.248327512091",
+      "long": "114.16606157053"
+    },
+    {
+      "stop": "002358",
+      "name_tc": "勝利工廠大廈, 黃竹坑道",
+      "name_en": "Victory Factory Building, Wong Chuk Hang Road",
+      "lat": "22.248392422091",
+      "long": "114.16314899053"
+    },
+    {
+      "stop": "002160",
+      "name_tc": "逸港居, 香港仔海傍道",
+      "name_en": "Ocean Court, Aberdeen Praya Road",
+      "lat": "22.247488362091",
+      "long": "114.15902634053"
+    },
+    {
+      "stop": "002161",
+      "name_tc": "香港仔海濱公園, 香港仔海傍道",
+      "name_en": "Aberdeen Promenade, Aberdeen Praya Road",
+      "lat": "22.247000182091",
+      "long": "114.15578260053"
+    },
+    {
+      "stop": "002162",
+      "name_tc": "香港仔魚類批發市場, 香港仔海傍道",
+      "name_en": "Aberdeen Wholesale Fish Market, Aberdeen Praya Road",
+      "lat": "22.247980382091",
+      "long": "114.15243083053"
+    },
+    {
+      "stop": "002163",
+      "name_tc": "田灣街, 香港仔海傍道",
+      "name_en": "Tin Wan Street, Aberdeen Praya Road",
+      "lat": "22.248632712091",
+      "long": "114.14809052053"
+    },
+    {
+      "stop": "002261",
+      "name_tc": "華富道, 石排灣道",
+      "name_en": "Wah Fu Road, Shek Pai Wan Road",
+      "lat": "22.252557142091",
+      "long": "114.14024833053"
+    },
+    {
+      "stop": "001400",
+      "name_tc": "匯翔道, 廣東道",
+      "name_en": "Wui Cheung Road, Canton Road",
+      "lat": "22.304374172091",
+      "long": "114.16780688053"
+    },
+    {
+      "stop": "001403",
+      "name_tc": "戲曲中心, 廣東道",
+      "name_en": "Xiqu Centre, Canton Road",
+      "lat": "22.301518502091",
+      "long": "114.16811772053"
+    },
+    {
+      "stop": "002626",
+      "name_tc": "中港城, 九龍公園徑",
+      "name_en": "China Hong Kong City, Kowloon Park Drive",
+      "lat": "22.299863552091",
+      "long": "114.16890645053"
+    },
+    {
+      "stop": "002627",
+      "name_tc": "北京道, 九龍公園徑",
+      "name_en": "Peking Road, Kowloon Park Drive",
+      "lat": "22.295787822091",
+      "long": "114.17046485053"
+    },
+    {
+      "stop": "001587",
+      "name_tc": "尖東站, 梳士巴利道",
+      "name_en": "East Tsim Sha Tsui Station, Salisbury Road",
+      "lat": "22.295215502091",
+      "long": "114.17460773053"
+    },
+    {
+      "stop": "001152",
+      "name_tc": "堅尼地城",
+      "name_en": "Kennedy Town",
+      "lat": "22.282465512091",
+      "long": "114.12322612053"
+    },
+    {
+      "stop": "001163",
+      "name_tc": "西市街, 域多利道",
+      "name_en": "Sai See Street, Victoria Road",
+      "lat": "22.282182852091",
+      "long": "114.12521679053"
+    },
+    {
+      "stop": "002692",
+      "name_tc": "士美菲路, 吉席街",
+      "name_en": "Smithfield, Catchick Street",
+      "lat": "22.283365132091",
+      "long": "114.12838920053"
+    },
+    {
+      "stop": "001081",
+      "name_tc": "西祥街, 堅彌地城海旁",
+      "name_en": "Sai Cheung Street, Kennedy Town Praya",
+      "lat": "22.284984992091",
+      "long": "114.13095631053"
+    },
+    {
+      "stop": "001059",
+      "name_tc": "堅尼地城游泳池休憩處, 德輔道西",
+      "name_en": "Kennedy Town Swimming Pool Sitting-out Area, Des Voeux Road West",
+      "lat": "22.287202282091",
+      "long": "114.13257171053"
+    },
+    {
+      "stop": "001060",
+      "name_tc": "山道, 德輔道西",
+      "name_en": "Hill Road, Des Voeux Road West",
+      "lat": "22.287192342091",
+      "long": "114.13433789053"
+    },
+    {
+      "stop": "001192",
+      "name_tc": "均益大廈第二期, 德輔道西",
+      "name_en": "Kwan Yick Building Phase II, Des Voeux Road West",
+      "lat": "22.287246062091",
+      "long": "114.13780956053"
+    },
+    {
+      "stop": "002734",
+      "name_tc": "西區警署, 德輔道西",
+      "name_en": "Western Police Station, Des Voeux Road West",
+      "lat": "22.287766442091",
+      "long": "114.13975075053"
+    },
+    {
+      "stop": "001064",
+      "name_tc": "東邊街, 德輔道西",
+      "name_en": "Eastern Street, Des Voeux Road West",
+      "lat": "22.287915452091",
+      "long": "114.14422510053"
+    },
+    {
+      "stop": "001065",
+      "name_tc": "修打蘭街, 德輔道西",
+      "name_en": "Sutherland Street, Des Voeux Road West",
+      "lat": "22.287779782091",
+      "long": "114.14637128053"
+    },
+    {
+      "stop": "001044",
+      "name_tc": "林士街, 德輔道中",
+      "name_en": "Rumsey Street, Des Voeux Road Central",
+      "lat": "22.286050072091",
+      "long": "114.15372775053"
+    },
+    {
+      "stop": "002737",
+      "name_tc": "砵典乍街, 德輔道中",
+      "name_en": "Pottinger Street, Des Voeux Road Central",
+      "lat": "22.283948002091",
+      "long": "114.15630946053"
+    },
+    {
+      "stop": "001051",
+      "name_tc": "皇后像廣場, 德輔道中",
+      "name_en": "Statue Square, Des Voeux Road Central",
+      "lat": "22.280748762091",
+      "long": "114.15964401053"
+    },
+    {
+      "stop": "002427",
+      "name_tc": "軍器廠街, 軒尼詩道",
+      "name_en": "Arsenal Street, Hennessy Road",
+      "lat": "22.277848662091",
+      "long": "114.16894462053"
+    },
+    {
+      "stop": "002431",
+      "name_tc": "柯布連道, 軒尼詩道",
+      "name_en": "O'Brien Road, Hennessy Road",
+      "lat": "22.277694092091",
+      "long": "114.17312989053"
+    },
+    {
+      "stop": "002413",
+      "name_tc": "大有廣場, 菲林明道",
+      "name_en": "Tai Yau Plaza, Fleming Road",
+      "lat": "22.276992282091",
+      "long": "114.17491050053"
+    },
+    {
+      "stop": "002539",
+      "name_tc": "克街, 灣仔道",
+      "name_en": "Heard Street, Wan Chai Road",
+      "lat": "22.277181682091",
+      "long": "114.17717573053"
+    },
+    {
+      "stop": "002968",
+      "name_tc": "南洋酒店, 摩理臣山道",
+      "name_en": "South Pacific Hotel, Morrison Hill Road",
+      "lat": "22.276754282091",
+      "long": "114.18038082053"
+    },
+    {
+      "stop": "001475",
+      "name_tc": "海底隧道巴士轉乘站",
+      "name_en": "Cross Harbour Tunnel Bus-Bus Interchange",
+      "lat": "22.302817792091",
+      "long": "114.18008423053"
+    },
+    {
+      "stop": "001412",
+      "name_tc": "山谷道, 漆咸道北",
+      "name_en": "Valley Road, Chatham Road North",
+      "lat": "22.309305192091",
+      "long": "114.18379162053"
+    },
+    {
+      "stop": "001413",
+      "name_tc": "北拱街, 漆咸道北",
+      "name_en": "Pak Kung Street, Chatham Road North",
+      "lat": "22.312201072091",
+      "long": "114.18612482053"
+    },
+    {
+      "stop": "001534",
+      "name_tc": "落山道, 馬頭圍道",
+      "name_en": "Lok Shan Road, Ma Tau Wai Road",
+      "lat": "22.316614492091",
+      "long": "114.18747797053"
+    },
+    {
+      "stop": "001535",
+      "name_tc": "天光道, 馬頭圍道",
+      "name_en": "Tin Kwong Road, Ma Tau Wai Road",
+      "lat": "22.319316112091",
+      "long": "114.18745764053"
+    },
+    {
+      "stop": "001772",
+      "name_tc": "馬頭圍邨洋葵樓, 馬頭涌道",
+      "name_en": "Geranium House Ma Tau Wai Estate, Ma Tau Chung Road",
+      "lat": "22.322467342091",
+      "long": "114.18759772053"
+    },
+    {
+      "stop": "001529",
+      "name_tc": "亞皆老街遊樂場, 馬頭涌道",
+      "name_en": "Argyle Street Playground, Ma Tau Chung Road",
+      "lat": "22.326431422091",
+      "long": "114.18954401053"
+    },
+    {
+      "stop": "001572",
+      "name_tc": "九龍城–衙前圍道, 太子道東",
+      "name_en": "Kowloon City - Nga Tsin Wai Road, Prince Edward Road East",
+      "lat": "22.328494832091",
+      "long": "114.19184067053"
+    },
+    {
+      "stop": "002976",
+      "name_tc": "景泰街, 太子道東",
+      "name_en": "King Tai Street, Prince Edward Road East",
+      "lat": "22.334041842091",
+      "long": "114.19883754053"
+    },
+    {
+      "stop": "001829",
+      "name_tc": "彩虹邨, 太子道東",
+      "name_en": "Choi Hung Estate, Prince Edward Road East",
+      "lat": "22.335344522091",
+      "long": "114.20407525053"
+    },
+    {
+      "stop": "001503",
+      "name_tc": "坪石邨, 太子道東",
+      "name_en": "Ping Shek Estate, Prince Edward Road East",
+      "lat": "22.333081342091",
+      "long": "114.20723458053"
+    },
+    {
+      "stop": "001504",
+      "name_tc": "啟業邨, 觀塘道",
+      "name_en": "Kai Yip Estate, Kwun Tong Road",
+      "lat": "22.330616082091",
+      "long": "114.21034329053"
+    },
+    {
+      "stop": "001505",
+      "name_tc": "九龍灣站, 觀塘道",
+      "name_en": "Kowloon Bay Station, Kwun Tong Road",
+      "lat": "22.325498272091",
+      "long": "114.21429538053"
+    },
+    {
+      "stop": "001506",
+      "name_tc": "牛頭角下邨, 觀塘道",
+      "name_en": "Lower Ngau Tau Kok Estate, Kwun Tong Road",
+      "lat": "22.321454812091",
+      "long": "114.21463179053"
+    },
+    {
+      "stop": "001797",
+      "name_tc": "觀塘道休憩處, 觀塘道",
+      "name_en": "Kwun Tong Road Sitting-out Area, Kwun Tong Road",
+      "lat": "22.318072952091",
+      "long": "114.21503387053"
+    },
+    {
+      "stop": "001508",
+      "name_tc": "牛頭角站, 觀塘道",
+      "name_en": "Ngau Tau Kok Station, Kwun Tong Road",
+      "lat": "22.315130552091",
+      "long": "114.21954638053"
+    },
+    {
+      "stop": "002977",
+      "name_tc": "觀塘 (裕民坊)",
+      "name_en": "Kwun Tong (Yue Man Square)",
+      "lat": "22.314506752091",
+      "long": "114.22472004053"
+    },
+    {
+      "stop": "001648",
+      "name_tc": "牛頭角站, 牛頭角道",
+      "name_en": "Ngau Tau Kok Station, Ngau Tau Kok Road",
+      "lat": "22.315247332091",
+      "long": "114.21981384053"
+    },
+    {
+      "stop": "001650",
+      "name_tc": "觀塘官立小學, 牛頭角道",
+      "name_en": "Kwun Tong Government Primary School, Ngau Tau Kok Road",
+      "lat": "22.316965702091",
+      "long": "114.21762044053"
+    },
+    {
+      "stop": "002978",
+      "name_tc": "牛頭角下邨, 牛頭角道",
+      "name_en": "Lower Ngau Tau Kok Estate, Ngau Tau Kok Road",
+      "lat": "22.320004152091",
+      "long": "114.21526898053"
+    },
+    {
+      "stop": "002979",
+      "name_tc": "淘大花園, 牛頭角道",
+      "name_en": "Amoy Gardens, Ngau Tau Kok Road",
+      "lat": "22.324506682091",
+      "long": "114.21538780053"
+    },
+    {
+      "stop": "002889",
+      "name_tc": "啟業邨, 觀塘道",
+      "name_en": "Kai Yip Estate, Kwun Tong Road",
+      "lat": "22.330495182091",
+      "long": "114.20984372053"
+    },
+    {
+      "stop": "001502",
+      "name_tc": "麗晶花園, 太子道東",
+      "name_en": "Richland Gardens, Prince Edward Road East",
+      "lat": "22.332582922091",
+      "long": "114.20691744053"
+    },
+    {
+      "stop": "001575",
+      "name_tc": "采頤花園, 太子道東",
+      "name_en": "Rhythm Garden, Prince Edward Road East",
+      "lat": "22.334936902091",
+      "long": "114.20201687053"
+    },
+    {
+      "stop": "001576",
+      "name_tc": "譽．港灣, 太子道東",
+      "name_en": "The Latitude, Prince Edward Road East",
+      "lat": "22.332221292091",
+      "long": "114.19699015053"
+    },
+    {
+      "stop": "001577",
+      "name_tc": "九龍城–宋皇臺遊樂場, 太子道東",
+      "name_en": "Kowloon City - Sung Wong Toi Playground, Prince Edward Road East",
+      "lat": "22.327146622091",
+      "long": "114.19053280053"
+    },
+    {
+      "stop": "001530",
+      "name_tc": "木廠街, 馬頭涌道",
+      "name_en": "Mok Cheong Street, Ma Tau Chung Road",
+      "lat": "22.323261842091",
+      "long": "114.18821017053"
+    },
+    {
+      "stop": "001538",
+      "name_tc": "土瓜灣街市, 馬頭圍道",
+      "name_en": "To Kwa Wan Market, Ma Tau Wai Road",
+      "lat": "22.317651292091",
+      "long": "114.18770359053"
+    },
+    {
+      "stop": "001643",
+      "name_tc": "浙江街遊樂場, 漆咸道北",
+      "name_en": "Chi Kiang Street Playground, Chatham Road North",
+      "lat": "22.313753452091",
+      "long": "114.18730143053"
+    },
+    {
+      "stop": "001644",
+      "name_tc": "北拱街, 漆咸道北",
+      "name_en": "Pak Kung Street, Chatham Road North",
+      "lat": "22.311833242091",
+      "long": "114.18612626053"
+    },
+    {
+      "stop": "001415",
+      "name_tc": "平治街, 漆咸道北",
+      "name_en": "Ping Chi Street, Chatham Road North",
+      "lat": "22.309564142091",
+      "long": "114.18459248053"
+    },
+    {
+      "stop": "001476",
+      "name_tc": "海底隧道巴士轉乘站",
+      "name_en": "Cross Harbour Tunnel Bus-Bus Interchange",
+      "lat": "22.303015922091",
+      "long": "114.18084154053"
+    },
+    {
+      "stop": "002566",
+      "name_tc": "利景酒店, 灣仔道",
+      "name_en": "The Charterhouse, Wan Chai Road",
+      "lat": "22.277832632091",
+      "long": "114.17916549053"
+    },
+    {
+      "stop": "002537",
+      "name_tc": "普樂里, 灣仔道",
+      "name_en": "Bullock Lane, Wan Chai Road",
+      "lat": "22.276798792091",
+      "long": "114.17597252053"
+    },
+    {
+      "stop": "002446",
+      "name_tc": "修頓球場, 軒尼詩道",
+      "name_en": "Southorn Playground, Hennessy Road",
+      "lat": "22.277433042091",
+      "long": "114.17187855053"
+    },
+    {
+      "stop": "001140",
+      "name_tc": "金鐘 - 太古廣場, 金鐘道",
+      "name_en": "Admiralty - Pacific Place, Queensway",
+      "lat": "22.278070732091",
+      "long": "114.16486695053"
+    },
+    {
+      "stop": "001142",
+      "name_tc": "中銀大廈, 金鐘道",
+      "name_en": "Bank of China Tower, Queensway",
+      "lat": "22.279480102091",
+      "long": "114.16214434053"
+    },
+    {
+      "stop": "001054",
+      "name_tc": "置地廣場, 德輔道中",
+      "name_en": "The Landmark, Des Voeux Road Central",
+      "lat": "22.281316152091",
+      "long": "114.15825054053"
+    },
+    {
+      "stop": "001121",
+      "name_tc": "中環街市, 域多利皇后街",
+      "name_en": "Central Market, Queen Victoria Street",
+      "lat": "22.283815052091",
+      "long": "114.15559526053"
+    },
+    {
+      "stop": "001125",
+      "name_tc": "威靈頓街, 皇后大道中",
+      "name_en": "Wellington Street, Queen's Road Central",
+      "lat": "22.284833042091",
+      "long": "114.15330172053"
+    },
+    {
+      "stop": "001126",
+      "name_tc": "荷李活華庭, 皇后大道中",
+      "name_en": "Hollywood Terrace, Queen's Road Central",
+      "lat": "22.284443202091",
+      "long": "114.15115814053"
+    },
+    {
+      "stop": "001127",
+      "name_tc": "上環文娛中心, 皇后大道中",
+      "name_en": "Sheung Wan Civic Centre, Queen's Road Central",
+      "lat": "22.285970352091",
+      "long": "114.14910338053"
+    },
+    {
+      "stop": "001134",
+      "name_tc": "帝后華庭, 皇后大道西",
+      "name_en": "Queen's Terrace, Queen's Road West",
+      "lat": "22.286525342091",
+      "long": "114.14736012053"
+    },
+    {
+      "stop": "001130",
+      "name_tc": "正街, 皇后大道西",
+      "name_en": "Centre Street, Queen's Road West",
+      "lat": "22.286844142091",
+      "long": "114.14276129053"
+    },
+    {
+      "stop": "001132",
+      "name_tc": "朝光街, 皇后大道西",
+      "name_en": "Chiu Kwong Street, Queen's Road West",
+      "lat": "22.286757962091",
+      "long": "114.13975003053"
+    },
+    {
+      "stop": "001133",
+      "name_tc": "石塘咀市政大廈, 皇后大道西",
+      "name_en": "Shek Tong Tsui Complex, Queen's Road West",
+      "lat": "22.285969012091",
+      "long": "114.13561606053"
+    },
+    {
+      "stop": "001128",
+      "name_tc": "日富里, 皇后大道西",
+      "name_en": "Yat Fu Lane, Queen's Road West",
+      "lat": "22.286430502091",
+      "long": "114.13350308053"
+    },
+    {
+      "stop": "001003",
+      "name_tc": "山市街, 卑路乍街",
+      "name_en": "Sands Street, Belcher's Street",
+      "lat": "22.283632272091",
+      "long": "114.13063421053"
+    },
+    {
+      "stop": "001005",
+      "name_tc": "聯邦新樓, 卑路乍街",
+      "name_en": "Luen Bong Apartment, Belcher's Street",
+      "lat": "22.282463392091",
+      "long": "114.12760792053"
+    },
+    {
+      "stop": "001164",
+      "name_tc": "加惠民道, 域多利道",
+      "name_en": "Ka Wai Man Road, Victoria Road",
+      "lat": "22.282072692091",
+      "long": "114.12493465053"
+    },
+    {
+      "stop": "001063",
+      "name_tc": "正街, 德輔道西",
+      "name_en": "Centre Street, Des Voeux Road West",
+      "lat": "22.287991912091",
+      "long": "114.14192498053"
+    },
+    {
+      "stop": "002738",
+      "name_tc": "威利麻街, 德輔道西",
+      "name_en": "Wilmer Street, Des Voeux Road West",
+      "lat": "22.287877042091",
+      "long": "114.14528892053"
+    },
+    {
+      "stop": "001137",
+      "name_tc": "金鐘 - 統一中心, 金鐘道",
+      "name_en": "Admiralty - United Centre, Queensway",
+      "lat": "22.278348592091",
+      "long": "114.16493918053"
+    },
+    {
+      "stop": "002423",
+      "name_tc": "入境事務大樓, 告士打道",
+      "name_en": "Immigration Tower, Gloucester Road",
+      "lat": "22.279435952091",
+      "long": "114.17270317053"
+    },
+    {
+      "stop": "002426",
+      "name_tc": "灣仔游泳池, 港灣道",
+      "name_en": "Wan Chai Swimming Pool, Harbour Road",
+      "lat": "22.280878042091",
+      "long": "114.17655559053"
+    },
+    {
+      "stop": "001769",
+      "name_tc": "拔萃女書院, 加士居道",
+      "name_en": "Diocesan Girls' School, Gascoigne Road",
+      "lat": "22.307534682091",
+      "long": "114.17292169053"
+    },
+    {
+      "stop": "001549",
+      "name_tc": "碧街, 彌敦道",
+      "name_en": "Pitt Street, Nathan Road",
+      "lat": "22.314107332091",
+      "long": "114.17032997053"
+    },
+    {
+      "stop": "002817",
+      "name_tc": "奶路臣街, 彌敦道",
+      "name_en": "Nelson Street, Nathan Road",
+      "lat": "22.318682242091",
+      "long": "114.16939107053"
+    },
+    {
+      "stop": "002818",
+      "name_tc": "港九潮州公學, 洗衣街",
+      "name_en": "HK & Kowloon Chiu Chow School, Sai Yee Street",
+      "lat": "22.321761142091",
+      "long": "114.17111798053"
+    },
+    {
+      "stop": "002819",
+      "name_tc": "伊利沙伯中學, 洗衣街",
+      "name_en": "Queen Elizabeth School, Sai Yee Street",
+      "lat": "22.323529612091",
+      "long": "114.17077433053"
+    },
+    {
+      "stop": "002820",
+      "name_tc": "太子站, 通菜街",
+      "name_en": "Prince Edward Station, Tung Choi Street",
+      "lat": "22.324870922091",
+      "long": "114.16937160053"
+    },
+    {
+      "stop": "002821",
+      "name_tc": "大坑東遊樂場, 大坑東道",
+      "name_en": "Tai Hang Tung Recreation Ground, Tai Hang Tung Road",
+      "lat": "22.327961132091",
+      "long": "114.17202509053"
+    },
+    {
+      "stop": "002822",
+      "name_tc": "協同中學, 大坑東道",
+      "name_en": "Concordia Lutheran School, Tai Hang Tung Road",
+      "lat": "22.329888172091",
+      "long": "114.17195233053"
+    },
+    {
+      "stop": "002823",
+      "name_tc": "石硤尾站, 窩仔街",
+      "name_en": "Shek Kip Mei Station, Woh Chai Street",
+      "lat": "22.331507902091",
+      "long": "114.16940987053"
+    },
+    {
+      "stop": "002824",
+      "name_tc": "白田邨瑞田樓, 南昌街",
+      "name_en": "Shui Tin House Pak Tin Estate, Nam Cheong Street",
+      "lat": "22.335642652091",
+      "long": "114.16891179053"
+    },
+    {
+      "stop": "003428",
+      "name_tc": "白田 (北)",
+      "name_en": "Pak Tin (North)",
+      "lat": "22.336440972091",
+      "long": "114.16829083053"
+    },
+    {
+      "stop": "002826",
+      "name_tc": "白田邨康田樓, 白雲街",
+      "name_en": "Hong Tin House Pak Tin Estate, Pak Wan Street",
+      "lat": "22.336905632091",
+      "long": "114.16561953053"
+    },
+    {
+      "stop": "002825",
+      "name_tc": "白田邨",
+      "name_en": "Pak Tin Estate",
+      "lat": "22.336271232091",
+      "long": "114.16594467053"
+    },
+    {
+      "stop": "002827",
+      "name_tc": "白田邨麗田樓, 偉倫街",
+      "name_en": "Lai Tin House Pak Tin Estate, Wai Lun Street",
+      "lat": "22.335019812091",
+      "long": "114.16727682053"
+    },
+    {
+      "stop": "003190",
+      "name_tc": "石硤尾邨美映樓, 南昌街",
+      "name_en": "Mei Ying House Shek Kip Mei Estate, Nam Cheong Street",
+      "lat": "22.334216712091",
+      "long": "114.16786701053"
+    },
+    {
+      "stop": "002830",
+      "name_tc": "石硤尾站, 窩仔街",
+      "name_en": "Shek Kip Mei Station, Woh Chai Street",
+      "lat": "22.331883842091",
+      "long": "114.16783961053"
+    },
+    {
+      "stop": "002831",
+      "name_tc": "大坑西新邨民樂樓, 窩仔街",
+      "name_en": "Man Lok House Tai Hang Sai Estate, Woh Chai Street",
+      "lat": "22.331603112091",
+      "long": "114.16915727053"
+    },
+    {
+      "stop": "002832",
+      "name_tc": "協同中學, 大坑東道",
+      "name_en": "Concordia Lutheran School, Tai Hang Tung Road",
+      "lat": "22.330954892091",
+      "long": "114.17165116053"
+    },
+    {
+      "stop": "002833",
+      "name_tc": "大坑東遊樂場, 大坑東道",
+      "name_en": "Tai Hang Tung Recreation Ground, Tai Hang Tung Road",
+      "lat": "22.328150242091",
+      "long": "114.17217151053"
+    },
+    {
+      "stop": "002834",
+      "name_tc": "勵德街",
+      "name_en": "Knight Street",
+      "lat": "22.325886452091",
+      "long": "114.17632775053"
+    },
+    {
+      "stop": "002835",
+      "name_tc": "協和小學, 太子道西",
+      "name_en": "Heep Woh Primary School, Prince Edward Road West",
+      "lat": "22.324704672091",
+      "long": "114.17284338053"
+    },
+    {
+      "stop": "001560",
+      "name_tc": "山東街, 彌敦道",
+      "name_en": "Shantung Street, Nathan Road",
+      "lat": "22.317136402091",
+      "long": "114.16988485053"
+    },
+    {
+      "stop": "001471",
+      "name_tc": "勞資審裁處, 加士居道",
+      "name_en": "Labour Tribunal, Gascoigne Road",
+      "lat": "22.308028422091",
+      "long": "114.17252808053"
+    },
+    {
+      "stop": "001411",
+      "name_tc": "香港理工大學第八期, 漆咸道北",
+      "name_en": "Hong Kong Polytechnic University Phase 8, Chatham Road North",
+      "lat": "22.306388992091",
+      "long": "114.17999535053"
+    },
+    {
+      "stop": "002570",
+      "name_tc": "伊利莎伯大廈, 告士打道",
+      "name_en": "Elizabeth House, Gloucester Road",
+      "lat": "22.281546792091",
+      "long": "114.18126242053"
+    },
+    {
+      "stop": "002417",
+      "name_tc": "國際調解院, 告士打道",
+      "name_en": "International Organization for Mediation, Gloucester Road",
+      "lat": "22.279365262091",
+      "long": "114.17502194053"
+    },
+    {
+      "stop": "002419",
+      "name_tc": "六國酒店, 告士打道",
+      "name_en": "Gloucester Luk Kwok, Gloucester Road",
+      "lat": "22.279008442091",
+      "long": "114.17233107053"
+    },
+    {
+      "stop": "002448",
+      "name_tc": "循道衛理大廈, 軒尼詩道",
+      "name_en": "Methodist House, Hennessy Road",
+      "lat": "22.277587912091",
+      "long": "114.16981359053"
+    },
+    {
+      "stop": "001027",
+      "name_tc": "中環 (港澳碼頭)",
+      "name_en": "Central (Macao Ferry)",
+      "lat": "22.288274152091",
+      "long": "114.15042248053"
+    },
+    {
+      "stop": "001642",
+      "name_tc": "天主教伍華中學, 彩虹道",
+      "name_en": "Ng Wah Catholic Secondary School, Choi Hung Road",
+      "lat": "22.333238172091",
+      "long": "114.19538309053"
+    },
+    {
+      "stop": "003005",
+      "name_tc": "東頭邨泰東樓, 彩虹道",
+      "name_en": "Tai Tung House Tung Tau Estate, Choi Hung Road",
+      "lat": "22.335570972091",
+      "long": "114.19418205053"
+    },
+    {
+      "stop": "001689",
+      "name_tc": "黃大仙警署, 彩虹道",
+      "name_en": "Wong Tai Sin Police Station, Choi Hung Road",
+      "lat": "22.339132542091",
+      "long": "114.19711901053"
+    },
+    {
+      "stop": "001452",
+      "name_tc": "四美街, 彩虹道",
+      "name_en": "Sze Mei Street, Choi Hung Road",
+      "lat": "22.338412692091",
+      "long": "114.20116223053"
+    },
+    {
+      "stop": "001448",
+      "name_tc": "彩虹邨金碧樓, 彩虹邨通道",
+      "name_en": "Kam Pik House Choi Hung Estate, Choi Hung access Road",
+      "lat": "22.335157802091",
+      "long": "114.20498066053"
+    },
+    {
+      "stop": "001654",
+      "name_tc": "坪石邨",
+      "name_en": "Ping Shek Estate",
+      "lat": "22.334128192091",
+      "long": "114.21002009053"
+    },
+    {
+      "stop": "001525",
+      "name_tc": "彩虹邨丹鳳樓, 龍翔道",
+      "name_en": "Tan Fung House Choi Hung Estate, Lung Cheung Road",
+      "lat": "22.335290892091",
+      "long": "114.20761701053"
+    },
+    {
+      "stop": "001472",
+      "name_tc": "彩虹邨錦雲樓, 龍翔道",
+      "name_en": "Kam Wan House Choi Hung Estate, Lung Cheung Road",
+      "lat": "22.337151872091",
+      "long": "114.20451787053"
+    },
+    {
+      "stop": "001699",
+      "name_tc": "四美街, 彩虹道",
+      "name_en": "Sze Mei Street, Choi Hung Road",
+      "lat": "22.337937222091",
+      "long": "114.20174654053"
+    },
+    {
+      "stop": "001450",
+      "name_tc": "彩虹道遊樂場, 彩虹道",
+      "name_en": "Choi Hung Road Playground, Choi Hung Road",
+      "lat": "22.337495022091",
+      "long": "114.19561951053"
+    },
+    {
+      "stop": "001451",
+      "name_tc": "寧遠街, 彩虹道",
+      "name_en": "Ning Yuen Street, Choi Hung Road",
+      "lat": "22.334144962091",
+      "long": "114.19475521053"
+    },
+    {
+      "stop": "002441",
+      "name_tc": "天樂里, 軒尼詩道",
+      "name_en": "Tin Lok Lane, Hennessy Road",
+      "lat": "22.278925922091",
+      "long": "114.18029774053"
+    },
+    {
+      "stop": "002444",
+      "name_tc": "軒尼詩道官立小學, 軒尼詩道",
+      "name_en": "Hennessy Road Government Primary School, Hennessy Road",
+      "lat": "22.277744552091",
+      "long": "114.17543474053"
+    },
+    {
+      "stop": "002445",
+      "name_tc": "菲林明道, 軒尼詩道",
+      "name_en": "Fleming Road, Hennessy Road",
+      "lat": "22.277602072091",
+      "long": "114.17407242053"
+    },
+    {
+      "stop": "001141",
+      "name_tc": "金鐘 - 高等法院, 金鐘道",
+      "name_en": "Admiralty - High Court, Queensway",
+      "lat": "22.278413762091",
+      "long": "114.16387262053"
+    },
+    {
+      "stop": "001053",
+      "name_tc": "滙豐總行大廈, 德輔道中",
+      "name_en": "HSBC Main Building, Des Voeux Road Central",
+      "lat": "22.280739462091",
+      "long": "114.15905007053"
+    },
+    {
+      "stop": "001056",
+      "name_tc": "中環街市, 德輔道中",
+      "name_en": "Central Market, Des Voeux Road Central",
+      "lat": "22.284855172091",
+      "long": "114.15539392053"
+    },
+    {
+      "stop": "001177",
+      "name_tc": "卑路乍灣",
+      "name_en": "Belcher Bay",
+      "lat": "22.284611882091",
+      "long": "114.12845352053"
+    },
+    {
+      "stop": "002764",
+      "name_tc": "荷蘭街",
+      "name_en": "Holland Street",
+      "lat": "22.284460442091",
+      "long": "114.13077129053"
+    },
+    {
+      "stop": "001047",
+      "name_tc": "德忌利士街, 德輔道中",
+      "name_en": "Douglas Street, Des Voeux Road Central",
+      "lat": "22.283301982091",
+      "long": "114.15683404053"
+    },
+    {
+      "stop": "001136",
+      "name_tc": "金鐘 - 金鐘花園, 金鐘道",
+      "name_en": "Admiralty - Admiralty Garden, Queensway",
+      "lat": "22.278493752091",
+      "long": "114.16445856053"
+    },
+    {
+      "stop": "002479",
+      "name_tc": "太古廣場三座, 皇后大道東",
+      "name_en": "Three Pacific Place, Queen's Road East",
+      "lat": "22.277614332091",
+      "long": "114.16784733053"
+    },
+    {
+      "stop": "002480",
+      "name_tc": "聯發街, 皇后大道東",
+      "name_en": "Lun Fat Street, Queen's Road East",
+      "lat": "22.276092532091",
+      "long": "114.17017417053"
+    },
+    {
+      "stop": "002481",
+      "name_tc": "廈門街, 皇后大道東",
+      "name_en": "Amoy Street, Queen's Road East",
+      "lat": "22.275205172091",
+      "long": "114.17158011053"
+    },
+    {
+      "stop": "002482",
+      "name_tc": "尚翹峰, 皇后大道東",
+      "name_en": "The Zenith, Queen's Road East",
+      "lat": "22.274470092091",
+      "long": "114.17386255053"
+    },
+    {
+      "stop": "002484",
+      "name_tc": "聖若瑟小學, 皇后大道東",
+      "name_en": "St. Joseph's Primary School, Queen's Road East",
+      "lat": "22.275165142091",
+      "long": "114.17692050053"
+    },
+    {
+      "stop": "002405",
+      "name_tc": "堅拿道西",
+      "name_en": "Canal Road West",
+      "lat": "22.277412402091",
+      "long": "114.18097147053"
+    },
+    {
+      "stop": "001578",
+      "name_tc": "嘉輝台, 公主道",
+      "name_en": "Greenfield Terrace, Princess Margaret Road",
+      "lat": "22.313295812091",
+      "long": "114.17677449053"
+    },
+    {
+      "stop": "001579",
+      "name_tc": "醫療輔助隊總部, 公主道",
+      "name_en": "Auxiliary Medical Services Headquarters, Princess Margaret Road",
+      "lat": "22.317377132091",
+      "long": "114.17833347053"
+    },
+    {
+      "stop": "001616",
+      "name_tc": "九龍維景酒店, 窩打老道",
+      "name_en": "Metropark Hotel Kowloon, Waterloo Road",
+      "lat": "22.319136922091",
+      "long": "114.17577537053"
+    },
+    {
+      "stop": "001617",
+      "name_tc": "聖佐治大廈, 窩打老道",
+      "name_en": "St. George's Apartments, Waterloo Road",
+      "lat": "22.323495502091",
+      "long": "114.17811905053"
+    },
+    {
+      "stop": "003015",
+      "name_tc": "聖德肋撒堂, 太子道西",
+      "name_en": "St. Teresa's Church, Prince Edward Road West",
+      "lat": "22.325527352091",
+      "long": "114.17759294053"
+    },
+    {
+      "stop": "003016",
+      "name_tc": "基堤道",
+      "name_en": "Embankment Road",
+      "lat": "22.325651522091",
+      "long": "114.17415508053"
+    },
+    {
+      "stop": "003017",
+      "name_tc": "明愛太子宿舍, 界限街",
+      "name_en": "Caritas Dormitory Prince Edward, Boundary Street",
+      "lat": "22.326951232091",
+      "long": "114.17713847053"
+    },
+    {
+      "stop": "003018",
+      "name_tc": "喇沙小學, 界限街",
+      "name_en": "La Salle Primary School, Boundary Street",
+      "lat": "22.327114502091",
+      "long": "114.18105590053"
+    },
+    {
+      "stop": "003019",
+      "name_tc": "聖德肋撒醫院, 界限街",
+      "name_en": "St. Teresa's Hospital, Boundary Street",
+      "lat": "22.327312562091",
+      "long": "114.18559238053"
+    },
+    {
+      "stop": "003020",
+      "name_tc": "衙前圍道, 嘉林邊道",
+      "name_en": "Nga Tsin Wai Road, Grampian Road",
+      "lat": "22.328394612091",
+      "long": "114.18638464053"
+    },
+    {
+      "stop": "003021",
+      "name_tc": "東寶庭道, 嘉林邊道",
+      "name_en": "Dumbarton Road, Grampian Road",
+      "lat": "22.330607402091",
+      "long": "114.18647885053"
+    },
+    {
+      "stop": "003022",
+      "name_tc": "九龍寨城公園, 東頭村道",
+      "name_en": "Kowloon Walled City Park, Tung Tau Tsuen Road",
+      "lat": "22.332474952091",
+      "long": "114.18912449053"
+    },
+    {
+      "stop": "003023",
+      "name_tc": "美東邨美東樓, 東頭村道",
+      "name_en": "Mei Tung House Mei Tung Estate, Tung Tau Tsuen Road",
+      "lat": "22.333155732091",
+      "long": "114.19040981053"
+    },
+    {
+      "stop": "003024",
+      "name_tc": "摩士公園露天劇場, 東頭村道",
+      "name_en": "Morse Park Open-Air Theatre, Tung Tau Tsuen Road",
+      "lat": "22.336213802091",
+      "long": "114.19155837053"
+    },
+    {
+      "stop": "003025",
+      "name_tc": "黃大仙下邨龍滿樓, 東頭村道",
+      "name_en": "Lung Moon House Lower Wong Tai Sin Estate, Tung Tau Tsuen Road",
+      "lat": "22.337938162091",
+      "long": "114.19268420053"
+    },
+    {
+      "stop": "002993",
+      "name_tc": "黃大仙下邨龍慧樓, 東頭村道",
+      "name_en": "Lung Wai House Lower Wong Tai Sin Estate, Tung Tau Tsuen Road",
+      "lat": "22.339992092091",
+      "long": "114.19421942053"
+    },
+    {
+      "stop": "001742",
+      "name_tc": "彩虹邨碧海樓, 彩虹邨通道",
+      "name_en": "Pik Hoi House Choi Hung Estate, Choi Hung access road",
+      "lat": "22.335452152091",
+      "long": "114.20483854053"
+    },
+    {
+      "stop": "001698",
+      "name_tc": "彩虹",
+      "name_en": "Choi Hung",
+      "lat": "22.336220792091",
+      "long": "114.20420603053"
+    },
+    {
+      "stop": "001695",
+      "name_tc": "鑽石山站, 龍翔道",
+      "name_en": "Diamond Hill Station, Lung Cheung Road",
+      "lat": "22.339272392091",
+      "long": "114.20228739053"
+    },
+    {
+      "stop": "001690",
+      "name_tc": "沙田坳道, 龍翔道",
+      "name_en": "Shatin Pass Road, Lung Cheung Road",
+      "lat": "22.341586742091",
+      "long": "114.19546107053"
+    },
+    {
+      "stop": "001524",
+      "name_tc": "摩士公園游泳池, 龍翔道",
+      "name_en": "Morse Park Swimming Pool, Lung Cheung Road",
+      "lat": "22.341541322091",
+      "long": "114.19151762053"
+    },
+    {
+      "stop": "003006",
+      "name_tc": "摩士公園, 鳳舞街",
+      "name_en": "Morse Park, Fung Mo Street",
+      "lat": "22.339926712091",
+      "long": "114.18935852053"
+    },
+    {
+      "stop": "003007",
+      "name_tc": "摩士公園體育館, 鳳舞街",
+      "name_en": "Morse Park Sports Centre, Fung Mo Street",
+      "lat": "22.338013342091",
+      "long": "114.18969742053"
+    },
+    {
+      "stop": "003008",
+      "name_tc": "東頭邨偉東樓, 東頭村道",
+      "name_en": "Wai Tung House Tung Tau Estate, Tung Tau Tsuen Road",
+      "lat": "22.335890592091",
+      "long": "114.19152220053"
+    },
+    {
+      "stop": "003014",
+      "name_tc": "東頭邨盈東樓, 東頭村道",
+      "name_en": "Ying Tung House Tung Tau Estate, Tung Tau Tsuen Road",
+      "lat": "22.334102832091",
+      "long": "114.19102897053"
+    },
+    {
+      "stop": "003009",
+      "name_tc": "九龍寨城公園, 東頭村道",
+      "name_en": "Kowloon Walled City Park, Tung Tau Tsuen Road",
+      "lat": "22.332321132091",
+      "long": "114.18823587053"
+    },
+    {
+      "stop": "003010",
+      "name_tc": "賈炳達道, 聯合道",
+      "name_en": "Carpenter Road, Junction Road",
+      "lat": "22.330306152091",
+      "long": "114.18708746053"
+    },
+    {
+      "stop": "003011",
+      "name_tc": "太子道西, 聯合道",
+      "name_en": "Prince Edward Road West, Junction Road",
+      "lat": "22.327964722091",
+      "long": "114.18699193053"
+    },
+    {
+      "stop": "003012",
+      "name_tc": "喇沙利道, 太子道西",
+      "name_en": "La Salle Road, Prince Edward Road West",
+      "lat": "22.326509252091",
+      "long": "114.18310233053"
+    },
+    {
+      "stop": "003013",
+      "name_tc": "伯爵街, 太子道西",
+      "name_en": "Earl Street, Prince Edward Road West",
+      "lat": "22.326031552091",
+      "long": "114.18039547053"
+    },
+    {
+      "stop": "001625",
+      "name_tc": "九龍醫院, 窩打老道",
+      "name_en": "Kowloon Hospital, Waterloo Road",
+      "lat": "22.323544842091",
+      "long": "114.17836146053"
+    },
+    {
+      "stop": "001626",
+      "name_tc": "萬基大廈, 窩打老道",
+      "name_en": "Man Kee Mansion, Waterloo Road",
+      "lat": "22.320013062091",
+      "long": "114.17668017053"
+    },
+    {
+      "stop": "002719",
+      "name_tc": "培正中學, 培正道",
+      "name_en": "Pui Ching Middle School, Pui Ching Road",
+      "lat": "22.318136222091",
+      "long": "114.17641017053"
+    },
+    {
+      "stop": "001580",
+      "name_tc": "醫療輔助隊總部, 公主道",
+      "name_en": "Auxiliary Medical Services Headquarters, Princess Margaret Road",
+      "lat": "22.317200302091",
+      "long": "114.17848322053"
+    },
+    {
+      "stop": "001581",
+      "name_tc": "愛民邨, 公主道",
+      "name_en": "Oi Man Estate, Princess Margaret Road",
+      "lat": "22.312810302091",
+      "long": "114.17687688053"
+    },
+    {
+      "stop": "001537",
+      "name_tc": "海底隧道巴士轉乘站",
+      "name_en": "Cross Harbour Tunnel Bus-Bus Interchange",
+      "lat": "22.302678002091",
+      "long": "114.18065137053"
+    },
+    {
+      "stop": "002558",
+      "name_tc": "跑馬地馬場, 摩理臣山道",
+      "name_en": "Happy Valley Racecourse, Morrison Hill Road",
+      "lat": "22.275441072091",
+      "long": "114.18030536053"
+    },
+    {
+      "stop": "002487",
+      "name_tc": "香港華仁書院, 皇后大道東",
+      "name_en": "Wah Yan College Hong Kong, Queen's Road East",
+      "lat": "22.274833802091",
+      "long": "114.17623997053"
+    },
+    {
+      "stop": "002569",
+      "name_tc": "胡忠大廈, 皇后大道東",
+      "name_en": "Wu Chung House, Queen's Road East",
+      "lat": "22.274580512091",
+      "long": "114.17250642053"
+    },
+    {
+      "stop": "002488",
+      "name_tc": "聯發街, 皇后大道東",
+      "name_en": "Lun Fat Street, Queen's Road East",
+      "lat": "22.276100292091",
+      "long": "114.17002156053"
+    },
+    {
+      "stop": "002489",
+      "name_tc": "太古廣場三座, 皇后大道東",
+      "name_en": "Three Pacific Place, Queen's Road East",
+      "lat": "22.277274142091",
+      "long": "114.16820458053"
+    },
+    {
+      "stop": "001175",
+      "name_tc": "急庇利街, 德輔道中",
+      "name_en": "Cleverly Street, Des Voeux Road Central",
+      "lat": "22.286597682091",
+      "long": "114.15157623053"
+    },
+    {
+      "stop": "001040",
+      "name_tc": "西港城, 干諾道西",
+      "name_en": "Western Market, Connaught Road West",
+      "lat": "22.287710712091",
+      "long": "114.14980124053"
+    },
+    {
+      "stop": "001066",
+      "name_tc": "皇后街, 德輔道西",
+      "name_en": "Queen Street, Des Voeux Road West",
+      "lat": "22.287617562091",
+      "long": "114.14686036053"
+    },
+    {
+      "stop": "001067",
+      "name_tc": "高陞街, 德輔道西",
+      "name_en": "Ko Shing Street, Des Voeux Road West",
+      "lat": "22.287746752091",
+      "long": "114.14541645053"
+    },
+    {
+      "stop": "001068",
+      "name_tc": "正街, 德輔道西",
+      "name_en": "Centre Street, Des Voeux Road West",
+      "lat": "22.287878642091",
+      "long": "114.14161842053"
+    },
+    {
+      "stop": "001069",
+      "name_tc": "水街, 德輔道西",
+      "name_en": "Water Street, Des Voeux Road West",
+      "lat": "22.287186722091",
+      "long": "114.13806360053"
+    },
+    {
+      "stop": "001070",
+      "name_tc": "山道, 德輔道西",
+      "name_en": "Hill Road, Des Voeux Road West",
+      "lat": "22.286627542091",
+      "long": "114.13607459053"
+    },
+    {
+      "stop": "001082",
+      "name_tc": "堅尼地城游泳池, 堅彌地城海旁",
+      "name_en": "Kennedy Town Swimming Pool, Kennedy Town Praya",
+      "lat": "22.285471952091",
+      "long": "114.13174101053"
+    },
+    {
+      "stop": "001083",
+      "name_tc": "山市街, 堅彌地城海旁",
+      "name_en": "Sands Street, Kennedy Town Praya",
+      "lat": "22.284330652091",
+      "long": "114.13037010053"
+    },
+    {
+      "stop": "002590",
+      "name_tc": "加多近街",
+      "name_en": "Cadogan Street",
+      "lat": "22.282790252091",
+      "long": "114.12590822053"
+    },
+    {
+      "stop": "002337",
+      "name_tc": "華富 (中)",
+      "name_en": "Wah Fu (Central)",
+      "lat": "22.253621612091",
+      "long": "114.13521671053"
+    },
+    {
+      "stop": "003287",
+      "name_tc": "興和街, 石排灣道",
+      "name_en": "Hing Wo Street, Shek Pai Wan Road",
+      "lat": "22.249678472091",
+      "long": "114.14790169053"
+    },
+    {
+      "stop": "002343",
+      "name_tc": "香港仔工業學校, 黃竹坑道",
+      "name_en": "Aberdeen Technical School, Wong Chuk Hang Road",
+      "lat": "22.248699582091",
+      "long": "114.16253441053"
+    },
+    {
+      "stop": "002347",
+      "name_tc": "黃竹坑醫院, 香港仔隧道",
+      "name_en": "Wong Chuk Hang Hospital, Aberdeen Tunnel",
+      "lat": "22.249960892091",
+      "long": "114.17585543053"
+    },
+    {
+      "stop": "003969",
+      "name_tc": "香港仔隧道巴士轉乘站",
+      "name_en": "Aberdeen Tunnel Bus-Bus Interchange",
+      "lat": "22.251566892091",
+      "long": "114.17796668053"
+    },
+    {
+      "stop": "002467",
+      "name_tc": "立德里, 摩理臣山道",
+      "name_en": "Lap Tak Lane, Morrison Hill Road",
+      "lat": "22.276064312091",
+      "long": "114.18020849053"
+    },
+    {
+      "stop": "002437",
+      "name_tc": "灣仔消防局, 軒尼詩道",
+      "name_en": "Wan Chai Fire Station, Hennessy Road",
+      "lat": "22.279686862091",
+      "long": "114.18178779053"
+    },
+    {
+      "stop": "002555",
+      "name_tc": "銅鑼灣 - 百德新街, 怡和街",
+      "name_en": "Causeway Bay - Paterson Street, Yee Wo Street",
+      "lat": "22.279935442091",
+      "long": "114.18558549053"
+    },
+    {
+      "stop": "001213",
+      "name_tc": "維多利亞公園, 高士威道",
+      "name_en": "Victoria Park, Causeway Road",
+      "lat": "22.281133262091",
+      "long": "114.19006592053"
+    },
+    {
+      "stop": "001251",
+      "name_tc": "興發街",
+      "name_en": "Hing Fat Street",
+      "lat": "22.283573922091",
+      "long": "114.19109346053"
+    },
+    {
+      "stop": "002414",
+      "name_tc": "景隆街, 告士打道",
+      "name_en": "Cannon Street, Gloucester Road",
+      "lat": "22.281732142091",
+      "long": "114.18280892053"
+    },
+    {
+      "stop": "001618",
+      "name_tc": "九龍塘會, 窩打老道",
+      "name_en": "Kowloon Tong Club, Waterloo Road",
+      "lat": "22.329741772091",
+      "long": "114.17850824053"
+    },
+    {
+      "stop": "001619",
+      "name_tc": "基督中心堂, 窩打老道",
+      "name_en": "Christian Central Church, Waterloo Road",
+      "lat": "22.331951342091",
+      "long": "114.17864036053"
+    },
+    {
+      "stop": "001620",
+      "name_tc": "九龍塘官立小學, 窩打老道",
+      "name_en": "Kowloon Tong Government Primary School, Waterloo Road",
+      "lat": "22.335892832091",
+      "long": "114.17886262053"
+    },
+    {
+      "stop": "001621",
+      "name_tc": "映月台, 窩打老道",
+      "name_en": "Moonbeam Terrace, Waterloo Road",
+      "lat": "22.342003242091",
+      "long": "114.17872334053"
+    },
+    {
+      "stop": "001932",
+      "name_tc": "獅子山隧道巴士轉乘站",
+      "name_en": "Lion Rock Tunnel Bus-Bus Interchange",
+      "lat": "22.358394952091",
+      "long": "114.17311070053"
+    },
+    {
+      "stop": "001924",
+      "name_tc": "世界花園, 紅梅谷路",
+      "name_en": "World-wide Gardens, Hung Mui Kuk Road",
+      "lat": "22.366204882091",
+      "long": "114.18058072053"
+    },
+    {
+      "stop": "001925",
+      "name_tc": "新翠邨, 紅梅谷路",
+      "name_en": "Sun Chui Estate, Hung Mui Kuk Road",
+      "lat": "22.370341312091",
+      "long": "114.17955538053"
+    },
+    {
+      "stop": "001908",
+      "name_tc": "大圍站, 車公廟路",
+      "name_en": "Tai Wai Station, Che Kung Miu Road",
+      "lat": "22.372602942091",
+      "long": "114.18037944053"
+    },
+    {
+      "stop": "001909",
+      "name_tc": "車公廟, 車公廟路",
+      "name_en": "Che Kung Temple, Che Kung Miu Road",
+      "lat": "22.374610892091",
+      "long": "114.18401355053"
+    },
+    {
+      "stop": "001910",
+      "name_tc": "秦石邨, 車公廟路",
+      "name_en": "Chun Shek Estate, Che Kung Miu Road",
+      "lat": "22.374475262091",
+      "long": "114.18663344053"
+    },
+    {
+      "stop": "001928",
+      "name_tc": "乙明邨,  乙明邨街",
+      "name_en": "Jat Min Chuen, Jat Min Chuen Street",
+      "lat": "22.376165782091",
+      "long": "114.19165496053"
+    },
+    {
+      "stop": "001952",
+      "name_tc": "沙角邨, 沙角街",
+      "name_en": "Sha Kok Estate, Sha Kok Street",
+      "lat": "22.377280142091",
+      "long": "114.19482595053"
+    },
+    {
+      "stop": "001962",
+      "name_tc": "田園閣, 沙田圍路",
+      "name_en": "Greenfield Court, Sha Tin Wai Road",
+      "lat": "22.380025852091",
+      "long": "114.19513094053"
+    },
+    {
+      "stop": "001961",
+      "name_tc": "沙田站",
+      "name_en": "Sha Tin Station",
+      "lat": "22.383442502091",
+      "long": "114.18809125053"
+    },
+    {
+      "stop": "001963",
+      "name_tc": "田園閣, 沙田圍路",
+      "name_en": "Greenfield Court, Sha Tin Wai Road",
+      "lat": "22.379825532091",
+      "long": "114.19568000053"
+    },
+    {
+      "stop": "001953",
+      "name_tc": "博康邨, 沙角街",
+      "name_en": "Pok Hong Estate, Sha Kok Street",
+      "lat": "22.377444342091",
+      "long": "114.19523443053"
+    },
+    {
+      "stop": "001954",
+      "name_tc": "救世軍田家炳學校, 沙角街",
+      "name_en": "The Salvation Army Tin Ka Ping School, Sha Kok Street",
+      "lat": "22.375474742091",
+      "long": "114.19196126053"
+    },
+    {
+      "stop": "001911",
+      "name_tc": "秦石邨, 車公廟路",
+      "name_en": "Chun Shek Estate, Che Kung Miu Road",
+      "lat": "22.374290192091",
+      "long": "114.18675293053"
+    },
+    {
+      "stop": "001912",
+      "name_tc": "車公廟, 車公廟路",
+      "name_en": "Che Kung Temple, Che Kung Miu Road",
+      "lat": "22.374391922091",
+      "long": "114.18415010053"
+    },
+    {
+      "stop": "001926",
+      "name_tc": "新翠邨, 紅梅谷路",
+      "name_en": "Sun Chui Estate, Hung Mui Kuk Road",
+      "lat": "22.370602292091",
+      "long": "114.17966726053"
+    },
+    {
+      "stop": "001927",
+      "name_tc": "世界花園, 紅梅谷路",
+      "name_en": "World-wide Gardens, Hung Mui Kuk Road",
+      "lat": "22.364700442091",
+      "long": "114.18124640053"
+    },
+    {
+      "stop": "001933",
+      "name_tc": "獅子山隧道巴士轉乘站",
+      "name_en": "Lion Rock Tunnel Bus-Bus Interchange",
+      "lat": "22.358639782091",
+      "long": "114.17473549053"
+    },
+    {
+      "stop": "001622",
+      "name_tc": "聯合道, 窩打老道",
+      "name_en": "Junction Road, Waterloo Road",
+      "lat": "22.337980182091",
+      "long": "114.17926076053"
+    },
+    {
+      "stop": "001623",
+      "name_tc": "九龍塘站, 窩打老道",
+      "name_en": "Kowloon Tong Station, Waterloo Road",
+      "lat": "22.335714472091",
+      "long": "114.17908178053"
+    },
+    {
+      "stop": "001624",
+      "name_tc": "龍濤花園, 窩打老道",
+      "name_en": "La Villa, Waterloo Road",
+      "lat": "22.331146882091",
+      "long": "114.17880952053"
+    },
+    {
+      "stop": "002962",
+      "name_tc": "景隆街, 告士打道",
+      "name_en": "Cannon Street, Gloucester Road",
+      "lat": "22.281610952091",
+      "long": "114.18248055053"
+    },
+    {
+      "stop": "003968",
+      "name_tc": "香港仔隧道巴士轉乘站",
+      "name_en": "Aberdeen Tunnel Bus-Bus Interchange",
+      "lat": "22.251242822091",
+      "long": "114.17815020053"
+    },
+    {
+      "stop": "002348",
+      "name_tc": "黃竹坑醫院, 香港仔隧道",
+      "name_en": "Wong Chuk Hang Hospital, Aberdeen Tunnel",
+      "lat": "22.249770482091",
+      "long": "114.17533612053"
+    },
+    {
+      "stop": "001967",
+      "name_tc": "麗豪酒店, 大涌橋路",
+      "name_en": "Regal Riverside Hotel, Tai Chung Kiu Road",
+      "lat": "22.382465562091",
+      "long": "114.19564982053"
+    },
+    {
+      "stop": "001968",
+      "name_tc": "富豪花園, 大涌橋路",
+      "name_en": "Belair Garden, Tai Chung Kiu Road",
+      "lat": "22.384869092091",
+      "long": "114.19797965053"
+    },
+    {
+      "stop": "001940",
+      "name_tc": "置富第一城, 銀城街",
+      "name_en": "Fortune City One, Ngan Shing Street",
+      "lat": "22.386883952091",
+      "long": "114.20356624053"
+    },
+    {
+      "stop": "001941",
+      "name_tc": "愉田苑, 銀城街",
+      "name_en": "Yue Tin Court, Ngan Shing Street",
+      "lat": "22.384229662091",
+      "long": "114.20202071053"
+    },
+    {
+      "stop": "002051",
+      "name_tc": "第一城站, 插桅杆街",
+      "name_en": "City One Station, Chap Wai Kon Street",
+      "lat": "22.382674562091",
+      "long": "114.20361560053"
+    },
+    {
+      "stop": "002052",
+      "name_tc": "愉翠苑",
+      "name_en": "Yu Chui Court",
+      "lat": "22.382175142091",
+      "long": "114.20517003053"
+    },
+    {
+      "stop": "002053",
+      "name_tc": "愉田苑, 銀城街",
+      "name_en": "Yue Tin Court, Ngan Shing Street",
+      "lat": "22.383006712091",
+      "long": "114.20168939053"
+    },
+    {
+      "stop": "001943",
+      "name_tc": "沙田第一城",
+      "name_en": "City One Shatin",
+      "lat": "22.386285762091",
+      "long": "114.20250742053"
+    },
+    {
+      "stop": "001942",
+      "name_tc": "沙田第一城第11座, 銀城街",
+      "name_en": "Block 11 City One Shatin, Ngan Shing Street",
+      "lat": "22.387191032091",
+      "long": "114.20374711053"
+    },
+    {
+      "stop": "001964",
+      "name_tc": "沙田第一城第 13 座, 大涌橋路",
+      "name_en": "Block 13 City One Shatin, Tai Chung Kiu Road",
+      "lat": "22.388678672091",
+      "long": "114.20203124053"
+    },
+    {
+      "stop": "001965",
+      "name_tc": "富豪花園, 大涌橋路",
+      "name_en": "Belair Garden, Tai Chung Kiu Road",
+      "lat": "22.384816872091",
+      "long": "114.19820585053"
+    },
+    {
+      "stop": "001966",
+      "name_tc": "麗豪酒店, 大涌橋路",
+      "name_en": "Regal Riverside Hotel, Tai Chung Kiu Road",
+      "lat": "22.381941562091",
+      "long": "114.19542997053"
+    },
+    {
+      "stop": "002998",
+      "name_tc": "海底隧道巴士轉乘站",
+      "name_en": "Cross Harbour Tunnel Bus-Bus Interchange",
+      "lat": "22.301838952091",
+      "long": "114.18055015053"
+    },
+    {
+      "stop": "001184",
+      "name_tc": "中環街市, 德輔道中",
+      "name_en": "Central Market, Des Voeux Road Central",
+      "lat": "22.284417902091",
+      "long": "114.15575187053"
+    }
+  ]
+}

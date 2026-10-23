@@ -3,12 +3,12 @@ import {
   getCitybusEta,
   getCitybusRouteStops,
   getCitybusRoutes,
-  getCitybusStop,
   getKmbRouteStops,
   getKmbStopEta,
   getKmbStops,
   type TransitStopRecord,
 } from '../../../data/hkTransitApi';
+import { getStaticCitybusStops, STATIC_CITYBUS_ROUTES } from '../../../data/citybusStopsStatic';
 import { scoreRoutes, type Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 
@@ -52,35 +52,12 @@ function nearestStops(
     .slice(0, limit);
 }
 
-function etaMinutes(eta: string | null): number | null {
-  if (!eta) return null;
-  const minutes = Math.round((new Date(eta).getTime() - Date.now()) / 60000);
-  return minutes < 0 ? 0 : minutes;
-}
-
-function directionCode(bound: 'inbound' | 'outbound'): 'I' | 'O' {
-  return bound === 'outbound' ? 'O' : 'I';
-}
-
-function routeEtaMinutes(
-  etas: { route: string; dir: string; eta: string | null }[],
-  route: string,
-  bound: 'inbound' | 'outbound',
-): number[] {
-  const dir = directionCode(bound);
-  return etas
-    .filter((entry) => entry.route === route && entry.dir === dir && entry.eta)
-    .map((entry) => etaMinutes(entry.eta))
-    .filter((minutes): minutes is number => minutes !== null)
-    .sort((a, b) => a - b);
-}
-
-function deriveHeadway(minutes: number[], fallback = 10): number {
-  if (minutes.length < 2) return fallback;
-  const gaps = minutes.slice(1).map((minutesAt, index) => minutesAt - minutes[index]);
-  const averageGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
-  return averageGap >= 1 && averageGap <= 60 ? Math.round(averageGap) : fallback;
-}
+import {
+  deriveHeadway,
+  etaMinutes,
+  routeEtaMinutes,
+  type JourneyBound,
+} from '../../../engine/journeyHelpers';
 
 // Average urban bus speed in km/min used to estimate in-vehicle time
 // from the straight-line distance between boarding and alighting stops.
@@ -172,12 +149,17 @@ export async function GET(request: NextRequest) {
     const toStops = nearestStops(stops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
     // Citybus has no bulk stop-list endpoint (returns an empty object), so
-    // derive nearby Citybus stops from cross-harbour route-stop sequences:
-    // collect stop IDs from a bounded set of routes, fetch their coordinates,
-    // then pick the nearest ones by geographic distance.
-    const CROSS_HARBOUR_ROUTES = ['970', '973', '101', '104', '111', '113', '170', '182'];
+    // use the static cross-harbour stop catalog (fetched by
+    // scripts/fetch-citybus-stops.mjs) for coordinates, then scan route-stop
+    // sequences to match origin/destination stops in order.
+    const citybusStops = getStaticCitybusStops();
+    const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
+    const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
+
+    // Fetch cross-harbour route-stop sequences live (they change less often
+    // and are cached in-memory by the data module).
     const citybusRouteRows = await Promise.all(
-      CROSS_HARBOUR_ROUTES.flatMap((routeNum) =>
+      STATIC_CITYBUS_ROUTES.flatMap((routeNum) =>
         (['outbound', 'inbound'] as const).map(async (bound) => {
           try {
             return { routeNum, bound, rows: await getCitybusRouteStops(routeNum, bound) };
@@ -187,45 +169,10 @@ export async function GET(request: NextRequest) {
         }),
       ),
     );
-    const citybusStopIds = new Set<string>();
-    for (const result of citybusRouteRows) {
-      for (const row of result.rows) citybusStopIds.add(row.stop);
-    }
-
-    const citybusStops: TransitStopRecord[] = [];
-    const stopIdList = Array.from(citybusStopIds);
-    const CONCURRENCY = 30;
-    for (let i = 0; i < stopIdList.length; i += CONCURRENCY) {
-      const batch = stopIdList.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map((stopId) => getCitybusStop(stopId)),
-      );
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value && result.value.stop) {
-          const data = result.value;
-          const lat = Number(data.lat);
-          const lng = Number(data.long);
-          // Only keep stops near origin or destination (within 8km).
-          const nearFrom = haversineKm(fromLat, fromLon, lat, lng) <= 8;
-          const nearTo = haversineKm(toLat, toLon, lat, lng) <= 8;
-          if (nearFrom || nearTo) {
-            citybusStops.push({
-              stop: data.stop,
-              name_tc: data.name_tc,
-              name_en: data.name_en,
-              lat,
-              long: lng,
-            });
-          }
-        }
-      }
-    }
-    const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
-    const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
     const citybusCandidates: {
       route: string;
-      bound: 'inbound' | 'outbound';
+      bound: JourneyBound;
       fromStop: TransitStopRecord;
       toStop: TransitStopRecord;
       fromWalk: number;
@@ -512,7 +459,7 @@ export async function GET(request: NextRequest) {
         const routeEtas = routeEtaMinutes(
           etas,
           candidate.route,
-          candidate.bound as 'inbound' | 'outbound',
+          candidate.bound as JourneyBound,
         );
         if (routeEtas.length > 0) {
           firstEta = routeEtas[0];
@@ -615,7 +562,7 @@ export async function GET(request: NextRequest) {
         let headwayA = 10;
         try {
           const etas = await getKmbStopEta(tc.fromStop.stop);
-          const routeEtas = routeEtaMinutes(etas, tc.routeA, tc.boundA as 'inbound' | 'outbound');
+          const routeEtas = routeEtaMinutes(etas, tc.routeA, tc.boundA as JourneyBound);
           if (routeEtas.length > 0) etaA = routeEtas[0];
           headwayA = deriveHeadway(routeEtas);
         } catch {
