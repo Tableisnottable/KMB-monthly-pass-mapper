@@ -14,8 +14,11 @@ import { getRateLimiter } from '../../../lib/cloudflare';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_CANDIDATE_ROUTES = 40;
 const MAX_RESULTS = 6;
+const MAX_CANDIDATE_ROUTES = 40;
+const MAX_KMB_DIRECT_CANDIDATES = MAX_RESULTS * 2;
+const MAX_ROUTES_PER_STOP = 8;
+const TRANSFER_STOP_SCAN_LIMIT = 20;
 const NEARBY_STOP_LIMIT_WIDE = 15;
 const WALK_KM_PER_MIN = 5 / 60; // 5 km/h walking speed
 const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
@@ -248,32 +251,50 @@ export async function GET(request: NextRequest) {
         }),
       );
       for (const { entry, etas } of etaResults) {
-        if (candidates.length >= MAX_CANDIDATE_ROUTES) break;
+        if (candidates.length >= MAX_KMB_DIRECT_CANDIDATES) break;
         if (!etas || etas.length === 0) continue;
-        const routesAtStop = new Set(etas.map((e) => e.route));
-        const routeStopResults = await Promise.all(
-          Array.from(routesAtStop).map(async (route) => {
-            const bounds = await Promise.all(
-              (['outbound', 'inbound'] as const).map(async (bound) => {
-                try {
-                  return { bound, rows: await getKmbRouteStops(route, bound, '1') };
-                } catch {
-                  return { bound, rows: null };
-                }
-              }),
-            );
-            return { route, bounds };
-          }),
-        );
-        for (const { route, bounds } of routeStopResults) {
-          if (candidates.length >= MAX_CANDIDATE_ROUTES) break;
-          for (const { bound, rows } of bounds) {
-            if (candidates.length >= MAX_CANDIDATE_ROUTES) break;
-            if (!rows || rows.length === 0) continue;
-            const seqByStop = new Map<string, number>();
-            rows.forEach((row, index) => {
-              if (!seqByStop.has(row.stop)) seqByStop.set(row.stop, index);
-            });
+        // Route -> directions that actually have service at this stop.
+        const dirsByRoute = new Map<string, Set<'outbound' | 'inbound'>>();
+        for (const e of etas) {
+          const bound: 'outbound' | 'inbound' =
+            e.dir === 'I' ? 'inbound' : 'outbound';
+          if (!dirsByRoute.has(e.route)) dirsByRoute.set(e.route, new Set());
+          dirsByRoute.get(e.route)!.add(bound);
+        }
+        // Bound per-stop scan width: most stops serve more routes than we
+        // can afford to fan out on a cold start; prioritize routes with
+        // service in both directions, scanned in small batches so we can
+        // stop early once enough candidates are found.
+        const routesToScan = Array.from(dirsByRoute.entries())
+          .sort((a, b) => b[1].size - a[1].size)
+          .slice(0, MAX_ROUTES_PER_STOP)
+          .map(([route]) => route);
+        const SCAN_BATCH = 3;
+        for (let i = 0; i < routesToScan.length && candidates.length < MAX_KMB_DIRECT_CANDIDATES; i += SCAN_BATCH) {
+          const batch = routesToScan.slice(i, i + SCAN_BATCH);
+          const routeStopResults = await Promise.all(
+            batch.map(async (route) => {
+              const bounds = await Promise.all(
+                Array.from(dirsByRoute.get(route) ?? []).map(async (bound) => {
+                  try {
+                    return { bound, rows: await getKmbRouteStops(route, bound, '1') };
+                  } catch {
+                    return { bound, rows: null };
+                  }
+                }),
+              );
+              return { route, bounds };
+            }),
+          );
+          for (const { route, bounds } of routeStopResults) {
+            if (candidates.length >= MAX_KMB_DIRECT_CANDIDATES) break;
+            for (const { bound, rows } of bounds) {
+              if (candidates.length >= MAX_KMB_DIRECT_CANDIDATES) break;
+              if (!rows || rows.length === 0) continue;
+              const seqByStop = new Map<string, number>();
+              rows.forEach((row, index) => {
+                if (!seqByStop.has(row.stop)) seqByStop.set(row.stop, index);
+              });
             let bestTo: string | null = null;
             let bestIdx = Number.POSITIVE_INFINITY;
             for (const toId of Array.from(toIds)) {
@@ -299,6 +320,7 @@ export async function GET(request: NextRequest) {
               });
             }
           }
+        }
         }
       }
     };
@@ -387,18 +409,24 @@ export async function GET(request: NextRequest) {
 
         // For each stop on routeA after boarding, check if it's served by
         // routes that reach a destination stop.
-        for (const [transferId, transferIdx] of Array.from(stopSeq)) {
-          if (transferIdx <= fromIdx) continue;
+        // Fetch stop-eta for candidate transfer stops concurrently (they
+        // are likely cached from the direct scan or shared across routes).
+        const transferCandidatesToCheck = Array.from(stopSeq)
+          .filter(([, transferIdx]) => transferIdx > fromIdx)
+          .slice(0, TRANSFER_STOP_SCAN_LIMIT)
+          .map(([transferId]) => transferId);
+        const transferEtaResults = await Promise.all(
+          transferCandidatesToCheck.map(async (transferId) => {
+            try {
+              const etas = await getKmbStopEta(transferId);
+              return { transferId, routes: new Set(etas.map((e) => e.route)) };
+            } catch {
+              return { transferId, routes: new Set<string>() };
+            }
+          }),
+        );
+        for (const { transferId, routes: transferRoutes } of transferEtaResults) {
           if (transferCandidates.length >= MAX_CANDIDATE_ROUTES) break;
-
-          // Find routes serving this transfer stop (via stop-eta).
-          let transferRoutes: Set<string>;
-          try {
-            const etas = await getKmbStopEta(transferId);
-            transferRoutes = new Set(etas.map((e) => e.route));
-          } catch {
-            continue;
-          }
           if (transferRoutes.size === 0) continue;
 
           // For each route serving the transfer stop, check if it reaches
