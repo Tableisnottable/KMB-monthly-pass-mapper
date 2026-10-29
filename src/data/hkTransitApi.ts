@@ -144,17 +144,31 @@ export interface KmbRouteStopRecord {
   stop: string;
 }
 
+const kmbRouteStopCache = new Map<string, { data: KmbRouteStopRecord[]; expiresAt: number }>();
+const kmbStopEtaCache = new Map<string, { data: KmbStopEtaRecord[]; expiresAt: number }>();
+
 export async function getKmbRouteStops(route: string, bound: 'inbound' | 'outbound', serviceType = '1') {
+  const key = `${route}|${bound}|${serviceType}`;
+  const cached = kmbRouteStopCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
   const payload = await fetchJson<{ data: KmbRouteStopRecord[] }>(
     `${HK_TRANSIT_API.kmb}/route-stop/${encodeURIComponent(route)}/${bound}/${encodeURIComponent(serviceType)}`,
   );
+  kmbRouteStopCache.set(key, { data: payload.data, expiresAt: Date.now() + 30 * 60 * 1000 });
   return payload.data;
 }
 
 export async function getKmbStopEta(stopId: string) {
+  const cached = kmbStopEtaCache.get(stopId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
   const payload = await fetchJson<{ data: KmbStopEtaRecord[] }>(
     `${HK_TRANSIT_API.kmb}/stop-eta/${encodeURIComponent(stopId)}`,
   );
+  kmbStopEtaCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 60 * 1000 });
   return payload.data;
 }
 
