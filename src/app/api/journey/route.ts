@@ -16,7 +16,6 @@ export const dynamic = 'force-dynamic';
 
 const MAX_CANDIDATE_ROUTES = 40;
 const MAX_RESULTS = 6;
-const NEARBY_STOP_LIMIT = 5;
 const NEARBY_STOP_LIMIT_WIDE = 15;
 const WALK_KM_PER_MIN = 5 / 60; // 5 km/h walking speed
 const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
@@ -142,7 +141,7 @@ export async function GET(request: NextRequest) {
       getKmbStops(),
       getCitybusRoutes(),
     ]);
-    const fromStops = nearestStops(stops, fromLat, fromLon, NEARBY_STOP_LIMIT);
+    const fromStops = nearestStops(stops, fromLat, fromLon, NEARBY_STOP_LIMIT_WIDE);
     // Destination stops use a wider radius: the alighting stop is often
     // further from the destination point than the boarding stop is from
     // the origin.
@@ -153,7 +152,7 @@ export async function GET(request: NextRequest) {
     // scripts/fetch-citybus-stops.mjs) for coordinates, then scan route-stop
     // sequences to match origin/destination stops in order.
     const citybusStops = getStaticCitybusStops();
-    const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT);
+    const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT_WIDE);
     const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
     // Fetch cross-harbour route-stop sequences from the static catalog
@@ -305,11 +304,6 @@ export async function GET(request: NextRequest) {
     };
 
     await scanFromStops(fromStops);
-    if (candidates.length === 0) {
-      // Wider net: more origin stops so journeys boarding further away match.
-      const wideFromStops = nearestStops(stops, fromLat, fromLon, NEARBY_STOP_LIMIT_WIDE);
-      await scanFromStops(wideFromStops);
-    }
 
     // Transfer routes: when direct options are limited, find one-transfer
     // journeys via a common intermediate stop served by both an origin-side
