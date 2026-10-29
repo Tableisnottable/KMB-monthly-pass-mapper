@@ -10,10 +10,6 @@ import { RouteMinimap } from './RouteMinimap';
 
 type SortKey = 'all' | 'bus' | 'rail' | 'fastest' | 'cheapest';
 
-// Default departure "now" — the demo routes use a fixed timestamp for
-// reproducible ETAs; real journey results carry their own live ETA minutes.
-const DEMO_NOW = new Date('2026-09-13T18:25:00+08:00');
-
 const SORT_CHIPS: { key: SortKey; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'bus', label: '巴士' },
@@ -214,7 +210,7 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
           </div>
         ) : (
           <>
-            <MonthlySavingsCounter savingPerTrip={passInsight?.savingThisTrip ?? 0} />
+            <MonthlySavingsCounter savingPerTrip={passInsight?.savingThisTrip ?? 0} routes={routes} />
 
         {selected && passInsight && (
           <div className="rounded-3xl bg-gradient-to-br from-cm-green to-cm-greenDeep p-5 text-white shadow-card">
