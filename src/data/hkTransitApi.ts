@@ -146,6 +146,8 @@ export interface KmbRouteStopRecord {
 
 const kmbRouteStopCache = new Map<string, { data: KmbRouteStopRecord[]; expiresAt: number }>();
 const kmbStopEtaCache = new Map<string, { data: KmbStopEtaRecord[]; expiresAt: number }>();
+const kmbRouteStopInflight = new Map<string, Promise<KmbRouteStopRecord[]>>();
+const kmbStopEtaInflight = new Map<string, Promise<KmbStopEtaRecord[]>>();
 
 export async function getKmbRouteStops(route: string, bound: 'inbound' | 'outbound', serviceType = '1') {
   const key = `${route}|${bound}|${serviceType}`;
@@ -153,11 +155,20 @@ export async function getKmbRouteStops(route: string, bound: 'inbound' | 'outbou
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
-  const payload = await fetchJson<{ data: KmbRouteStopRecord[] }>(
+  const inflight = kmbRouteStopInflight.get(key);
+  if (inflight) {
+    return inflight;
+  }
+  const promise = fetchJson<{ data: KmbRouteStopRecord[] }>(
     `${HK_TRANSIT_API.kmb}/route-stop/${encodeURIComponent(route)}/${bound}/${encodeURIComponent(serviceType)}`,
-  );
-  kmbRouteStopCache.set(key, { data: payload.data, expiresAt: Date.now() + 30 * 60 * 1000 });
-  return payload.data;
+  ).then((payload) => {
+    kmbRouteStopCache.set(key, { data: payload.data, expiresAt: Date.now() + 30 * 60 * 1000 });
+    return payload.data;
+  }).finally(() => {
+    kmbRouteStopInflight.delete(key);
+  });
+  kmbRouteStopInflight.set(key, promise);
+  return promise;
 }
 
 export async function getKmbStopEta(stopId: string) {
@@ -165,11 +176,20 @@ export async function getKmbStopEta(stopId: string) {
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
-  const payload = await fetchJson<{ data: KmbStopEtaRecord[] }>(
+  const inflight = kmbStopEtaInflight.get(stopId);
+  if (inflight) {
+    return inflight;
+  }
+  const promise = fetchJson<{ data: KmbStopEtaRecord[] }>(
     `${HK_TRANSIT_API.kmb}/stop-eta/${encodeURIComponent(stopId)}`,
-  );
-  kmbStopEtaCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 60 * 1000 });
-  return payload.data;
+  ).then((payload) => {
+    kmbStopEtaCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 60 * 1000 });
+    return payload.data;
+  }).finally(() => {
+    kmbStopEtaInflight.delete(stopId);
+  });
+  kmbStopEtaInflight.set(stopId, promise);
+  return promise;
 }
 
 export async function getCitybusEta(stopId: string, route: string) {

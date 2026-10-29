@@ -238,25 +238,38 @@ export async function GET(request: NextRequest) {
     const scanFromStops = async (
       pool: { stop: TransitStopRecord; walkMinutes: number }[],
     ) => {
-      for (const entry of pool) {
+      // Fetch stop-eta for all pool stops concurrently, then scan routes.
+      const etaResults = await Promise.all(
+        pool.map(async (entry) => {
+          try {
+            return { entry, etas: await getKmbStopEta(entry.stop.stop) };
+          } catch {
+            return { entry, etas: null };
+          }
+        }),
+      );
+      for (const { entry, etas } of etaResults) {
         if (candidates.length >= MAX_CANDIDATE_ROUTES) break;
-        let etas;
-        try {
-          etas = await getKmbStopEta(entry.stop.stop);
-        } catch {
-          continue;
-        }
         if (!etas || etas.length === 0) continue;
         const routesAtStop = new Set(etas.map((e) => e.route));
-        for (const route of Array.from(routesAtStop)) {
+        const routeStopResults = await Promise.all(
+          Array.from(routesAtStop).map(async (route) => {
+            const bounds = await Promise.all(
+              (['outbound', 'inbound'] as const).map(async (bound) => {
+                try {
+                  return { bound, rows: await getKmbRouteStops(route, bound, '1') };
+                } catch {
+                  return { bound, rows: null };
+                }
+              }),
+            );
+            return { route, bounds };
+          }),
+        );
+        for (const { route, bounds } of routeStopResults) {
           if (candidates.length >= MAX_CANDIDATE_ROUTES) break;
-          for (const bound of ['outbound', 'inbound'] as const) {
-            let rows;
-            try {
-              rows = await getKmbRouteStops(route, bound, '1');
-            } catch {
-              continue;
-            }
+          for (const { bound, rows } of bounds) {
+            if (candidates.length >= MAX_CANDIDATE_ROUTES) break;
             if (!rows || rows.length === 0) continue;
             const seqByStop = new Map<string, number>();
             rows.forEach((row, index) => {
@@ -313,18 +326,23 @@ export async function GET(request: NextRequest) {
       toWalk: number;
     }[] = [];
 
-    if (candidates.length < MAX_RESULTS) {
+    if (candidates.length + citybusCandidates.length < MAX_RESULTS) {
       const MAX_TRANSFER_ROUTES = 8;
-      // Routes serving origin stops (from stop-eta).
+      // Routes serving origin stops (from stop-eta), fetched concurrently.
+      const originRouteEntries = await Promise.all(
+        fromStops.map(async (entry) => {
+          try {
+            const etas = await getKmbStopEta(entry.stop.stop);
+            const rs = new Set(etas.map((e) => e.route));
+            return { stopId: entry.stop.stop, routes: rs };
+          } catch {
+            return { stopId: entry.stop.stop, routes: new Set<string>() };
+          }
+        }),
+      );
       const originRoutes = new Map<string, Set<string>>(); // stopId -> routes
-      for (const entry of fromStops) {
-        try {
-          const etas = await getKmbStopEta(entry.stop.stop);
-          const rs = new Set(etas.map((e) => e.route));
-          if (rs.size > 0) originRoutes.set(entry.stop.stop, rs);
-        } catch {
-          continue;
-        }
+      for (const { stopId, routes } of originRouteEntries) {
+        if (routes.size > 0) originRoutes.set(stopId, routes);
       }
 
       // Build stop->routes index for origin-side routes (via route-stop).
@@ -447,23 +465,28 @@ export async function GET(request: NextRequest) {
 
     // Build direct KMB journey routes.
     const journeyRoutes: Route[] = [];
-    for (const candidate of candidates.slice(0, MAX_RESULTS * 2)) {
-      let firstEta: number | null = null;
-      let headway = 10; // default scheduled interval (minutes)
-      try {
-        const etas = await getKmbStopEta(candidate.fromStop.stop);
-        const routeEtas = routeEtaMinutes(
-          etas,
-          candidate.route,
-          candidate.bound as JourneyBound,
-        );
-        if (routeEtas.length > 0) {
-          firstEta = routeEtas[0];
+    const kmbEtaResults = await Promise.all(
+      candidates.slice(0, MAX_RESULTS * 2).map(async (candidate) => {
+        let firstEta: number | null = null;
+        let headway = 10; // default scheduled interval (minutes)
+        try {
+          const etas = await getKmbStopEta(candidate.fromStop.stop);
+          const routeEtas = routeEtaMinutes(
+            etas,
+            candidate.route,
+            candidate.bound as JourneyBound,
+          );
+          if (routeEtas.length > 0) {
+            firstEta = routeEtas[0];
+          }
+          headway = deriveHeadway(routeEtas);
+        } catch {
+          firstEta = null;
         }
-        headway = deriveHeadway(routeEtas);
-      } catch {
-        firstEta = null;
-      }
+        return { candidate, firstEta, headway };
+      }),
+    );
+    for (const { candidate, firstEta, headway } of kmbEtaResults) {
       journeyRoutes.push({
         id: `journey-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
         walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
@@ -505,15 +528,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Build direct Citybus journey routes for cross-harbour coverage.
-    for (const candidate of citybusCandidates.slice(0, MAX_RESULTS * 2)) {
-      let firstEta: number | null = null;
-      try {
-        const etas = await getCitybusEta(candidate.fromStop.stop, candidate.route);
-        const routeEtas = routeEtaMinutes(etas, candidate.route, candidate.bound);
-        firstEta = routeEtas[0] ?? null;
-      } catch {
-        firstEta = null;
-      }
+    const citybusEtaResults = await Promise.all(
+      citybusCandidates.slice(0, MAX_RESULTS * 2).map(async (candidate) => {
+        try {
+          const etas = await getCitybusEta(candidate.fromStop.stop, candidate.route);
+          const routeEtas = routeEtaMinutes(etas, candidate.route, candidate.bound);
+          return { candidate, firstEta: routeEtas[0] ?? null };
+        } catch {
+          return { candidate, firstEta: null };
+        }
+      }),
+    );
+    for (const { candidate, firstEta } of citybusEtaResults) {
       journeyRoutes.push({
         id: `journey-ctb-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
         walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
