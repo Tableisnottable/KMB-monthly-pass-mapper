@@ -9,3 +9,5 @@ npm-debug.log*
 
 devserver.log
 tsconfig.tsbuildinfo
+
+server-*.log
