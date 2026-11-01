@@ -9,6 +9,7 @@ import {
   type TransitStopRecord,
 } from '../../../data/hkTransitApi';
 import { getStaticCitybusRouteStops, getStaticCitybusStops, STATIC_CITYBUS_ROUTES } from '../../../data/citybusStopsStatic';
+import { getStaticKmbRouteStops } from '../../../data/kmbRouteStopsStatic';
 import { scoreRoutes, type Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 
@@ -25,6 +26,13 @@ const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+async function getJourneyKmbRouteStops(
+  route: string,
+  bound: 'inbound' | 'outbound',
+) {
+  return getStaticKmbRouteStops(route, bound) ?? getKmbRouteStops(route, bound, '1');
 }
 
 function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
@@ -277,7 +285,7 @@ export async function GET(request: NextRequest) {
               const bounds = await Promise.all(
                 Array.from(dirsByRoute.get(route) ?? []).map(async (bound) => {
                   try {
-                    return { bound, rows: await getKmbRouteStops(route, bound, '1') };
+                    return { bound, rows: await getJourneyKmbRouteStops(route, bound) };
                   } catch {
                     return { bound, rows: null };
                   }
@@ -372,7 +380,7 @@ export async function GET(request: NextRequest) {
             const key = `${route}|${bound}`;
             if (originRouteStops.has(key)) continue;
             try {
-              const rows = await getKmbRouteStops(route, bound, '1');
+              const rows = await getJourneyKmbRouteStops(route, bound);
               if (!rows || rows.length === 0) continue;
               const m = new Map<string, number>();
               rows.forEach((row, i) => {
@@ -438,7 +446,7 @@ export async function GET(request: NextRequest) {
               if (transferCandidates.length >= MAX_CANDIDATE_ROUTES) break;
               let rowsB;
               try {
-                rowsB = await getKmbRouteStops(routeB, boundB, '1');
+                rowsB = await getJourneyKmbRouteStops(routeB, boundB);
               } catch {
                 continue;
               }
