@@ -3,6 +3,7 @@ import {
   dedupeByRouteNumber,
   deriveHeadway,
   directionCode,
+  pickStopsByWalkBand,
   routeEtaMinutes,
   type EtaRecordLike,
 } from './journeyHelpers';
@@ -105,5 +106,34 @@ describe('dedupeByRouteNumber', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].finalScore).toBe(31);
+  });
+});
+
+describe('pickStopsByWalkBand', () => {
+  const stop = (id: string, walkMinutes: number) => ({ stop: { id }, walkMinutes });
+
+  it('does not let one dense cluster consume the whole budget', () => {
+    const dense = Array.from({ length: 30 }, (_unused, index) => stop(`near${index}`, 1));
+    const further = [stop('mid', 4), stop('far', 8), stop('farther', 14)];
+
+    const picked = pickStopsByWalkBand([...dense, ...further], 12);
+    const ids = picked.map((entry) => entry.stop.id);
+
+    expect(picked).toHaveLength(12);
+    expect(ids).toContain('mid');
+    expect(ids).toContain('far');
+  });
+
+  it('keeps results sorted by walking time', () => {
+    const picked = pickStopsByWalkBand(
+      [stop('c', 12), stop('a', 1), stop('b', 4)],
+      3,
+    );
+
+    expect(picked.map((entry) => entry.stop.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('returns every stop when the limit exceeds the pool', () => {
+    expect(pickStopsByWalkBand([stop('a', 1), stop('b', 9)], 10)).toHaveLength(2);
   });
 });

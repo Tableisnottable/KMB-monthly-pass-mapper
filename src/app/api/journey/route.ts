@@ -19,7 +19,7 @@ const MAX_CANDIDATE_ROUTES = 40;
 const MAX_KMB_DIRECT_CANDIDATES = MAX_RESULTS * 2;
 const MAX_ROUTES_PER_STOP = 8;
 const TRANSFER_STOP_SCAN_LIMIT = 20;
-const NEARBY_STOP_LIMIT_WIDE = 15;
+const NEARBY_STOP_LIMIT_WIDE = 40;
 const WALK_KM_PER_MIN = 5 / 60; // 5 km/h walking speed
 const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
 
@@ -55,20 +55,20 @@ function nearestStops(
   lon: number,
   limit: number,
 ): { stop: TransitStopRecord; walkMinutes: number }[] {
-  return stops
+  const ranked = stops
     .map((stop) => {
       const km = haversineKm(lat, lon, Number(stop.lat), Number(stop.long));
       return { stop, walkMinutes: Math.round(km / WALK_KM_PER_MIN) };
     })
-    .filter((s) => s.walkMinutes <= MAX_WALK_MINUTES)
-    .sort((a, b) => a.walkMinutes - b.walkMinutes)
-    .slice(0, limit);
+    .filter((s) => s.walkMinutes <= MAX_WALK_MINUTES);
+  return pickStopsByWalkBand(ranked, limit);
 }
 
 import {
   dedupeByRouteNumber,
   deriveHeadway,
   etaMinutes,
+  pickStopsByWalkBand,
   routeEtaMinutes,
   type JourneyBound,
 } from '../../../engine/journeyHelpers';
@@ -362,7 +362,11 @@ export async function GET(request: NextRequest) {
     }[] = [];
 
     if (candidates.length + citybusCandidates.length < MAX_RESULTS) {
-      const MAX_TRANSFER_ROUTES = 8;
+      // Scale the transfer search to the shortfall: a journey that already has
+      // five direct options does not need a wide transfer sweep, and the sweep
+      // is the most expensive part of a cold request.
+      const shortfall = MAX_RESULTS - candidates.length - citybusCandidates.length;
+      const MAX_TRANSFER_ROUTES = Math.max(4, Math.min(8, shortfall * 3));
       // Routes serving origin stops (from stop-eta), fetched concurrently.
       const originRouteEntries = await Promise.all(
         fromStops.map(async (entry) => {
@@ -432,7 +436,7 @@ export async function GET(request: NextRequest) {
         // are likely cached from the direct scan or shared across routes).
         const transferCandidatesToCheck = Array.from(stopSeq)
           .filter(([, transferIdx]) => transferIdx > fromIdx)
-          .slice(0, TRANSFER_STOP_SCAN_LIMIT)
+          .slice(0, Math.max(10, Math.round(TRANSFER_STOP_SCAN_LIMIT * (shortfall / MAX_RESULTS))))
           .map(([transferId]) => transferId);
         const transferEtaResults = await Promise.all(
           transferCandidatesToCheck.map(async (transferId) => {

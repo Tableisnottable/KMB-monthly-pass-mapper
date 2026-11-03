@@ -70,3 +70,41 @@ export function dedupeByRouteNumber<T extends ScoredJourneyLike>(routes: T[]): T
   }
   return Array.from(best.values()).sort((a, b) => a.finalScore - b.finalScore);
 }
+
+export interface WalkableStop<T> {
+  stop: T;
+  walkMinutes: number;
+}
+
+/**
+ * Picks up to `limit` stops while keeping every walk-time band represented.
+ * Dense areas cluster many stops within a minute of each other, so a plain
+ * "nearest N" cut can spend the whole budget on one interchange and miss the
+ * stops that actual routes call at.
+ */
+export function pickStopsByWalkBand<T>(
+  stops: WalkableStop<T>[],
+  limit: number,
+): WalkableStop<T>[] {
+  const bandOf = (walkMinutes: number) =>
+    walkMinutes <= 2 ? 0 : walkMinutes <= 5 ? 1 : walkMinutes <= 10 ? 2 : 3;
+  const bands: WalkableStop<T>[][] = [[], [], [], []];
+  for (const entry of [...stops].sort((a, b) => a.walkMinutes - b.walkMinutes)) {
+    bands[bandOf(entry.walkMinutes)].push(entry);
+  }
+
+  const picked: WalkableStop<T>[] = [];
+  let added = true;
+  while (picked.length < limit && added) {
+    added = false;
+    for (const band of bands) {
+      if (picked.length >= limit) break;
+      const next = band.shift();
+      if (next) {
+        picked.push(next);
+        added = true;
+      }
+    }
+  }
+  return picked.sort((a, b) => a.walkMinutes - b.walkMinutes);
+}
