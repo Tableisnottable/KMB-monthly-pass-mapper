@@ -10,6 +10,8 @@ const REQUEST_TIMEOUT_MS = 5000;
 const citybusStopCache = new Map<string, { data: { stop: string; name_tc: string; name_en: string; lat: string; long: string }; expiresAt: number }>();
 const citybusStopInflight = new Map<string, Promise<{ stop: string; name_tc: string; name_en: string; lat: string; long: string }>>();
 const citybusRouteStopCache = new Map<string, { data: CitybusRouteStopRecord[]; expiresAt: number }>();
+const citybusEtaCache = new Map<string, { data: CitybusEtaRecord[]; expiresAt: number }>();
+const citybusEtaInflight = new Map<string, Promise<CitybusEtaRecord[]>>();
 
 export interface KmbRouteRecord {
   route: string;
@@ -193,10 +195,25 @@ export async function getKmbStopEta(stopId: string) {
 }
 
 export async function getCitybusEta(stopId: string, route: string) {
-  const payload = await fetchJson<{ data: CitybusEtaRecord[] }>(
+  const key = `${stopId}|${route}`;
+  const cached = citybusEtaCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+  const inflight = citybusEtaInflight.get(key);
+  if (inflight) {
+    return inflight;
+  }
+  const promise = fetchJson<{ data: CitybusEtaRecord[] }>(
     `${HK_TRANSIT_API.citybus}/eta/CTB/${encodeURIComponent(stopId)}/${encodeURIComponent(route)}`,
-  );
-  return payload.data;
+  ).then((payload) => {
+    citybusEtaCache.set(key, { data: payload.data, expiresAt: Date.now() + 30 * 1000 });
+    return payload.data;
+  }).finally(() => {
+    citybusEtaInflight.delete(key);
+  });
+  citybusEtaInflight.set(key, promise);
+  return promise;
 }
 
 export async function getCitybusStopEta(stopId: string) {
