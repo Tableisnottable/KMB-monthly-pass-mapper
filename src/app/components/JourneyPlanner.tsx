@@ -10,6 +10,8 @@ interface JourneyMeta {
   source?: string;
   live?: boolean;
   candidates?: number;
+  kmbCandidates?: number;
+  citybusCandidates?: number;
   transfers?: number;
   durationMs?: number;
   fromStops?: { stop: string; name: string; walkMinutes: number }[];
@@ -91,8 +93,19 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
             找到 {routes.length} 條路線
             {typeof meta.candidates === 'number' ? `（候選 ${meta.candidates} 條）` : ''}
           </span>
+          {(typeof meta.kmbCandidates === 'number' ||
+            typeof meta.citybusCandidates === 'number') && (
+            <span>
+              九巴 {meta.kmbCandidates ?? 0} · 城巴 {meta.citybusCandidates ?? 0}
+            </span>
+          )}
           {typeof meta.durationMs === 'number' && (
-            <span>官方資料耗時 {Math.max(1, Math.round(meta.durationMs / 1000))} 秒</span>
+            <span>
+              官方資料耗時{' '}
+              {meta.durationMs >= 1000
+                ? `${(meta.durationMs / 1000).toFixed(1)} 秒`
+                : `${meta.durationMs} 毫秒`}
+            </span>
           )}
           {meta.source && <span>{meta.source}</span>}
           {meta.fromStops?.[0] && (

@@ -49,3 +49,24 @@ export function deriveHeadway(minutes: number[], fallback = 10): number {
   const averageGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
   return averageGap >= 1 && averageGap <= 60 ? Math.round(averageGap) : fallback;
 }
+
+export interface ScoredJourneyLike {
+  finalScore: number;
+  legs?: { routeNumber?: string }[];
+}
+
+/**
+ * Collapses journeys that ride the same set of routes (in any direction to
+ * the same stops) to the best-scoring one, then sorts by score ascending.
+ */
+export function dedupeByRouteNumber<T extends ScoredJourneyLike>(routes: T[]): T[] {
+  const best = new Map<string, T>();
+  for (const route of routes) {
+    const key = (route.legs ?? []).map((leg) => leg.routeNumber ?? '').join('+');
+    const existing = best.get(key);
+    if (!existing || route.finalScore < existing.finalScore) {
+      best.set(key, route);
+    }
+  }
+  return Array.from(best.values()).sort((a, b) => a.finalScore - b.finalScore);
+}

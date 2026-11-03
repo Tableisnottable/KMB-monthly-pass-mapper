@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getCitybusEta,
   getCitybusRouteStops,
-  getCitybusRoutes,
   getKmbRouteStops,
   getKmbStopEta,
   getKmbStops,
@@ -35,6 +34,10 @@ async function getJourneyKmbRouteStops(
   return getStaticKmbRouteStops(route, bound) ?? getKmbRouteStops(route, bound, '1');
 }
 
+// A journey is identified for display purposes by the routes it uses: the
+// same buses in the opposite direction are not a different trip, and showing
+// both just clutters the board. Keep the best-scoring variant of each.
+
 function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
   const R = 6371;
   const dLat = ((bLat - aLat) * Math.PI) / 180;
@@ -63,6 +66,7 @@ function nearestStops(
 }
 
 import {
+  dedupeByRouteNumber,
   deriveHeadway,
   etaMinutes,
   routeEtaMinutes,
@@ -148,10 +152,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const journeyStartedAt = Date.now();
-    const [stops, citybusRoutes] = await Promise.all([
-      getKmbStops(),
-      getCitybusRoutes(),
-    ]);
+    const stops = await getKmbStops();
     const fromStops = nearestStops(stops, fromLat, fromLon, NEARBY_STOP_LIMIT_WIDE);
     // Destination stops use a wider radius: the alighting stop is often
     // further from the destination point than the boarding stop is from
@@ -230,7 +231,6 @@ export async function GET(request: NextRequest) {
         });
       }
     };
-    await scanCitybusStops();
 
     const toIds = new Set(toStops.map((s) => s.stop.stop));
     const toStopById = new Map(toStops.map((s) => [s.stop.stop, s]));
@@ -243,7 +243,8 @@ export async function GET(request: NextRequest) {
       fromWalk: number;
       toWalk: number;
     }[] = [];
-    const seenPairs = new Set<string>();
+    // One entry per route+direction, keeping the least-walking boarding stop.
+    const candidateByRouteBound = new Map<string, (typeof candidates)[number]>();
 
     const scanFromStops = async (
       pool: { stop: TransitStopRecord; walkMinutes: number }[],
@@ -314,10 +315,17 @@ export async function GET(request: NextRequest) {
               }
             }
             if (bestTo) {
-              const pairKey = `${route}|${bound}|${entry.stop.stop}|${bestTo}`;
-              if (seenPairs.has(pairKey)) continue;
-              seenPairs.add(pairKey);
-              candidates.push({
+              // One candidate per route+direction: several nearby boarding
+              // stops usually match the same route, and a repeated pair would
+              // both waste the candidate budget and duplicate the card.
+              const routeKey = `${route}|${bound}`;
+              const existing = candidateByRouteBound.get(routeKey);
+              const walk = entry.walkMinutes + toStopById.get(bestTo)!.walkMinutes;
+              if (existing && existing.fromWalk + existing.toWalk <= walk) continue;
+              if (existing) {
+                candidates.splice(candidates.indexOf(existing), 1);
+              }
+              const candidate = {
                 route,
                 bound,
                 serviceType: '1',
@@ -325,7 +333,9 @@ export async function GET(request: NextRequest) {
                 toStop: toStopById.get(bestTo)!.stop,
                 fromWalk: entry.walkMinutes,
                 toWalk: toStopById.get(bestTo)!.walkMinutes,
-              });
+              };
+              candidates.push(candidate);
+              candidateByRouteBound.set(routeKey, candidate);
             }
           }
         }
@@ -333,7 +343,8 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    await scanFromStops(fromStops);
+    // KMB and Citybus catalogs are independent, so scan them concurrently.
+    await Promise.all([scanCitybusStops(), scanFromStops(fromStops)]);
 
     // Transfer routes: when direct options are limited, find one-transfer
     // journeys via a common intermediate stop served by both an origin-side
@@ -604,7 +615,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const scored = scoreRoutes(journeyRoutes).slice(0, MAX_RESULTS);
+    const scoredAll = dedupeByRouteNumber(scoreRoutes(journeyRoutes));
+    const scored = scoredAll.slice(0, MAX_RESULTS);
+
+    const buildMeta = (extra: Record<string, number> = {}) => ({
+      source: 'KMB/Citybus route/stop/ETA APIs',
+      live: true,
+      durationMs: Date.now() - journeyStartedAt,
+      candidates: candidates.length + citybusCandidates.length,
+      kmbCandidates: candidates.length,
+      citybusCandidates: citybusCandidates.length,
+      ...extra,
+      fromStops: fromStops.map((s) => ({
+        stop: s.stop.stop,
+        name: s.stop.name_tc || s.stop.name_en,
+        walkMinutes: s.walkMinutes,
+      })),
+      toStops: toStops.map((s) => ({
+        stop: s.stop.stop,
+        name: s.stop.name_tc || s.stop.name_en,
+        walkMinutes: s.walkMinutes,
+      })),
+    });
 
     // Build transfer (1-transfer) journey routes when direct results are few.
     if (scored.length < MAX_RESULTS && transferCandidates.length > 0) {
@@ -680,55 +712,19 @@ export async function GET(request: NextRequest) {
           ],
         });
       }
-      const scoredTransfers = scoreRoutes(transferRoutes);
-      const merged = [...scored, ...scoredTransfers]
-        .sort((a, b) => a.finalScore - b.finalScore)
+      const merged = dedupeByRouteNumber([...scoredAll, ...scoreRoutes(transferRoutes)])
         .slice(0, MAX_RESULTS);
       return NextResponse.json(
         {
           data: merged,
-          meta: {
-            source: 'KMB/Citybus route/stop/ETA APIs',
-            live: true,
-            durationMs: Date.now() - journeyStartedAt,
-            candidates: candidates.length,
-            transfers: transferCandidates.length,
-            fromStops: fromStops.map((s) => ({
-              stop: s.stop.stop,
-              name: s.stop.name_tc || s.stop.name_en,
-              walkMinutes: s.walkMinutes,
-            })),
-            toStops: toStops.map((s) => ({
-              stop: s.stop.stop,
-              name: s.stop.name_tc || s.stop.name_en,
-              walkMinutes: s.walkMinutes,
-            })),
-          },
+          meta: buildMeta({ transfers: transferCandidates.length }),
         },
         { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
     return NextResponse.json(
-      {
-        data: scored,
-        meta: {
-          source: 'KMB/Citybus route/stop/ETA APIs',
-          live: true,
-          durationMs: Date.now() - journeyStartedAt,
-          candidates: candidates.length,
-          fromStops: fromStops.map((s) => ({
-            stop: s.stop.stop,
-            name: s.stop.name_tc || s.stop.name_en,
-            walkMinutes: s.walkMinutes,
-          })),
-          toStops: toStops.map((s) => ({
-            stop: s.stop.stop,
-            name: s.stop.name_tc || s.stop.name_en,
-            walkMinutes: s.walkMinutes,
-          })),
-        },
-      },
+      { data: scored, meta: buildMeta() },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

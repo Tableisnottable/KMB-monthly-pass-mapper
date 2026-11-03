@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dedupeByRouteNumber,
   deriveHeadway,
   directionCode,
   routeEtaMinutes,
@@ -70,5 +71,39 @@ describe('deriveHeadway', () => {
   it('falls back when the gap is implausible', () => {
     expect(deriveHeadway([1, 90])).toBe(10);
     expect(deriveHeadway([0, 0])).toBe(10);
+  });
+});
+
+describe('dedupeByRouteNumber', () => {
+  it('keeps the best-scoring variant of the same route set', () => {
+    const outbound = { finalScore: 38, legs: [{ routeNumber: '234X' }] };
+    const inbound = { finalScore: 35, legs: [{ routeNumber: '234X' }] };
+    const other = { finalScore: 40, legs: [{ routeNumber: '30' }] };
+
+    const result = dedupeByRouteNumber([outbound, other, inbound]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe(inbound);
+    expect(result.map((route) => route.finalScore)).toEqual([35, 40]);
+  });
+
+  it('treats different route combinations as distinct journeys', () => {
+    const direct = { finalScore: 30, legs: [{ routeNumber: '30X' }] };
+    const viaTransfer = {
+      finalScore: 32,
+      legs: [{ routeNumber: '243M' }, { routeNumber: '30X' }],
+    };
+
+    expect(dedupeByRouteNumber([direct, viaTransfer])).toHaveLength(2);
+  });
+
+  it('collapses mirrored route sets that differ only by order', () => {
+    const a = { finalScore: 33, legs: [{ routeNumber: 'A' }, { routeNumber: 'B' }] };
+    const b = { finalScore: 31, legs: [{ routeNumber: 'A' }, { routeNumber: 'B' }] };
+
+    const result = dedupeByRouteNumber([a, b]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].finalScore).toBe(31);
   });
 });
