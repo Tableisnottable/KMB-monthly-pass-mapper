@@ -383,33 +383,38 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
                             </div>
                             <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold text-cm-muted">
                               <span>{leg.journeyTimeMinutes ?? 0} 分鐘</span>
-                              {leg.realtimeEta ? (
+                              {leg.serviceEnded ? (
+                                <span className="text-rose-700">· 今日服務已結束</span>
+                              ) : leg.realtimeEta ? (
                                 <span className="text-cm-greenDark">· {leg.realtimeEta.etaMinutes} 分到站</span>
                               ) : (
                                 <span>· 每 {leg.scheduledIntervalMinutes} 分一班</span>
                               )}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              {nextDepartures(leg, new Date()).map((dep, i) => (
-                                <span
-                                  className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums ${
-                                    dep.isLive
-                                      ? 'bg-cm-green text-white'
-                                      : 'border border-dashed border-amber-500 bg-amber-50 text-amber-800'
-                                  }`}
-                                  key={`${leg.id}-dep-${i}`}
-                                >
-                                  {dep.time}
-                                </span>
-                              ))}
+                              {!leg.serviceEnded &&
+                                nextDepartures(leg, new Date()).map((dep, i) => (
+                                  <span
+                                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums ${
+                                      dep.isLive
+                                        ? 'bg-cm-green text-white'
+                                        : 'border border-dashed border-amber-500 bg-amber-50 text-amber-800'
+                                    }`}
+                                    key={`${leg.id}-dep-${i}`}
+                                  >
+                                    {dep.time}
+                                  </span>
+                                ))}
                               <span
                                 className={`rounded px-1 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${
-                                  leg.realtimeEta
-                                    ? 'bg-cm-green/10 text-cm-greenDark'
-                                    : 'bg-amber-100 text-amber-800'
+                                  leg.serviceEnded
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : leg.realtimeEta
+                                      ? 'bg-cm-green/10 text-cm-greenDark'
+                                      : 'bg-amber-100 text-amber-800'
                                 }`}
                               >
-                                {leg.realtimeEta ? '實時' : '班表'}
+                                {leg.serviceEnded ? '已收班' : leg.realtimeEta ? '實時' : '班表'}
                               </span>
                             </div>
                           </div>
@@ -434,6 +439,11 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
                   <div className="mt-3 flex items-center justify-between gap-2 border-t border-cm-line pt-2.5">
                     <div className="flex items-center gap-2 text-[11px] font-bold text-cm-muted">
                       <span>評分 {route.finalScore.toFixed(1)}</span>
+                      {route.legs.some((leg) => leg.serviceEnded) && (
+                        <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-rose-700">
+                          部分已收班
+                        </span>
+                      )}
                       {route.legs.some((leg) => leg.realtimeEta) && (
                         <span className="rounded-full bg-cm-green/10 px-1.5 py-0.5 text-cm-greenDark">
                           LIVE

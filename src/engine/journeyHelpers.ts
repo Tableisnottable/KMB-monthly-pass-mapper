@@ -40,6 +40,23 @@ export function routeEtaMinutes(
 }
 
 /**
+ * Distinguishes "the provider knows this route but has no upcoming trip"
+ * (service has stopped for the day, or the route is overnight-only) from
+ * "there is an arrival we can wait for". A route with no upcoming trip must
+ * not be ranked as if a bus were due any minute.
+ */
+export function hasUpcomingTrip(etas: EtaRecordLike[], route: string, bound: JourneyBound): boolean {
+  const dir = directionCode(bound);
+  return etas.some(
+    (entry) =>
+      entry.route === route &&
+      entry.dir === dir &&
+      entry.eta !== null &&
+      new Date(entry.eta).getTime() > Date.now() - 60_000,
+  );
+}
+
+/**
  * Derives the scheduled interval (headway) from consecutive ETA gaps.
  * Falls back when fewer than two ETAs are known or the gap is implausible.
  */

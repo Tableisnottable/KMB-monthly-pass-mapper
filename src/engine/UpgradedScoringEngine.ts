@@ -27,6 +27,12 @@ export interface Segment {
   realtimeEtaMinutes?: number;
   realtimeEta?: RealtimeEta | null;
   isEtaFresh?: boolean;
+  /**
+   * The provider serves this route but has no upcoming trip for it, e.g. an
+   * overnight-only route during the day or a route that has finished for the
+   * night. Such a leg must not be scored as if a vehicle were imminent.
+   */
+  serviceEnded?: boolean;
   originStop?: Stop;
   destinationStop?: Stop;
   fare?: number;
@@ -92,6 +98,11 @@ const operatorAdjustments: Record<string, number> = {
   CTB: 1,
 };
 
+// Penalty applied when a leg has no upcoming trip at all. Large enough that
+// an alternative with a real bus always wins, but finite so the journey still
+// appears (lower in the list) instead of vanishing from the board.
+const SERVICE_ENDED_WAIT_PENALTY = 90;
+
 function round(value: number): number {
   return Number(value.toFixed(2));
 }
@@ -127,6 +138,11 @@ export class UpgradedScoringEngine {
 
   public static calculateSegmentScore(segment: Segment, date: Date = new Date()): number {
     const multiplier = this.getTimeMultiplier(date);
+    // No upcoming trip: the wait is unbounded, so push the leg far down the
+    // ranking rather than assuming an average half-headway wait.
+    if (segment.serviceEnded) {
+      return journeyTime(segment) + SERVICE_ENDED_WAIT_PENALTY * multiplier + this.getOperatorAdjustment(segment.operator);
+    }
     const liveEta = segment.realtimeEta?.isLive
       ? segment.realtimeEta.etaMinutes
       : segment.realtimeEtaMinutes !== undefined && segment.isEtaFresh

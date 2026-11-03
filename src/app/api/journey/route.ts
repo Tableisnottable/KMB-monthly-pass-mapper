@@ -68,6 +68,7 @@ import {
   dedupeByRouteNumber,
   deriveHeadway,
   etaMinutes,
+  hasUpcomingTrip,
   pickStopsByWalkBand,
   routeEtaMinutes,
   type JourneyBound,
@@ -514,6 +515,8 @@ export async function GET(request: NextRequest) {
       candidates.slice(0, MAX_RESULTS * 2).map(async (candidate) => {
         let firstEta: number | null = null;
         let headway = 10; // default scheduled interval (minutes)
+        // Default to "has service" so an upstream failure never hides a route.
+        let hasService = true;
         try {
           const etas = await getKmbStopEta(candidate.fromStop.stop);
           const routeEtas = routeEtaMinutes(
@@ -525,13 +528,18 @@ export async function GET(request: NextRequest) {
             firstEta = routeEtas[0];
           }
           headway = deriveHeadway(routeEtas);
+          // The provider lists this route at the stop but has no upcoming trip
+          // for it (overnight-only during the day, or service finished).
+          hasService =
+            routeEtas.length > 0 ||
+            hasUpcomingTrip(etas, candidate.route, candidate.bound as JourneyBound);
         } catch {
           firstEta = null;
         }
-        return { candidate, firstEta, headway };
+        return { candidate, firstEta, headway, hasService };
       }),
     );
-    for (const { candidate, firstEta, headway } of kmbEtaResults) {
+    for (const { candidate, firstEta, headway, hasService } of kmbEtaResults) {
       journeyRoutes.push({
         id: `journey-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
         walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
@@ -556,6 +564,7 @@ export async function GET(request: NextRequest) {
             },
             journeyTimeMinutes: estimateRideMinutes(candidate.fromStop, candidate.toStop),
             scheduledIntervalMinutes: headway,
+            serviceEnded: !hasService,
             realtimeEta:
               firstEta === null
                 ? null
@@ -578,13 +587,15 @@ export async function GET(request: NextRequest) {
         try {
           const etas = await getCitybusEta(candidate.fromStop.stop, candidate.route);
           const routeEtas = routeEtaMinutes(etas, candidate.route, candidate.bound);
-          return { candidate, firstEta: routeEtas[0] ?? null };
+          const hasService =
+            routeEtas.length > 0 || hasUpcomingTrip(etas, candidate.route, candidate.bound);
+          return { candidate, firstEta: routeEtas[0] ?? null, hasService };
         } catch {
-          return { candidate, firstEta: null };
+          return { candidate, firstEta: null, hasService: true };
         }
       }),
     );
-    for (const { candidate, firstEta } of citybusEtaResults) {
+    for (const { candidate, firstEta, hasService } of citybusEtaResults) {
       journeyRoutes.push({
         id: `journey-ctb-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
         walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
@@ -609,6 +620,7 @@ export async function GET(request: NextRequest) {
             },
             journeyTimeMinutes: estimateRideMinutes(candidate.fromStop, candidate.toStop),
             scheduledIntervalMinutes: 10,
+            serviceEnded: !hasService,
             realtimeEta:
               firstEta === null
                 ? null
@@ -648,11 +660,15 @@ export async function GET(request: NextRequest) {
       for (const tc of transferCandidates.slice(0, MAX_RESULTS - scored.length)) {
         let etaA: number | null = null;
         let headwayA = 10;
+        let hasServiceA = true;
         try {
           const etas = await getKmbStopEta(tc.fromStop.stop);
           const routeEtas = routeEtaMinutes(etas, tc.routeA, tc.boundA as JourneyBound);
           if (routeEtas.length > 0) etaA = routeEtas[0];
           headwayA = deriveHeadway(routeEtas);
+          hasServiceA =
+            routeEtas.length > 0 ||
+            hasUpcomingTrip(etas, tc.routeA, tc.boundA as JourneyBound);
         } catch {
           etaA = null;
         }
@@ -660,6 +676,24 @@ export async function GET(request: NextRequest) {
         const rideA = estimateRideMinutes(tc.fromStop, tc.transferStop);
         const rideB = estimateRideMinutes(tc.transferStop, tc.toStop);
         const transferWalk = 3; // assumed transfer walk at interchange
+
+        // The second leg boards at the interchange, so ask for its arrivals
+        // there too; otherwise the engine assumes an average wait and can rank
+        // a transfer above a direct bus that genuinely has a trip coming.
+        let etaB: number | null = null;
+        let headwayB = 10;
+        let hasServiceB = true;
+        try {
+          const etasB = await getKmbStopEta(tc.transferStop.stop);
+          const routeEtasB = routeEtaMinutes(etasB, tc.routeB, tc.boundB as JourneyBound);
+          if (routeEtasB.length > 0) etaB = routeEtasB[0];
+          headwayB = deriveHeadway(routeEtasB);
+          hasServiceB =
+            routeEtasB.length > 0 ||
+            hasUpcomingTrip(etasB, tc.routeB, tc.boundB as JourneyBound);
+        } catch {
+          etaB = null;
+        }
 
         transferRoutes.push({
           id: `journey-t-${tc.routeA}-${tc.routeB}-${tc.transferStop.stop}`,
@@ -685,6 +719,7 @@ export async function GET(request: NextRequest) {
               },
               journeyTimeMinutes: rideA,
               scheduledIntervalMinutes: headwayA,
+              serviceEnded: !hasServiceA,
               realtimeEta:
                 etaA === null
                   ? null
@@ -709,8 +744,12 @@ export async function GET(request: NextRequest) {
                 lng: Number(tc.toStop.long),
               },
               journeyTimeMinutes: rideB,
-              scheduledIntervalMinutes: 10,
-              realtimeEta: null,
+              scheduledIntervalMinutes: headwayB,
+              serviceEnded: !hasServiceB,
+              realtimeEta:
+                etaB === null
+                  ? null
+                  : { etaMinutes: etaB, dataTime: new Date().toISOString(), isLive: true, source: 'DATAGOVHK' },
               fare: estimateFare(tc.transferStop, tc.toStop),
             },
           ],

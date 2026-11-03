@@ -3,6 +3,7 @@ import {
   dedupeByRouteNumber,
   deriveHeadway,
   directionCode,
+  hasUpcomingTrip,
   pickStopsByWalkBand,
   routeEtaMinutes,
   type EtaRecordLike,
@@ -135,5 +136,26 @@ describe('pickStopsByWalkBand', () => {
 
   it('returns every stop when the limit exceeds the pool', () => {
     expect(pickStopsByWalkBand([stop('a', 1), stop('b', 9)], 10)).toHaveLength(2);
+  });
+});
+
+describe('hasUpcomingTrip', () => {
+  const past = new Date(Date.now() - 5 * 60000).toISOString();
+  const soon = new Date(Date.now() + 5 * 60000).toISOString();
+
+  it('reports a trip when the provider lists a future arrival', () => {
+    expect(hasUpcomingTrip([{ route: '30X', dir: 'I', eta: soon }], '30X', 'inbound')).toBe(true);
+  });
+
+  it('reports no trip when every arrival is in the past', () => {
+    expect(hasUpcomingTrip([{ route: '30X', dir: 'I', eta: past }], '30X', 'inbound')).toBe(false);
+  });
+
+  it('ignores arrivals in the opposite direction', () => {
+    expect(hasUpcomingTrip([{ route: '30X', dir: 'O', eta: soon }], '30X', 'inbound')).toBe(false);
+  });
+
+  it('treats a null eta as no trip', () => {
+    expect(hasUpcomingTrip([{ route: '30X', dir: 'I', eta: null }], '30X', 'inbound')).toBe(false);
   });
 });
