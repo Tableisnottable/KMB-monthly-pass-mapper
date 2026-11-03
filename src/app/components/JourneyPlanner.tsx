@@ -25,6 +25,11 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
   const [meta, setMeta] = useState<JourneyMeta | null>(null);
   const [searched, setSearched] = useState(false);
 
+  // Every leg of every proposed journey has finished for the day.
+  const allClosed =
+    routes.length > 0 &&
+    routes.every((route) => (route.legs ?? []).every((leg) => leg.serviceEnded));
+
   async function handleSearch(origin: PlaceResult, destination: PlaceResult) {
     setSearching(true);
     setError(null);
@@ -82,6 +87,11 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
       {error && (
         <div className="rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700 ring-1 ring-red-200">
           {error}
+        </div>
+      )}
+      {searched && allClosed && (
+        <div className="rounded-2xl bg-rose-50 p-3 text-sm font-bold text-rose-800 ring-1 ring-rose-200">
+          此路線的所有班次今日已經結束。以下為最後可行的走法供參考，或可考慮其他交通方式。
         </div>
       )}
       {searched && meta && (

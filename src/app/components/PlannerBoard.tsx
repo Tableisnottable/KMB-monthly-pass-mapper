@@ -164,6 +164,30 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [navigating, setNavigating] = useState(false);
 
+  const hasBus = useMemo(() => routes.some((route) => route.legs.some((leg) => leg.mode === 'BUS')), [routes]);
+  const hasRail = useMemo(
+    () => routes.some((route) => route.legs.some((leg) => leg.mode === 'SUBWAY')),
+    [routes],
+  );
+
+  // Only offer mode chips for modes that actually appear in the results;
+  // a "港鐵" filter that always yields nothing just looks broken.
+  const availableChips = useMemo(
+    () =>
+      SORT_CHIPS.filter((chip) => {
+        if (chip.key === 'bus') return hasBus;
+        if (chip.key === 'rail') return hasRail;
+        return true;
+      }),
+    [hasBus, hasRail],
+  );
+
+  useEffect(() => {
+    if (!availableChips.some((chip) => chip.key === sortKey)) {
+      setSortKey('all');
+    }
+  }, [availableChips, sortKey]);
+
   const visibleRoutes = useMemo(() => {
     let list = [...routes];
     if (sortKey === 'bus') {
@@ -263,7 +287,7 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
         )}
 
         <div className="flex flex-wrap gap-2">
-          {SORT_CHIPS.map((chip) => (
+          {availableChips.map((chip) => (
             <button
               className={`cm-chip transition ${
                 sortKey === chip.key
