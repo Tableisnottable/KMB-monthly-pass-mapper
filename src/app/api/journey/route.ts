@@ -42,14 +42,7 @@ async function getJourneyKmbRouteStops(
 // both just clutters the board. Keep the best-scoring variant of each.
 
 function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const R = 6371;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLon = ((bLon - aLon) * Math.PI) / 180;
-  const s1 = Math.sin(dLat / 2);
-  const s2 = Math.sin(dLon / 2);
-  const a =
-    s1 * s1 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * s2 * s2;
-  return 2 * R * Math.asin(Math.sqrt(a));
+  return haversineDistanceKm(aLat, aLon, bLat, bLon);
 }
 
 function nearestStops(
@@ -71,7 +64,9 @@ import {
   dedupeByRouteNumber,
   deriveHeadway,
   etaMinutes,
+  haversineKm as haversineDistanceKm,
   hasUpcomingTrip,
+  isTooCloseToRide,
   pickAlightingIndex,
   pickStopsByWalkBand,
   routeEtaMinutes,
@@ -153,6 +148,28 @@ export async function GET(request: NextRequest) {
     Math.abs(toLon) > 180
   ) {
     return badRequest('fromLat, fromLon, toLat and toLon are required.');
+  }
+
+  // Walking is the answer when the two points are already close; searching
+  // bus routes would only suggest riding around the block.
+  if (isTooCloseToRide(fromLat, fromLon, toLat, toLon)) {
+    return NextResponse.json(
+      {
+        data: [],
+        meta: {
+          source: 'KMB/Citybus route/stop/ETA APIs',
+          live: true,
+          durationMs: 0,
+          candidates: 0,
+          kmbCandidates: 0,
+          citybusCandidates: 0,
+          tooCloseToRide: true,
+          fromStops: [],
+          toStops: [],
+        },
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
   try {

@@ -15,6 +15,29 @@ export function directionCode(bound: JourneyBound): DirectionCode {
   return bound === 'outbound' ? 'O' : 'I';
 }
 
+export function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLon = ((bLon - aLon) * Math.PI) / 180;
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLon / 2);
+  const a =
+    s1 * s1 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * s2 * s2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Below this the whole trip is a short walk, so bus suggestions are noise. */
+export const MIN_RIDEABLE_JOURNEY_KM = 0.4;
+
+export function isTooCloseToRide(
+  fromLat: number,
+  fromLon: number,
+  toLat: number,
+  toLon: number,
+): boolean {
+  return haversineKm(fromLat, fromLon, toLat, toLon) < MIN_RIDEABLE_JOURNEY_KM;
+}
+
 export function etaMinutes(eta: string | null): number | null {
   if (!eta) return null;
   const time = new Date(eta).getTime();

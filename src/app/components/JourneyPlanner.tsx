@@ -14,6 +14,7 @@ interface JourneyMeta {
   citybusCandidates?: number;
   transfers?: number;
   durationMs?: number;
+  tooCloseToRide?: boolean;
   fromStops?: { stop: string; name: string; walkMinutes: number }[];
   toStops?: { stop: string; name: string; walkMinutes: number }[];
 }
@@ -89,12 +90,17 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
           {error}
         </div>
       )}
+      {searched && meta?.tooCloseToRide && (
+        <div className="rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-900 ring-1 ring-amber-200">
+          起點與目的地相距很近，步行即可到達，不需要乘車。
+        </div>
+      )}
       {searched && allClosed && (
         <div className="rounded-2xl bg-rose-50 p-3 text-sm font-bold text-rose-800 ring-1 ring-rose-200">
           此路線的所有班次今日已經結束。以下為最後可行的走法供參考，或可考慮其他交通方式。
         </div>
       )}
-      {searched && meta && (
+      {searched && meta && !meta.tooCloseToRide && (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 text-xs text-cm-muted shadow-card ring-1 ring-cm-line">
           <span className="rounded-full bg-cm-green/10 px-2 py-0.5 font-extrabold text-cm-greenDark">
             {meta.live ? '實時路線' : '路線結果'}
@@ -130,7 +136,14 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
           )}
         </div>
       )}
-      <PlannerBoard routes={routes} emptyHint="輸入起點和目的地，搜尋真實巴士路線。" />
+      <PlannerBoard
+        emptyHint={
+          meta?.tooCloseToRide
+            ? '這段距離步行即可到達。'
+            : '輸入起點和目的地，搜尋真實巴士路線。'
+        }
+        routes={routes}
+      />
     </>
   );
 }

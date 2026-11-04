@@ -3,7 +3,9 @@ import {
   dedupeByRouteNumber,
   deriveHeadway,
   directionCode,
+  haversineKm,
   hasUpcomingTrip,
+  isTooCloseToRide,
   pickAlightingIndex,
   pickStopsByWalkBand,
   routeEtaMinutes,
@@ -108,6 +110,27 @@ describe('dedupeByRouteNumber', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].finalScore).toBe(31);
+  });
+});
+
+describe('isTooCloseToRide', () => {
+  it('treats an identical origin and destination as walk-only', () => {
+    expect(isTooCloseToRide(22.3193, 114.1694, 22.3193, 114.1694)).toBe(true);
+  });
+
+  it('treats a few hundred metres as walk-only', () => {
+    expect(isTooCloseToRide(22.3193, 114.1694, 22.3220, 114.1694)).toBe(true);
+  });
+
+  it('allows riding once the points are a real trip apart', () => {
+    expect(isTooCloseToRide(22.3193, 114.1694, 22.3280, 114.1694)).toBe(false);
+  });
+
+  it('computes distance with the haversine formula', () => {
+    // Tsim Sha Tsui to Central is roughly 4.7 km in a straight line.
+    const km = haversineKm(22.2978, 114.172, 22.2819, 114.1581);
+    expect(km).toBeGreaterThan(2);
+    expect(km).toBeLessThan(3);
   });
 });
 
