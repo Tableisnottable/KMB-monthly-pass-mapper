@@ -19,7 +19,10 @@ const MAX_CANDIDATE_ROUTES = 40;
 const MAX_KMB_DIRECT_CANDIDATES = MAX_RESULTS * 2;
 const MAX_ROUTES_PER_STOP = 8;
 const TRANSFER_STOP_SCAN_LIMIT = 20;
-const NEARBY_STOP_LIMIT_WIDE = 40;
+// Dense districts can list ~80 stops within a five minute walk, so the pool
+// has to be wide enough to reach the stops routes actually call at. Scan cost
+// stays bounded by the per-stop route cap and the candidate budget.
+const NEARBY_STOP_LIMIT_WIDE = 90;
 const WALK_KM_PER_MIN = 5 / 60; // 5 km/h walking speed
 const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
 
@@ -69,6 +72,7 @@ import {
   deriveHeadway,
   etaMinutes,
   hasUpcomingTrip,
+  pickAlightingIndex,
   pickStopsByWalkBand,
   routeEtaMinutes,
   type JourneyBound,
@@ -301,20 +305,12 @@ export async function GET(request: NextRequest) {
             for (const { bound, rows } of bounds) {
               if (candidates.length >= MAX_KMB_DIRECT_CANDIDATES) break;
               if (!rows || rows.length === 0) continue;
-              const seqByStop = new Map<string, number>();
-              rows.forEach((row, index) => {
-                if (!seqByStop.has(row.stop)) seqByStop.set(row.stop, index);
-              });
-            let bestTo: string | null = null;
-            let bestIdx = Number.POSITIVE_INFINITY;
-            for (const toId of Array.from(toIds)) {
-              const toIdx = seqByStop.get(toId);
-              if (toIdx === undefined || toIdx <= 0) continue;
-              if (toIdx < bestIdx) {
-                bestIdx = toIdx;
-                bestTo = toId;
-              }
-            }
+              // Boarding stop must exist on this direction, and the alighting
+              // stop must come after it; otherwise the bus has already passed
+              // the destination when we board.
+              const alight = pickAlightingIndex(rows, entry.stop.stop, toIds);
+              if (!alight) continue;
+              const bestTo = alight.stopId;
             if (bestTo) {
               // One candidate per route+direction: several nearby boarding
               // stops usually match the same route, and a repeated pair would

@@ -4,6 +4,7 @@ import {
   deriveHeadway,
   directionCode,
   hasUpcomingTrip,
+  pickAlightingIndex,
   pickStopsByWalkBand,
   routeEtaMinutes,
   type EtaRecordLike,
@@ -157,5 +158,42 @@ describe('hasUpcomingTrip', () => {
 
   it('treats a null eta as no trip', () => {
     expect(hasUpcomingTrip([{ route: '30X', dir: 'I', eta: null }], '30X', 'inbound')).toBe(false);
+  });
+
+  it('treats the empty string KMB sends for unscheduled routes as no trip', () => {
+    expect(hasUpcomingTrip([{ route: 'N260', dir: 'O', eta: '' }], 'N260', 'outbound')).toBe(false);
+  });
+
+  it('ignores unparseable timestamps instead of throwing', () => {
+    expect(hasUpcomingTrip([{ route: '30X', dir: 'I', eta: 'not-a-date' }], '30X', 'inbound')).toBe(false);
+  });
+});
+
+describe('pickAlightingIndex', () => {
+  const sequence = [
+    { stop: 'MOK1' },
+    { stop: 'MOK2' },
+    { stop: 'TW1' },
+    { stop: 'TW2' },
+  ];
+
+  it('picks the earliest served alighting stop after boarding', () => {
+    const result = pickAlightingIndex(sequence, 'TW1', new Set(['MOK1', 'MOK2']));
+
+    expect(result).toBeNull();
+  });
+
+  it('returns the closest later stop when the direction is valid', () => {
+    const result = pickAlightingIndex(sequence, 'MOK1', new Set(['TW1', 'TW2']));
+
+    expect(result).toEqual({ stopId: 'TW1', index: 2 });
+  });
+
+  it('rejects a boarding stop that this direction never serves', () => {
+    expect(pickAlightingIndex(sequence, 'ABSENT', new Set(['MOK2']))).toBeNull();
+  });
+
+  it('rejects when the destination is only reachable before boarding', () => {
+    expect(pickAlightingIndex(sequence, 'TW2', new Set(['MOK1', 'MOK2']))).toBeNull();
   });
 });

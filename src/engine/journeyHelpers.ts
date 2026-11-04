@@ -17,8 +17,19 @@ export function directionCode(bound: JourneyBound): DirectionCode {
 
 export function etaMinutes(eta: string | null): number | null {
   if (!eta) return null;
-  const minutes = Math.round((new Date(eta).getTime() - Date.now()) / 60000);
+  const time = new Date(eta).getTime();
+  if (!Number.isFinite(time)) return null;
+  const minutes = Math.round((time - Date.now()) / 60000);
   return minutes < 0 ? 0 : minutes;
+}
+
+/**
+ * KMB returns `eta: ""` (not null) when a route is listed at a stop but has no
+ * scheduled arrival, so truthiness and validity both have to be checked.
+ */
+function isUsableEta(eta: string | null): eta is string {
+  if (!eta) return false;
+  return Number.isFinite(new Date(eta).getTime());
 }
 
 /**
@@ -33,7 +44,7 @@ export function routeEtaMinutes(
 ): number[] {
   const dir = directionCode(bound);
   return etas
-    .filter((entry) => entry.route === route && entry.dir === dir && entry.eta)
+    .filter((entry) => entry.route === route && entry.dir === dir && isUsableEta(entry.eta))
     .map((entry) => etaMinutes(entry.eta))
     .filter((minutes): minutes is number => minutes !== null)
     .sort((a, b) => a - b);
@@ -51,7 +62,7 @@ export function hasUpcomingTrip(etas: EtaRecordLike[], route: string, bound: Jou
     (entry) =>
       entry.route === route &&
       entry.dir === dir &&
-      entry.eta !== null &&
+      isUsableEta(entry.eta) &&
       new Date(entry.eta).getTime() > Date.now() - 60_000,
   );
 }
@@ -70,6 +81,32 @@ export function deriveHeadway(minutes: number[], fallback = 10): number {
 export interface ScoredJourneyLike {
   finalScore: number;
   legs?: { routeNumber?: string }[];
+}
+
+/**
+ * Picks the alighting stop for a direct ride: it must be served by this
+ * direction of the route and must come strictly after the boarding stop.
+ * Returns null when the route does not actually connect the two points.
+ */
+export function pickAlightingIndex(
+  stopSequence: { stop: string }[],
+  boardingStopId: string,
+  candidateStopIds: Set<string>,
+): { stopId: string; index: number } | null {
+  const indexByOccupiedStop = new Map<string, number>();
+  stopSequence.forEach((row, index) => {
+    if (!indexByOccupiedStop.has(row.stop)) indexByOccupiedStop.set(row.stop, index);
+  });
+  const boardingIdx = indexByOccupiedStop.get(boardingStopId);
+  if (boardingIdx === undefined) return null;
+
+  let best: { stopId: string; index: number } | null = null;
+  candidateStopIds.forEach((stopId) => {
+    const idx = indexByOccupiedStop.get(stopId);
+    if (idx === undefined || idx <= boardingIdx) return;
+    if (!best || idx < best.index) best = { stopId, index: idx };
+  });
+  return best;
 }
 
 /**
