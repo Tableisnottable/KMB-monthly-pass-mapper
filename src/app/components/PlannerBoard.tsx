@@ -82,10 +82,12 @@ function nextDepartures(
 }
 
 function totalMinutes(route: ScoredRoute): number {
-  return (
-    route.legs.reduce((total, leg) => total + (leg.journeyTimeMinutes ?? 0), 0) +
-    route.walkTransferTimeMinutes
-  );
+  const ride = route.legs.reduce((total, leg) => total + (leg.journeyTimeMinutes ?? 0), 0);
+  // Waiting for the first bus is part of the trip; without it a 17 minute
+  // ride on a 10 minute headway reads as "17 min" while the user also waits.
+  const firstLeg = route.legs[0];
+  const initialWait = firstLeg && !firstLeg.serviceEnded ? firstLeg.realtimeEta?.etaMinutes ?? 0 : 0;
+  return ride + route.walkTransferTimeMinutes + initialWait;
 }
 
 function formatDuration(minutes: number): string {
@@ -109,12 +111,13 @@ function buildDirections(route: ScoredRoute, transferWalkMinutes: number): Direc
   const last = route.legs[route.legs.length - 1];
 
   if (first) {
+    const originWalk = route.originWalkMinutes ?? transferWalkMinutes;
     steps.push({
       key: `${route.id}-start`,
       kind: 'walk',
       icon: '🚶',
       title: `步行至 ${first.originStop?.name ?? '起點'}`,
-      detail: `約 ${Math.max(transferWalkMinutes, 1)} 分鐘`,
+      detail: `約 ${Math.max(originWalk, 1)} 分鐘`,
       color: '#9aa3ad',
     });
   }
@@ -145,11 +148,15 @@ function buildDirections(route: ScoredRoute, transferWalkMinutes: number): Direc
   });
 
   if (last) {
+    const destinationWalk = route.destinationWalkMinutes ?? 0;
     steps.push({
       key: `${route.id}-arrive`,
       kind: 'arrive',
       icon: '📍',
-      title: `抵達 ${last.destinationStop?.name ?? '目的地'}`,
+      title:
+        destinationWalk > 0
+          ? `步行 ${destinationWalk} 分鐘至目的地`
+          : `抵達 ${last.destinationStop?.name ?? '目的地'}`,
       detail: `全程車費 HK$ ${route.discountedFare.toFixed(2)}`,
       color: '#1a1a1a',
     });
@@ -451,9 +458,9 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
                       </div>
                       <div className="text-[12px] font-bold text-cm-ink">
                         {route.legs[route.legs.length - 1]?.destinationStop?.name ?? '目的地'}
-                        {route.walkTransferTimeMinutes > 0 && (
+                        {(route.destinationWalkMinutes ?? 0) > 0 && (
                           <span className="ml-2 font-semibold text-cm-muted">
-                            步行 {route.walkTransferTimeMinutes} 分
+                            步行 {route.destinationWalkMinutes} 分至目的地
                           </span>
                         )}
                       </div>

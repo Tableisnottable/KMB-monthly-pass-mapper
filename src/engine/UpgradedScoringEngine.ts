@@ -55,6 +55,10 @@ export interface Route {
   segments?: Segment[];
   legs?: Segment[];
   walkTransferTimeMinutes?: number;
+  /** Walking from the search origin to the first boarding stop. */
+  originWalkMinutes?: number;
+  /** Walking from the last alighting stop to the searched destination. */
+  destinationWalkMinutes?: number;
   transferCount?: number;
   longDistanceTransferSurcharge?: number;
 }

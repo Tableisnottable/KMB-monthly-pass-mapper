@@ -539,6 +539,8 @@ export async function GET(request: NextRequest) {
       journeyRoutes.push({
         id: `journey-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
         walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
+        originWalkMinutes: candidate.fromWalk,
+        destinationWalkMinutes: candidate.toWalk,
         transferCount: 0,
         legs: [
           {
@@ -595,6 +597,8 @@ export async function GET(request: NextRequest) {
       journeyRoutes.push({
         id: `journey-ctb-${candidate.route}-${candidate.bound}-${candidate.fromStop.stop}`,
         walkTransferTimeMinutes: candidate.fromWalk + candidate.toWalk,
+        originWalkMinutes: candidate.fromWalk,
+        destinationWalkMinutes: candidate.toWalk,
         transferCount: 0,
         legs: [
           {
@@ -694,6 +698,8 @@ export async function GET(request: NextRequest) {
         transferRoutes.push({
           id: `journey-t-${tc.routeA}-${tc.routeB}-${tc.transferStop.stop}`,
           walkTransferTimeMinutes: tc.fromWalk + tc.toWalk + transferWalk,
+          originWalkMinutes: tc.fromWalk,
+          destinationWalkMinutes: tc.toWalk,
           transferCount: 1,
           legs: [
             {
