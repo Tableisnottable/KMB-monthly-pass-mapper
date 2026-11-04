@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ScoredRoute, Segment, TransitLeg } from '../../engine/UpgradedScoringEngine';
-import { getMonthlyPassInsight } from '../../domain/monthlyPass';
+import { getMonthlyPassInsight, KMB_MONTHLY_PASS_PRICE } from '../../domain/monthlyPass';
 import { getAlertsForRoutes } from '../../data/trafficAlerts';
 import { NextTripPanel } from './NextTripPanel';
+import { PassBreakEvenPanel } from './PassBreakEvenPanel';
 import MonthlySavingsCounter from './MonthlySavingsCounter';
 import { RouteMinimap } from './RouteMinimap';
 
@@ -642,18 +643,20 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
         <div className="cm-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-cm-greenDark">快速入口</p>
-              <h3 className="mt-1 text-xl font-extrabold">我的地點</h3>
+              <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-cm-greenDark">月票分析</p>
+              <h3 className="mt-1 text-xl font-extrabold">用月票划算嗎？</h3>
             </div>
-            <button className="text-sm font-bold text-cm-greenDark" type="button">
-              編輯
-            </button>
+            <span className="rounded-full bg-cm-green/10 px-2 py-1 text-[10px] font-extrabold text-cm-greenDark">
+              HK$ {KMB_MONTHLY_PASS_PRICE}
+            </span>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <p className="col-span-2 rounded-2xl bg-cm-paper p-3 text-sm text-cm-muted">
-              尚未有快速入口；搜尋並選擇地點後才會顯示。
+          {selected && passInsight ? (
+            <PassBreakEvenPanel insight={passInsight} />
+          ) : (
+            <p className="mt-4 rounded-2xl bg-cm-paper p-3 text-sm text-cm-muted">
+              選擇一條路線後，這裡會計算月票要坐幾次才回本。
             </p>
-          </div>
+          )}
         </div>
       </aside>
 
