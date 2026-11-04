@@ -231,19 +231,20 @@ export function LiveTransitSearch() {
 
   return (
     <div className="mt-3 rounded-2xl border border-cm-line bg-cm-paper/60 p-3">
+      <p className="mb-2 text-xs font-bold text-cm-ink">查看車站到站時間</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
-          aria-label="起點"
+          aria-label="上車站"
           className="min-w-0 rounded-xl border-0 bg-white px-3 py-2 text-sm ring-1 ring-cm-line"
           onChange={(event) => setFrom(event.target.value)}
-          placeholder="輸入起點"
+          placeholder="輸入車站名稱（如上車站）"
           value={from}
         />
         <input
-          aria-label="目的地"
+          aria-label="落車站"
           className="min-w-0 rounded-xl border-0 bg-white px-3 py-2 text-sm ring-1 ring-cm-line"
           onChange={(event) => setTo(event.target.value)}
-          placeholder="輸入目的地"
+          placeholder="輸入車站名稱（如落車站）"
           value={to}
         />
         <select
@@ -252,8 +253,8 @@ export function LiveTransitSearch() {
           onChange={(event) => setOperator(event.target.value as 'KMB' | 'CTB')}
           value={operator}
         >
-          <option value="KMB">九巴官方 API</option>
-          <option value="CTB">城巴官方 API</option>
+          <option value="KMB">九巴</option>
+          <option value="CTB">城巴</option>
         </select>
         <button
           className="rounded-xl bg-cm-green px-4 py-2 text-sm font-extrabold text-white hover:bg-cm-greenDark"
@@ -261,11 +262,12 @@ export function LiveTransitSearch() {
           onClick={search}
           type="button"
         >
-          {loading ? '載入中...' : '搜尋官方路線及站點'}
+          {loading ? '載入中...' : '查詢車站'}
         </button>
       </div>
       <p className="mt-2 text-xs text-cm-muted">
-        可輸入任意香港地點的中英文名稱；搜尋後會從官方站點目錄揀選實際站點，不需要預設清單。
+        只想查看某個車站有哪些路線、下一班幾時到？在這裡輸入車站名稱即可。
+        要規劃整個行程，請用下方的「帶我去目的地」。
       </p>
       {stops.length > 0 && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">

@@ -41,6 +41,12 @@ export default function Home() {
         <div className="grid gap-3 lg:grid-cols-[minmax(380px,0.86fr)_minmax(0,1.14fr)] lg:items-start">
           <div className="space-y-3">
             <section id="live-search" className="cm-card p-3">
+              <div className="mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cm-muted">
+                  車站
+                </p>
+                <h2 className="text-base font-extrabold text-cm-ink">查詢車站到站時間</h2>
+              </div>
               <LiveTransitSearch />
             </section>
           </div>

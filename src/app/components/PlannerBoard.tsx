@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ScoredRoute, Segment, TransitLeg } from '../../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight } from '../../domain/monthlyPass';
 import { getAlertsForRoutes } from '../../data/trafficAlerts';
-import { CalendarAndPlaces } from './CalendarAndPlaces';
+import { NextTripPanel } from './NextTripPanel';
 import MonthlySavingsCounter from './MonthlySavingsCounter';
 import { RouteMinimap } from './RouteMinimap';
 
@@ -590,7 +590,7 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
             <span className="text-xs font-semibold text-cm-muted">事故及擠塞</span>
           </a>
         </div>
-        <CalendarAndPlaces />
+        <NextTripPanel route={selected ?? null} />
         <div id="map" className="cm-card p-3">
           <div className="mb-2 flex items-center justify-between px-1">
             <p className="text-xs font-extrabold text-cm-ink">
