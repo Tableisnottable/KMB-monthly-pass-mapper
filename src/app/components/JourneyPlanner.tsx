@@ -78,6 +78,7 @@ export function JourneyPlanner({ initialRoutes }: { initialRoutes: ScoredRoute[]
 
   return (
     <>
+      <div id="journey" />
       <JourneyPlaceSearch onSearch={handleSearch} searching={searching} />
       {searching && (
         <div className="flex items-center gap-3 rounded-2xl bg-cm-ink p-4 text-sm font-bold text-white shadow-card">

@@ -64,16 +64,20 @@ export default function Home() {
 
         <div className="my-3 grid grid-cols-2 gap-2 rounded-3xl bg-white p-2 shadow-card ring-1 ring-cm-line sm:grid-cols-4">
           {[
-            ['🚌', '巴士', '按資料比較'],
-            ['🚶', '步行', '附近車站'],
-            ['🚇', '港鐵', '比較車費'],
-            ['⛴', '渡輪', '即將推出'],
-          ].map(([icon, label, caption]) => (
-            <button key={label} className="rounded-2xl px-3 py-3 text-left transition hover:bg-cm-paper">
+            ['🚌', '巴士', '規劃行程', '/#journey'],
+            ['🕒', '到站時間', '查詢車站', '/#live-search'],
+            ['🗺️', '路線圖', '沿線站點', '/#map'],
+            ['⚠', '交通', '事故及擠塞', '/traffic'],
+          ].map(([icon, label, caption, href]) => (
+            <a
+              key={label}
+              className="rounded-2xl px-3 py-3 text-left transition hover:bg-cm-paper"
+              href={href}
+            >
               <div className="text-xl">{icon}</div>
               <div className="mt-1 text-sm font-extrabold text-cm-ink">{label}</div>
               <div className="text-[11px] text-cm-muted">{caption}</div>
-            </button>
+            </a>
           ))}
         </div>
 
@@ -107,7 +111,7 @@ export default function Home() {
       </div>
       <nav className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-4 rounded-2xl border border-cm-line bg-white/95 p-1 shadow-pop backdrop-blur sm:hidden">
         {[
-          ['⌕', '搜尋', '#live-search'],
+          ['⌕', '規劃', '#journey'],
           ['⌖', '地圖', '#map'],
           ['⚠', '交通', '/traffic'],
           ['☰', '更多', '/updates'],
