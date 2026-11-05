@@ -6,7 +6,6 @@ import { getMonthlyPassInsight, KMB_MONTHLY_PASS_PRICE } from '../../domain/mont
 import { getAlertsForRoutes } from '../../data/trafficAlerts';
 import { NextTripPanel } from './NextTripPanel';
 import { PassBreakEvenPanel } from './PassBreakEvenPanel';
-import MonthlySavingsCounter from './MonthlySavingsCounter';
 import { RouteMinimap } from './RouteMinimap';
 
 type SortKey = 'all' | 'bus' | 'rail' | 'fastest' | 'cheapest';
@@ -242,8 +241,6 @@ export function PlannerBoard({ routes, emptyHint }: { routes: ScoredRoute[]; emp
           </div>
         ) : (
           <>
-            <MonthlySavingsCounter savingPerTrip={passInsight?.savingThisTrip ?? 0} routes={routes} />
-
         {selected && passInsight && (
           <div className="rounded-3xl bg-gradient-to-br from-cm-green to-cm-greenDeep p-5 text-white shadow-card">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
