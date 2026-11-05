@@ -25,6 +25,8 @@ const TRANSFER_STOP_SCAN_LIMIT = 20;
 const NEARBY_STOP_LIMIT_WIDE = 90;
 const WALK_KM_PER_MIN = 5 / 60; // 5 km/h walking speed
 const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
+// Offer a walk-only comparison for trips short enough to consider walking.
+const MAX_WALK_CANDIDATE_MINUTES = 45;
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -35,6 +37,20 @@ async function getJourneyKmbRouteStops(
   bound: 'inbound' | 'outbound',
 ) {
   return getStaticKmbRouteStops(route, bound) ?? getKmbRouteStops(route, bound, '1');
+}
+
+/**
+ * Places the walk-only option where it reads best: after the rides that are
+ * faster end-to-end, before the ones that are slower.
+ */
+function mergeWalkCandidate<T extends { finalScore: number }>(
+  routes: T[],
+  walk: T | undefined,
+): T[] {
+  if (!walk) return routes;
+  const insertAt = routes.findIndex((route) => route.finalScore > walk.finalScore);
+  if (insertAt < 0) return [...routes, walk];
+  return [...routes.slice(0, insertAt), walk, ...routes.slice(insertAt)];
 }
 
 // A journey is identified for display purposes by the routes it uses: the
@@ -651,6 +667,36 @@ export async function GET(request: NextRequest) {
     const scoredAll = dedupeByRouteNumber(scoreRoutes(journeyRoutes));
     const scored = scoredAll.slice(0, MAX_RESULTS);
 
+    // Walking is often the honest answer for short hops; offer it as a
+    // baseline so the bus options can be judged against it.
+    const walkOnlyMinutes = Math.round(
+      (haversineDistanceKm(fromLat, fromLon, toLat, toLon) * 1.35) / WALK_KM_PER_MIN,
+    );
+    let walkOnlyRoute: Route | null = null;
+    if (walkOnlyMinutes <= MAX_WALK_CANDIDATE_MINUTES) {
+      walkOnlyRoute = {
+        id: `journey-walk-${fromLat.toFixed(5)}-${toLat.toFixed(5)}`,
+        walkTransferTimeMinutes: 0,
+        transferCount: 0,
+        originWalkMinutes: walkOnlyMinutes,
+        destinationWalkMinutes: 0,
+        legs: [
+          {
+            id: 'leg-walk',
+            operator: 'WALK',
+            mode: 'WALK',
+            routeNumber: '步行',
+            originStop: { id: 'origin', name: '起點', lat: fromLat, lng: fromLon },
+            destinationStop: { id: 'destination', name: '目的地', lat: toLat, lng: toLon },
+            journeyTimeMinutes: walkOnlyMinutes,
+            scheduledIntervalMinutes: 0,
+            realtimeEta: null,
+            fare: 0,
+          },
+        ],
+      } as unknown as Route;
+    }
+
     const buildMeta = (extra: Record<string, number> = {}) => ({
       source: 'KMB/Citybus route/stop/ETA APIs',
       live: true,
@@ -776,17 +822,27 @@ export async function GET(request: NextRequest) {
       }
       const merged = dedupeByRouteNumber([...scoredAll, ...scoreRoutes(transferRoutes)])
         .slice(0, MAX_RESULTS);
+      const walkScored = walkOnlyRoute ? scoreRoutes([walkOnlyRoute])[0] : undefined;
       return NextResponse.json(
         {
-          data: merged,
-          meta: buildMeta({ transfers: transferCandidates.length }),
+          data: mergeWalkCandidate(merged, walkScored),
+          meta: buildMeta({
+            transfers: transferCandidates.length,
+            ...(walkOnlyMinutes <= MAX_WALK_CANDIDATE_MINUTES ? { walkOnlyMinutes } : {}),
+          }),
         },
         { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
+    const walkScored = walkOnlyRoute ? scoreRoutes([walkOnlyRoute])[0] : undefined;
     return NextResponse.json(
-      { data: scored, meta: buildMeta() },
+      {
+        data: mergeWalkCandidate(scored, walkScored),
+        meta: buildMeta(
+          walkOnlyMinutes <= MAX_WALK_CANDIDATE_MINUTES ? { walkOnlyMinutes } : {},
+        ),
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

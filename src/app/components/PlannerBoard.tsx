@@ -30,6 +30,7 @@ const operatorDotColors: Record<string, string> = {
   LWB: '#ff6a00',
   MTR: '#a6192e',
   CTB: '#f7b500',
+  WALK: '#0f766e',
 };
 
 const modeLabel: Record<string, string> = {
