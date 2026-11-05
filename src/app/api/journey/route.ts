@@ -27,6 +27,18 @@ const WALK_KM_PER_MIN = 5 / 60; // 5 km/h walking speed
 const MAX_WALK_MINUTES = 25; // cap: ignore stops further than a 25-min walk
 // Offer a walk-only comparison for trips short enough to consider walking.
 const MAX_WALK_CANDIDATE_MINUTES = 45;
+// A ride shorter than this means a route merely passes through; waiting for it
+// costs more than the distance covered, so it is not a useful suggestion.
+const MIN_RIDE_KM = 0.8;
+// Walking more than this multiple of the ride time means the bus is barely
+// helping, so the option is noise rather than a suggestion.
+const MAX_WALK_TO_RIDE_RATIO = 2.5;
+// Absolute cap on the walking needed to reach and leave the bus for a direct
+// ride; beyond this the door-to-door trip is mostly walking anyway.
+const MAX_TOTAL_FEEDER_WALK_MINUTES = 20;
+// Rides shorter than this are not worth boarding: the wait alone usually
+// exceeds the time saved.
+const MIN_RIDE_MINUTES = 6;
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -256,6 +268,20 @@ export async function GET(request: NextRequest) {
           if (!toMatch || walk < toMatch.walk) toMatch = { entry: stop, index, walk };
         }
         if (!toMatch) continue;
+        // Same short-ride rule as the KMB scan: skip routes that only clip
+        // across the trip.
+        const rideKm = haversineKm(
+          Number(fromMatch.entry.lat),
+          Number(fromMatch.entry.long),
+          Number(toMatch.entry.lat),
+          Number(toMatch.entry.long),
+        );
+        if (rideKm < MIN_RIDE_KM) continue;
+        const cityTotalWalk = fromMatch.walk + toMatch.walk;
+        const cityRideMinutes = Math.max(1, Math.round((rideKm * 1.35) / BUS_SPEED_KM_MIN));
+        if (cityRideMinutes < MIN_RIDE_MINUTES) continue;
+        if (cityTotalWalk > cityRideMinutes * MAX_WALK_TO_RIDE_RATIO) continue;
+        if (cityTotalWalk > MAX_TOTAL_FEEDER_WALK_MINUTES) continue;
         const key = `${routeNum}|${bound}|${fromMatch.entry.stop}|${toMatch.entry.stop}`;
         if (seenCitybus.has(key)) continue;
         seenCitybus.add(key);
@@ -343,7 +369,46 @@ export async function GET(request: NextRequest) {
               // the destination when we board.
               const alight = pickAlightingIndex(rows, entry.stop.stop, toIds);
               if (!alight) continue;
-              const bestTo = alight.stopId;
+              // Prefer the alighting stop nearest the destination, not merely
+              // the first one the route reaches: a loop route can pass a far
+              // stop early and the convenient one later.
+              const seqByStop = new Map<string, number>();
+              rows.forEach((row, rowIndex) => {
+                if (!seqByStop.has(row.stop)) seqByStop.set(row.stop, rowIndex);
+              });
+              const boardingIdx = seqByStop.get(entry.stop.stop);
+              if (boardingIdx === undefined) continue;
+              let bestTo = alight.stopId;
+              let bestWalk = toStopById.get(bestTo)!.walkMinutes;
+              toIds.forEach((toId) => {
+                const idx = seqByStop.get(toId);
+                if (idx === undefined || idx <= boardingIdx) return;
+                const walk = toStopById.get(toId)!.walkMinutes;
+                if (walk < bestWalk) {
+                  bestWalk = walk;
+                  bestTo = toId;
+                }
+              });
+              // A ride shorter than a few minutes usually means a route merely
+              // passes through both points on its way somewhere else; waiting
+              // for it costs more than walking the gap.
+              const rideKm = haversineKm(
+                Number(entry.stop.lat),
+                Number(entry.stop.long),
+                Number(toStopById.get(bestTo)!.stop.lat),
+                Number(toStopById.get(bestTo)!.stop.long),
+              );
+              if (rideKm < MIN_RIDE_KM) continue;
+              // Reject options where the walking dwarfs the ride: 44 minutes of
+              // walking to sit on a bus for 4 minutes is not a useful answer.
+              const totalWalk = entry.walkMinutes + toStopById.get(bestTo)!.walkMinutes;
+              const rideMinutesForFilter = Math.max(
+                1,
+                Math.round((rideKm * 1.35) / BUS_SPEED_KM_MIN),
+              );
+              if (rideMinutesForFilter < MIN_RIDE_MINUTES) continue;
+              if (totalWalk > rideMinutesForFilter * MAX_WALK_TO_RIDE_RATIO) continue;
+              if (totalWalk > MAX_TOTAL_FEEDER_WALK_MINUTES) continue;
             if (bestTo) {
               // One candidate per route+direction: several nearby boarding
               // stops usually match the same route, and a repeated pair would
@@ -517,6 +582,25 @@ export async function GET(request: NextRequest) {
 
               const transferStop = stops.find((s) => s.stop === transferId);
               if (!transferStop) continue;
+              // Both legs must actually carry the passenger somewhere: a 4
+              // minute feeder hop to reach a transfer point adds a boarding
+              // wait for almost no distance.
+              const legAKm = haversineKm(
+                Number(fromStop.lat),
+                Number(fromStop.long),
+                Number(transferStop.lat),
+                Number(transferStop.long),
+              );
+              const legBKm = haversineKm(
+                Number(transferStop.lat),
+                Number(transferStop.long),
+                Number(destStop.lat),
+                Number(destStop.long),
+              );
+              const legAMinutes = Math.max(1, Math.round((legAKm * 1.35) / BUS_SPEED_KM_MIN));
+              const legBMinutes = Math.max(1, Math.round((legBKm * 1.35) / BUS_SPEED_KM_MIN));
+              if (legAMinutes < MIN_RIDE_MINUTES || legBMinutes < MIN_RIDE_MINUTES) continue;
+              if (legAKm < MIN_RIDE_KM || legBKm < MIN_RIDE_KM) continue;
               const pairKey = `${routeA}|${transferId}|${routeB}|${destStop.stop}`;
               if (seenTransfers.has(pairKey)) continue;
               seenTransfers.add(pairKey);
