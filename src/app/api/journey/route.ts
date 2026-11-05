@@ -39,6 +39,9 @@ const MAX_TOTAL_FEEDER_WALK_MINUTES = 20;
 // Rides shorter than this are not worth boarding: the wait alone usually
 // exceeds the time saved.
 const MIN_RIDE_MINUTES = 6;
+// A transfer option scoring worse than this multiple of the best direct route
+// is not a realistic alternative.
+const MAX_TRANSFER_SCORE_RATIO = 2;
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -94,6 +97,7 @@ import {
   etaMinutes,
   haversineKm as haversineDistanceKm,
   hasUpcomingTrip,
+  isOnlyPartnerSlot,
   isTooCloseToRide,
   pickAlightingIndex,
   pickStopsByWalkBand,
@@ -702,8 +706,29 @@ export async function GET(request: NextRequest) {
         try {
           const etas = await getCitybusEta(candidate.fromStop.stop, candidate.route);
           const routeEtas = routeEtaMinutes(etas, candidate.route, candidate.bound);
+          // A jointly operated route listed during the partner's slot is still
+          // running, so it must not be reported as finished for the day.
+          const etasWithRemarks = (etas as unknown as {
+            route: string;
+            dir: string;
+            eta: string | null;
+            rmk_tc?: string;
+            remarks_tc?: string;
+          }[]).map((entry) => ({
+            route: entry.route,
+            dir: entry.dir,
+            eta: entry.eta,
+            remarks: entry.rmk_tc ?? entry.remarks_tc ?? null,
+          }));
+          const partnerSlot = isOnlyPartnerSlot(
+            etasWithRemarks,
+            candidate.route,
+            candidate.bound,
+          );
           const hasService =
-            routeEtas.length > 0 || hasUpcomingTrip(etas, candidate.route, candidate.bound);
+            partnerSlot ||
+            routeEtas.length > 0 ||
+            hasUpcomingTrip(etas, candidate.route, candidate.bound);
           return { candidate, firstEta: routeEtas[0] ?? null, hasService };
         } catch {
           return { candidate, firstEta: null, hasService: true };
@@ -906,10 +931,17 @@ export async function GET(request: NextRequest) {
       }
       const merged = dedupeByRouteNumber([...scoredAll, ...scoreRoutes(transferRoutes)])
         .slice(0, MAX_RESULTS);
-      const walkScored = walkOnlyRoute ? scoreRoutes([walkOnlyRoute])[0] : undefined;
-      return NextResponse.json(
+      // Drop transfers that are far worse than the best direct option: an 89
+      // minute two-bus hop next to a 15 minute crossing is not a choice.
+      const bestDirectScore = scored.length > 0 ? scored[0].finalScore : Infinity;
+      const usableTransfers = merged.filter(
+        (route) =>
+          (route.transferCount ?? 0) === 0 ||
+          route.finalScore <= bestDirectScore * MAX_TRANSFER_SCORE_RATIO,
+      );
+      const walkScored = walkOnlyRoute ? scoreRoutes([walkOnlyRoute])[0] : undefined;      return NextResponse.json(
         {
-          data: mergeWalkCandidate(merged, walkScored),
+          data: mergeWalkCandidate(usableTransfers, walkScored),
           meta: buildMeta({
             transfers: transferCandidates.length,
             ...(walkOnlyMinutes <= MAX_WALK_CANDIDATE_MINUTES ? { walkOnlyMinutes } : {}),

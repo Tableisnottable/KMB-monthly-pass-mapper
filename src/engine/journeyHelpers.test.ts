@@ -5,6 +5,8 @@ import {
   directionCode,
   haversineKm,
   hasUpcomingTrip,
+  isOnlyPartnerSlot,
+  isPartnerOperatorSlot,
   isTooCloseToRide,
   pickAlightingIndex,
   pickStopsByWalkBand,
@@ -131,6 +133,38 @@ describe('isTooCloseToRide', () => {
     const km = haversineKm(22.2978, 114.172, 22.2819, 114.1581);
     expect(km).toBeGreaterThan(2);
     expect(km).toBeLessThan(3);
+  });
+});
+
+describe('isOnlyPartnerSlot', () => {
+  const slot = (remark: string | null): EtaRecordLike => ({
+    route: '104',
+    dir: 'I',
+    eta: null,
+    remarks: remark,
+  });
+
+  it('recognises a joint-operation slot as running service', () => {
+    expect(isOnlyPartnerSlot([slot('九巴時段'), slot('九巴時段')], '104', 'inbound')).toBe(true);
+  });
+
+  it('is false once a real arrival exists', () => {
+    const soon = new Date(Date.now() + 6 * 60000).toISOString();
+    expect(
+      isOnlyPartnerSlot([slot('九巴時段'), { route: '104', dir: 'I', eta: soon }], '104', 'inbound'),
+    ).toBe(false);
+  });
+
+  it('is false when there are no records at all', () => {
+    expect(isOnlyPartnerSlot([], '104', 'inbound')).toBe(false);
+  });
+
+  it('is false when the empty eta has no partner remark', () => {
+    expect(isOnlyPartnerSlot([slot(null)], '104', 'inbound')).toBe(false);
+  });
+
+  it('ignores records for other routes', () => {
+    expect(isOnlyPartnerSlot([slot('九巴時段')], '113', 'inbound')).toBe(false);
   });
 });
 

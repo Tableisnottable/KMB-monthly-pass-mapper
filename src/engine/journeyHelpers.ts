@@ -9,6 +9,19 @@ export interface EtaRecordLike {
   route: string;
   dir: string;
   eta: string | null;
+  /** Provider remark, e.g. Citybus flags a jointly operated route's partner
+   *  slot with 九巴時段 / 城巴時段. */
+  remarks?: string | null;
+}
+
+/**
+ * Jointly operated cross-harbour routes alternate between operators. A
+ * provider lists the route at a stop during its partner's slot with an empty
+ * eta and a remark like 九巴時段; that is not the service being finished.
+ */
+export function isPartnerOperatorSlot(remark: string | null | undefined): boolean {
+  if (!remark) return false;
+  return remark.includes('時段');
 }
 
 export function directionCode(bound: JourneyBound): DirectionCode {
@@ -78,6 +91,10 @@ export function routeEtaMinutes(
  * (service has stopped for the day, or the route is overnight-only) from
  * "there is an arrival we can wait for". A route with no upcoming trip must
  * not be ranked as if a bus were due any minute.
+ *
+ * A joint-operation slot (the partner operator is running this route right
+ * now) is not the same as service having ended: the route is running, just
+ * not by this provider, so it is left to the caller to decide.
  */
 export function hasUpcomingTrip(etas: EtaRecordLike[], route: string, bound: JourneyBound): boolean {
   const dir = directionCode(bound);
@@ -88,6 +105,18 @@ export function hasUpcomingTrip(etas: EtaRecordLike[], route: string, bound: Jou
       isUsableEta(entry.eta) &&
       new Date(entry.eta).getTime() > Date.now() - 60_000,
   );
+}
+
+/**
+ * True when the only records for this route+direction are partner-operator
+ * slots, i.e. the route runs but this provider is not driving it now.
+ */
+export function isOnlyPartnerSlot(etas: EtaRecordLike[], route: string, bound: JourneyBound): boolean {
+  const dir = directionCode(bound);
+  const relevant = etas.filter((entry) => entry.route === route && entry.dir === dir);
+  if (relevant.length === 0) return false;
+  if (relevant.some((entry) => isUsableEta(entry.eta))) return false;
+  return relevant.every((entry) => isPartnerOperatorSlot(entry.remarks));
 }
 
 /**
