@@ -6,6 +6,7 @@ export type JourneyLocations = Record<JourneyField, import('./PlaceAutocomplete'
 export const copy = (locale: PlannerLocale, zh: string, en: string) => locale === 'en' ? en : zh;
 
 export function journeyMinutes(route: ScoredRoute): number {
+  if (route.departureTime && route.arrivalTime) return Math.max(0, Math.ceil((new Date(route.arrivalTime).getTime() - new Date(route.departureTime).getTime()) / 60000));
   const ride = route.legs.reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), 0);
   const wait = route.legs.reduce((sum, leg) => {
     if (leg.mode === 'WALK' || leg.serviceEnded) return sum;
@@ -38,5 +39,6 @@ export function modeLabel(mode: string | undefined, locale: PlannerLocale): stri
 
 export function fareLabel(route: ScoredRoute, locale: PlannerLocale): string {
   if (route.legs.some(l => l.fareStatus === 'UNAVAILABLE')) return copy(locale, '票價待查', 'Fare unavailable');
-  return route.discountedFare > 0 ? '$' + route.discountedFare.toFixed(2) : copy(locale, '免費', 'Free');
+  const prefix = route.legs.some(l => l.fareStatus === 'FULL_FARE') ? copy(locale, '最多 ', 'Up to ') : '';
+  return route.discountedFare > 0 ? prefix + '$' + route.discountedFare.toFixed(2) : copy(locale, '免費', 'Free');
 }

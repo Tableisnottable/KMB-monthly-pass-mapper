@@ -1,4 +1,4 @@
-import { stops, routes, patterns, fares, rail_fares, calendar, exceptions } from './transport/snapshot';
+import { stops, routes, patterns, fares, rail_fares, full_fares, calendar, exceptions } from './transport/snapshot';
 import manifest from './transport/manifest.json';
 
 // Compact on-disk tuples keep every generated file below the GitHub size cap.
@@ -24,6 +24,18 @@ const calendars = new Map((calendar as (number | string)[][]).map(r => [Number(r
 const changes = new Map((exceptions as (number | string)[][]).map(r => [`${r[0]}:${r[1]}`, Number(r[2])]));
 const fareRows = new Map((fares as [number, number, [number, number[]][]][]).map(r => [`${r[0]}:${r[1]}`, r[2]]));
 const railFares = new Map((rail_fares as number[][]).map(r => [`${r[0]}:${r[1]}`, r[2] / 100]));
+const fullFares = new Map((full_fares as number[][]).map(r => [r[0], r[1] / 100]));
+const stopIndex = new Map(networkStops.map((s, i) => [s[0], i]));
+export function networkStopIndex(id: string) { return stopIndex.get(id); }
+
+export function normalAdultFare(routeIndex: number, from: number, to: number) {
+  const mode = networkRoutes[routeIndex][5];
+  const exact = mode === 'SUBWAY' || mode === 'LIGHT_RAIL' ? railFare(from, to) : publishedFare(routeIndex, from, to);
+  const full = exact === undefined ? fullFares.get(routeIndex) : undefined;
+  return { fare: exact ?? full ?? 0,
+    fareStatus: exact !== undefined ? 'PUBLISHED' as const : full !== undefined ? 'FULL_FARE' as const : 'UNAVAILABLE' as const,
+    fareBasis: mode === 'SUBWAY' || mode === 'LIGHT_RAIL' ? 'Adult Octopus' : 'Normal adult' };
+}
 
 /** Date arithmetic is explicitly Hong Kong time, independent of server TZ. */
 export function hongKongClock(date: Date) {
@@ -33,7 +45,7 @@ export function hongKongClock(date: Date) {
     minute: local.getUTCHours() * 60 + local.getUTCMinutes() + local.getUTCSeconds() / 60 };
 }
 
-/** Supply HK wall-clock hours to the unchanged, local-time weighting engine. */
+/** Supply HK wall-clock hours to the local-time weighting engine. */
 export function weightingDate(date: Date): Date {
   const hk = new Date(date.getTime() + 8 * 3600000);
   return new Date(hk.getUTCFullYear(), hk.getUTCMonth(), hk.getUTCDate(), hk.getUTCHours(), hk.getUTCMinutes(), hk.getUTCSeconds());

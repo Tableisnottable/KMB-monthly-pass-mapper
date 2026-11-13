@@ -105,6 +105,22 @@ button {
 .departure-options button { color: #aaa; }
 .departure-options .departure-now { color: var(--green); }
 .departure-options .planner-spinner { margin-left: auto; color: var(--green); }
+.departure-options .time-apply { margin-left: auto; color: #fff; }
+.time-apply { background: var(--green); color: #fff; border-radius: 4px; padding: 5px 12px; font-size: 14px; font-weight: 700; }
+.time-apply:disabled { opacity: .45; }
+.journey-time-picker { margin-top: 16px; min-width: 0; }
+.journey-time-picker label { display: block; font-size: 13px; color: #666; margin-bottom: 7px; }
+.journey-time-picker label small { font-size: 11px; color: #888; margin-left: 6px; }
+.journey-time-picker > div { display: flex; gap: 8px; }
+.journey-time-picker input { min-width: 0; flex: 1; max-width: 100%; padding: 7px; border: 1px solid #ccc; border-radius: 4px; font: inherit; font-size: 14px; color: var(--text); }
+.adult-fare-basis { font-size: 11px; color: #777; margin-top: 13px; line-height: 1.5; }
+.route-clock-line { display: block; color: #555; font-size: 13px; margin-top: 7px; }
+.route-clock-line small { color: #888; font-size: 11px; }
+.journey-clock-summary { margin-bottom: 15px; font-weight: 700; }
+.journey-clock-summary small { display: block; color: #888; font-size: 11px; margin-top: 4px; }
+.leg-adult-fare { color: #258021 !important; }
+.fare-explanation { font-size: 12px; line-height: 1.6; color: #777; margin: 15px 0; }
+.more-journeys { display: block; width: 100%; padding: 11px; margin-top: 8px; border: 1px solid #fff8; border-radius: 4px; color: #fff; font-size: 13px; font-weight: 700; }
 .planner-notice { margin: 16px 12px 0; padding: 12px; background: #fff; border-radius: 5px; font-size: 13px; line-height: 1.6; }
 .notice-error { color: #b53936; }
 .notice-warning { color: #966a20; background: #fffbea; }

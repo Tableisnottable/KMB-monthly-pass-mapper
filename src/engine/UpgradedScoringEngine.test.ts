@@ -58,6 +58,12 @@ describe('UpgradedScoringEngine', () => {
   });
 
   describe('calculateSegmentScore', () => {
+    it('uses actual timetable waiting rather than double-counting half the headway', () => {
+      expect(UpgradedScoringEngine.calculateSegmentScore(leg({ scheduledWaitMinutes: 2, scheduledIntervalMinutes: 30 }), new Date(2026, 10, 13, 12))).toBe(21.6);
+    });
+    it('subtracts access walking from a live arrival before applying the waiting multiplier', () => {
+      expect(UpgradedScoringEngine.calculateSegmentScore(leg({ accessWalkMinutes: 5, realtimeEta: { etaMinutes: 8, isLive: true, dataTime: '', source: 'DATAGOVHK' } }), new Date(2026, 10, 13, 12))).toBe(22.9);
+    });
     it('prefers a live ETA over the scheduled wait', () => {
       const withLive = leg({ realtimeEta: { etaMinutes: 3, dataTime: new Date().toISOString(), isLive: true, source: 'DATAGOVHK' } });
       const withScheduled = leg({ realtimeEta: null, scheduledIntervalMinutes: 12 });
@@ -85,24 +91,25 @@ describe('UpgradedScoringEngine', () => {
       };
       const result = UpgradedScoringEngine.calculateRouteScore(route, new Date(2026, 9, 14, 12, 0));
       expect(result.transferPenalty).toBe(8);
-      expect(result.walkTransferTime).toBe(4);
-      expect(result.finalScore).toBe(result.legSubtotal + 4 + 8);
+      expect(result.walkTransferTime).toBe(5.4);
+      expect(result.fareCost).toBe(6.12);
+      expect(result.finalScore).toBe(Number((result.legSubtotal + 5.4 + 8 + 6.12).toFixed(2)));
     });
   });
 
   describe('calculateFare', () => {
-    it('applies a same-operator discount capped at 4.2', () => {
+    it('does not invent a same-operator interchange discount', () => {
       const legs = [leg({ fare: 8.7 }), leg({ fare: 6.8 })];
       const result = UpgradedScoringEngine.calculateFare(legs);
-      expect(result.bbiDiscountApplied).toBe(4.2);
-      expect(result.discountedFare).toBe(11.3);
+      expect(result.bbiDiscountApplied).toBe(0);
+      expect(result.discountedFare).toBe(15.5);
     });
 
-    it('applies the full second-leg fare when under the cap', () => {
+    it('charges both published adult fares even when the second fare is low', () => {
       const legs = [leg({ operator: 'KMB', fare: 12.5 }), leg({ operator: 'KMB', fare: 3.5 })];
       const result = UpgradedScoringEngine.calculateFare(legs);
-      expect(result.bbiDiscountApplied).toBe(3.5);
-      expect(result.discountedFare).toBe(12.5);
+      expect(result.bbiDiscountApplied).toBe(0);
+      expect(result.discountedFare).toBe(16);
     });
 
     it('does not discount across different operators', () => {
@@ -114,6 +121,24 @@ describe('UpgradedScoringEngine', () => {
   });
 
   describe('scoreRoutes', () => {
+    it('weights an entirely walking journey once and does not invent vehicle waiting', () => {
+      const [route] = scoreRoutes([{ id: 'walk', legs: [leg({ operator: 'WALK', mode: 'WALK', journeyTimeMinutes: 20, fare: 0 })] }]);
+      expect(route.finalScore).toBe(27);
+      expect(route.breakdown.walkTransferTime).toBe(27);
+      expect(route.breakdown.scheduledWait).toBe(0);
+      expect(route.breakdown.journeyTime).toBe(0);
+    });
+    it('penalizes unverified service without changing its adult fare', () => {
+      const routes = scoreRoutes([{ id: 'estimated', legs: [leg({ serviceStatus: 'UNVERIFIED' })] }, { id: 'timetable', legs: [leg({ serviceStatus: 'TIMETABLE' })] }]);
+      expect(routes.map(r => r.id)).toEqual(['timetable', 'estimated']);
+      expect(routes[1].finalScore - routes[0].finalScore).toBeCloseTo(4, 2);
+      expect(routes[1].discountedFare).toBe(routes[0].discountedFare);
+    });
+    it('prefers the lower normal adult fare when time and transfers match', () => {
+      const routes = scoreRoutes([{ id: 'premium', legs: [leg({ fare: 120 })] }, { id: 'normal', legs: [leg({ fare: 34.6 })] }]);
+      expect(routes.map(r => r.id)).toEqual(['normal', 'premium']);
+      expect(routes[0].breakdown.fareCost).toBe(15.57);
+    });
     it('sorts results by ascending score and attaches breakdown', () => {
       const slow: Route = { id: 'slow', legs: [leg({ journeyTimeMinutes: 40 })] };
       const fast: Route = { id: 'fast', legs: [leg({ journeyTimeMinutes: 10 })] };

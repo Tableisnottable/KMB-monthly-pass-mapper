@@ -36,8 +36,9 @@ export interface Segment {
   originStop?: Stop;
   destinationStop?: Stop;
   fare?: number;
-  /** Metadata from the multimodal snapshot; scoring calculations are unchanged. */
-  fareStatus?: 'PUBLISHED' | 'UNAVAILABLE';
+  /** Normal adult fares, with Octopus used where the source distinguishes it. */
+  fareStatus?: 'PUBLISHED' | 'FULL_FARE' | 'UNAVAILABLE';
+  fareBasis?: string;
   serviceStatus?: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED';
   scheduledDepartureMinutes?: number;
   scheduledWaitMinutes?: number;
@@ -47,6 +48,8 @@ export interface Segment {
   boardingIndex?: number;
   alightingIndex?: number;
   path?: [number, number][];
+  departureTime?: string;
+  arrivalTime?: string;
 }
 
 export interface TransitLeg extends Segment {
@@ -72,6 +75,9 @@ export interface Route {
   destinationWalkMinutes?: number;
   transferCount?: number;
   longDistanceTransferSurcharge?: number;
+  departureTime?: string;
+  arrivalTime?: string;
+  timeMode?: 'now' | 'depart' | 'arrive';
 }
 
 export type RouteOption = Route & {
@@ -88,6 +94,8 @@ export interface ScoreBreakdown {
   walkTransferTime: number;
   transferPenalty: number;
   longDistanceSurcharge: number;
+  fareCost: number;
+  reliabilityPenalty: number;
 }
 
 export interface ScoreResult {
@@ -96,6 +104,8 @@ export interface ScoreResult {
   transferPenalty: number;
   walkTransferTime: number;
   longDistanceSurcharge: number;
+  fareCost: number;
+  reliabilityPenalty: number;
 }
 
 export type ScoredRoute = RouteOption & {
@@ -117,6 +127,8 @@ const operatorAdjustments: Record<string, number> = {
 // an alternative with a real bus always wins, but finite so the journey still
 // appears (lower in the list) instead of vanishing from the board.
 const SERVICE_ENDED_WAIT_PENALTY = 90;
+export const FARE_MINUTES_PER_DOLLAR = 0.45;
+export const WALK_MULTIPLIER = 1.35;
 
 function round(value: number): number {
   return Number(value.toFixed(2));
@@ -152,6 +164,8 @@ export class UpgradedScoringEngine {
   }
 
   public static calculateSegmentScore(segment: Segment, date: Date = new Date()): number {
+    // All walking is charged once in the route-level walking component.
+    if (segment.mode === 'WALK') return 0;
     const multiplier = this.getTimeMultiplier(date);
     // No upcoming trip: the wait is unbounded, so push the leg far down the
     // ranking rather than assuming an average half-headway wait.
@@ -163,7 +177,10 @@ export class UpgradedScoringEngine {
       : segment.realtimeEtaMinutes !== undefined && segment.isEtaFresh
         ? segment.realtimeEtaMinutes
         : undefined;
-    const wait = liveEta ?? (segment.scheduledIntervalMinutes ?? 12) * 0.5 * multiplier;
+    const waitMinutes = liveEta !== undefined
+      ? Math.max(0, liveEta - (segment.accessWalkMinutes ?? 0))
+      : segment.scheduledWaitMinutes ?? (segment.scheduledIntervalMinutes ?? 12) * 0.5;
+    const wait = segment.mode === 'WALK' ? 0 : waitMinutes * multiplier;
     return journeyTime(segment) + wait + this.getOperatorAdjustment(segment.operator);
   }
 
@@ -171,31 +188,30 @@ export class UpgradedScoringEngine {
     const legs = normalizeLegs(route);
     const legSubtotal = legs.reduce((total, leg) => total + this.calculateSegmentScore(leg, date), 0);
     const transferPenalty = (route.transferCount ?? Math.max(0, legs.length - 1)) * 8;
-    const walkTransferTime = route.walkTransferTimeMinutes ?? 0;
+    const walkTransferTime = round(((route.walkTransferTimeMinutes ?? 0)
+      + legs.filter(leg => leg.mode === 'WALK').reduce((sum, leg) => sum + journeyTime(leg), 0)) * WALK_MULTIPLIER);
     const longDistanceSurcharge = route.longDistanceTransferSurcharge ?? 0;
+    const fareCost = round(this.calculateFare(legs).discountedFare * FARE_MINUTES_PER_DOLLAR);
+    const reliabilityPenalty = legs.reduce((sum, leg) => sum + (leg.serviceStatus === 'UNVERIFIED' ? 4 : 0), 0);
 
     return {
-      finalScore: round(legSubtotal + walkTransferTime + longDistanceSurcharge + transferPenalty),
+      finalScore: round(legSubtotal + walkTransferTime + longDistanceSurcharge + transferPenalty + fareCost + reliabilityPenalty),
       legSubtotal: round(legSubtotal),
       transferPenalty,
       walkTransferTime,
       longDistanceSurcharge,
+      fareCost,
+      reliabilityPenalty,
     };
   }
 
   public static calculateFare(legs: Segment[]): { discountedFare: number; bbiDiscountApplied: number } {
     const rawFare = legs.reduce((total, leg) => total + fare(leg), 0);
-    let discount = 0;
-
-    for (let index = 1; index < legs.length; index += 1) {
-      if (legs[index - 1].operator === legs[index].operator) {
-        discount += Math.min(4.2, fare(legs[index]));
-      }
-    }
-
+    // Same operator does not establish eligibility for an interchange offer.
+    // Contiguous paid-area rail fares are combined in the journey builder.
     return {
-      discountedFare: round(Math.max(0, rawFare - discount)),
-      bbiDiscountApplied: round(discount),
+      discountedFare: round(Math.max(0, rawFare)),
+      bbiDiscountApplied: 0,
     };
   }
 }
@@ -208,12 +224,14 @@ export function scoreRoutes(routes: Route[], date: Date = new Date()): ScoredRou
       const fareResult = UpgradedScoringEngine.calculateFare(legs);
       const breakdown: ScoreBreakdown = {
         legSubtotal: score.legSubtotal,
-        journeyTime: round(legs.reduce((total, leg) => total + journeyTime(leg), 0)),
-        scheduledWait: round(score.legSubtotal - legs.reduce((total, leg) => total + journeyTime(leg) + UpgradedScoringEngine.getOperatorAdjustment(leg.operator), 0)),
+        journeyTime: round(legs.reduce((total, leg) => total + (leg.mode === 'WALK' ? 0 : journeyTime(leg)), 0)),
+        scheduledWait: round(score.legSubtotal - legs.reduce((total, leg) => total + (leg.mode === 'WALK' ? 0 : journeyTime(leg) + UpgradedScoringEngine.getOperatorAdjustment(leg.operator)), 0)),
         operatorAdjustment: round(legs.reduce((total, leg) => total + UpgradedScoringEngine.getOperatorAdjustment(leg.operator), 0)),
         walkTransferTime: score.walkTransferTime,
         transferPenalty: score.transferPenalty,
         longDistanceSurcharge: score.longDistanceSurcharge,
+        fareCost: score.fareCost,
+        reliabilityPenalty: score.reliabilityPenalty,
       };
 
       return {

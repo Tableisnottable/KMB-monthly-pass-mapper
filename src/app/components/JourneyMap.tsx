@@ -20,6 +20,8 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
   const [message, setMessage] = useState('');
   const [tileError, setTileError] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [geometryStatus, setGeometryStatus] = useState<'loading' | 'ready' | 'partial' | 'error'>('loading');
+  const [estimatedRoad, setEstimatedRoad] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +67,6 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
         .bindTooltip(text, { direction: 'top' }).addTo(routeLayer);
       points.push(p);
     }
-    function connect(a: Leaflet.LatLngTuple, b: Leaflet.LatLngTuple, color: string, walk = false) {
-      L.polyline([a, b], { color: '#fff', weight: walk ? 6 : 9, opacity: .9 }).addTo(routeLayer);
-      L.polyline([a, b], { color, weight: walk ? 3 : 5, dashArray: walk ? '5 7' : undefined, lineCap: 'round' }).addTo(routeLayer);
-    }
     function flag(place: PlaceResult, label: string) {
       const p: Leaflet.LatLngTuple = [place.lat, place.lng];
       const text = document.createElement('span'); text.className = 'map-endpoint-flag'; text.textContent = label;
@@ -77,34 +75,50 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
       points.push(p);
     }
     if (route) {
-      let previous: Leaflet.LatLngTuple | null = origin ? [origin.lat, origin.lng] : null;
       route.legs.forEach(leg => {
         const a = point(leg.originStop?.lat, leg.originStop?.lng);
         const b = point(leg.destinationStop?.lat, leg.destinationStop?.lng);
         if (!a || !b) return;
-        if (previous) connect(previous, a, '#72827d', true);
-        const path = leg.path?.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
-        if (path && path.length > 1) {
-          L.polyline(path, { color: '#fff', weight: 9, opacity: .9 }).addTo(routeLayer);
-          L.polyline(path, { color: routeColor(leg.operator), weight: 5, lineCap: 'round' }).addTo(routeLayer);
-          points.push(...path);
-        } else connect(a, b, routeColor(leg.operator), leg.mode === 'WALK');
         mark(a, leg.originStop?.name ?? '', routeColor(leg.operator));
         mark(b, leg.destinationStop?.name ?? '', routeColor(leg.operator));
-        previous = b;
       });
-      if (previous && destination) connect(previous, [destination.lat, destination.lng], '#8e8e8e', true);
-    } else if (origin && destination) {
-      connect([origin.lat, origin.lng], [destination.lat, destination.lng], '#37ab2e', true);
     }
     if (origin) flag(origin, copy(locale, '起點', 'Start'));
     if (destination) flag(destination, copy(locale, '目的地', 'End'));
-    if (points.length) {
-      journeyBounds.current = L.latLngBounds(points);
-      if (container.current?.clientWidth && container.current.clientHeight) {
-        map.fitBounds(journeyBounds.current, { padding: [65, 75], maxZoom: 15 });
+    function fit() {
+      if (points.length) {
+        journeyBounds.current = L.latLngBounds(points);
+        if (container.current?.clientWidth && container.current.clientHeight) map.fitBounds(journeyBounds.current, { padding: [65, 75], maxZoom: 15 });
       }
     }
+    fit();
+    if (!route || !origin || !destination) return;
+    const controller = new AbortController();
+    setGeometryStatus('loading');
+    setEstimatedRoad(false);
+    const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng) });
+    if (route.legs.every(l => l.mode === 'WALK')) params.set('walk', 'true');
+    else params.set('legs', route.legs.map(l => `${l.networkPattern}:${l.boardingIndex}:${l.alightingIndex}`).join(','));
+    const timeout = window.setTimeout(() => { setGeometryStatus('error'); controller.abort(); }, 45000);
+    fetch('/api/journey-geometry?' + params, { signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error('Geometry unavailable');
+      const payload = await response.json() as { pieces: { legIndex: number; walk: boolean; paths: [number, number][][]; source: string }[]; missing: number };
+      if (controller.signal.aborted) return;
+      for (const piece of payload.pieces) {
+        if (piece.source === 'UNAVAILABLE') continue;
+        const color = piece.walk ? '#72827d' : routeColor(route!.legs[piece.legIndex]?.operator ?? '');
+        for (const path of piece.paths) {
+          if (path.length < 2 || path.some(p => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) continue;
+          L.polyline(path, { color: '#fff', weight: piece.walk ? 6 : 9, opacity: .9, interactive: false }).addTo(routeLayer);
+          L.polyline(path, { color, weight: piece.walk ? 3 : 5, dashArray: piece.walk ? '5 7' : undefined, lineCap: 'round', interactive: false }).addTo(routeLayer);
+          points.push(...path);
+        }
+      }
+      setEstimatedRoad(payload.pieces.some(piece => piece.source === 'OSM_ROAD'));
+      setGeometryStatus(payload.missing ? 'partial' : 'ready'); fit();
+    }).catch(() => { if (!controller.signal.aborted) setGeometryStatus('error'); })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { controller.abort(); window.clearTimeout(timeout); };
   }, [ready, route, origin, destination, locale]);
 
   function locate() {
@@ -128,6 +142,11 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
       <button className="map-tool" aria-label={copy(locale, '返回香港全境', 'Reset Hong Kong map')} onClick={() => state.current?.map.setView([22.303, 114.164], 14)}><PlannerIcon name="compass" size={20} /></button></div>
     {!ready && !message && <div className="map-loading"><span className="planner-spinner" />{copy(locale, '正在載入地圖…', 'Loading the map…')}</div>}
     {(message || tileError) && <div className="map-message" role="status">{tileError ? copy(locale, '底圖暫時無法載入，路線仍可在左側查看。', 'Map tiles are unavailable. Your route details are still available.') : message}<button onClick={() => { setMessage(''); setTileError(false); }} aria-label={copy(locale, '關閉提示', 'Dismiss message')}><PlannerIcon name="close" size={14} /></button></div>}
-    {route && <div className="map-caption"><PlannerIcon name="info" size={12} /><span>{copy(locale, '路線連線為示意，並非實際行車或步行路徑。', 'Schematic connections, not street-level directions.')}</span></div>}
+    {route && <div className="map-caption" role="status"><PlannerIcon name="info" size={12} /><span>{geometryStatus === 'loading'
+      ? copy(locale, '正在載入實際路徑…', 'Loading roads and tracks…')
+      : geometryStatus === 'ready' ? estimatedRoad
+        ? copy(locale, '部分道路路徑由 OpenStreetMap 估算', 'Some road paths are estimated using OpenStreetMap')
+        : copy(locale, '運輸署道路線形 · OpenStreetMap 軌道及步行路徑', 'TD road alignments · OpenStreetMap tracks and footpaths')
+        : copy(locale, '部分路徑暫未能載入；該段連線已隱藏。', 'Some paths are unavailable; those lines are hidden.')}</span></div>}
   </section>;
 }

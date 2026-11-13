@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTrafficSourceCatalog } from '../../../data/hkTrafficSources';
 import coverage from '../../../data/transport/manifest.json';
+import alignments from '../../../data/alignments/manifest.json';
 
 export const dynamic = 'force-static';
 
@@ -9,6 +10,7 @@ export function GET() {
     {
       sources: getTrafficSourceCatalog(),
       coverage,
+      alignments,
       disclaimer:
         'Source availability and schemas are controlled by the respective providers. Verify official terms before production use.',
       generatedAt: new Date().toISOString(),

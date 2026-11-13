@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findMultimodalJourneys, dedupeJourneys, retimeConnections } from '../../../engine/multimodalJourney';
-import { scoreRoutes, type Route } from '../../../engine/UpgradedScoringEngine';
+import { findMultimodalJourneys, selectJourneyAlternatives, retimeConnections, setJourneyTimes } from '../../../engine/multimodalJourney';
+import { parseJourneyTime } from '../../../engine/journeyTime';
+import { scoreRoutes, type Route, type ScoredRoute } from '../../../engine/UpgradedScoringEngine';
 import { haversineKm } from '../../../engine/journeyHelpers';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { transportCoverage, weightingDate } from '../../../data/transportNetwork';
@@ -24,11 +25,17 @@ export async function GET(request: NextRequest) {
   }
   const locale = params.get('lang') === 'en' ? 'en' : 'zh';
   const now = new Date(), started = Date.now();
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, now, locale);
-  const candidates: Route[] = result.routes.slice(0, 16);
-  await enrichJourneyArrivals(candidates, now);
-  retimeConnections(candidates, now);
-  let scored = dedupeJourneys(scoreRoutes(candidates, weightingDate(now)));
+  let selection;
+  try { selection = parseJourneyTime(params.get('timeMode'), params.get('time'), now); }
+  catch (err) { return NextResponse.json({ error: (err as Error).message }, { status: 400 }); }
+  const { mode, date } = selection;
+  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive');
+  const candidates: Route[] = selectJourneyAlternatives(result.routes, 64);
+  // A current prediction says nothing about a trip on a selected future date.
+  if (mode === 'now') { await enrichJourneyArrivals(candidates, now); retimeConnections(candidates, now); }
+  else for (const route of candidates) setJourneyTimes(route, date, mode);
+  let scored: ScoredRoute[] = selectJourneyAlternatives(scoreRoutes(candidates.filter(r => !r.legs?.some(l => l.serviceEnded)
+    && (mode !== 'arrive' || new Date(r.arrivalTime!).getTime() <= date.getTime() + 1)), weightingDate(date)));
   const walkMinutes = Math.ceil(haversineKm(fromLat, fromLon, toLat, toLon) * 1.2 / (5 / 60));
   if (walkMinutes <= 45) {
     const walk: Route = { id: 'walk-only', transferCount: 0, walkTransferTimeMinutes: 0,
@@ -36,11 +43,17 @@ export async function GET(request: NextRequest) {
         originStop: { id: 'origin', name: locale === 'en' ? 'Start' : '起點', lat: fromLat, lng: fromLon },
         destinationStop: { id: 'destination', name: locale === 'en' ? 'End' : '目的地', lat: toLat, lng: toLon },
         journeyTimeMinutes: walkMinutes, scheduledIntervalMinutes: 0, realtimeEta: null, fare: 0 }] };
-    scored = [...scored.slice(0, 8), scoreRoutes([walk], weightingDate(now))[0]].sort((a, b) => a.finalScore - b.finalScore);
-  } else scored = scored.slice(0, 8);
+    const departure = mode === 'arrive' ? new Date(date.getTime() - walkMinutes * 60_000) : date;
+    walk.departureTime = departure.toISOString(); walk.arrivalTime = new Date(departure.getTime() + walkMinutes * 60_000).toISOString(); walk.timeMode = mode;
+    walk.legs![0].departureTime = walk.departureTime; walk.legs![0].arrivalTime = walk.arrivalTime;
+    scored = [...scored, scoreRoutes([walk], weightingDate(date))[0]].sort((a, b) => a.finalScore - b.finalScore);
+  }
   return NextResponse.json({ data: scored, meta: {
     source: 'Transport Department GTFS; MTR topology/fares; official KMB, Citybus and MTR arrivals',
     live: scored.some(r => r.legs.some(l => l.realtimeEta?.isLive)),
+    timeMode: mode, requestedTime: date.toISOString(), timeZone: 'Asia/Hong_Kong', farePassenger: 'NORMAL_ADULT',
+    fareBasis: 'Adult Octopus where published; normal adult fares otherwise. No assumed interchange or pass discount.',
+    weightingVersion: 2,
     importedOn: transportCoverage.importedOn, coverage: transportCoverage.counts,
     candidates: result.candidates, durationMs: Date.now() - started,
     originUncovered: !result.originStops.length, destinationUncovered: !result.destinationStops.length,

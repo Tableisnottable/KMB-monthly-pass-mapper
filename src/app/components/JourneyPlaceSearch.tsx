@@ -5,8 +5,9 @@ import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { PlannerIcon } from './PlannerIcon';
 import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import type { PlaceResult } from './PlaceAutocomplete';
+import { hongKongInputValue, type JourneyTimeSelection } from '../../engine/journeyTime';
 
-export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus, onSearch, searching, locale }: {
+export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus, onSearch, searching, locale, time, onTimeChange }: {
   places: JourneyLocations;
   onInput: (field: JourneyField) => void;
   onSelect: (field: JourneyField, place: PlaceResult) => void;
@@ -15,6 +16,8 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
   onSearch: () => void;
   searching: boolean;
   locale: PlannerLocale;
+  time: JourneyTimeSelection;
+  onTimeChange: (time: JourneyTimeSelection) => void;
 }) {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -38,11 +41,19 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
         onClick={() => { setOrigin(destination); setDestination(origin); onSwap(); }}><PlannerIcon name="swap" size={17} /></button>
     </div>
     <div className="departure-options" role="group" aria-label={copy(locale, '出發時間', 'Departure time options')}>
-      <button type="submit" className="departure-now" disabled={!places.origin || !places.destination || searching}
-        title={copy(locale, '使用現在出發的班次', 'Plan using current departures')}>{copy(locale, '現在', 'Now')}</button>
-      <button type="button" disabled title={copy(locale, '目前只支援現在出發', 'Currently supports leaving now only')}>{copy(locale, '抵達', 'Arrive')}</button>
-      <button type="button" disabled title={copy(locale, '目前只支援現在出發', 'Currently supports leaving now only')}>{copy(locale, '出發', 'Leave')}</button>
+      {(['now', 'arrive', 'depart'] as const).map(mode => <button key={mode} type="button" aria-pressed={time.mode === mode}
+        className={time.mode === mode ? 'departure-now' : ''}
+        onClick={() => onTimeChange({ mode, value: time.value || hongKongInputValue(new Date(Date.now() + 3600000)) })}>
+        {mode === 'now' ? copy(locale, '現在', 'Now') : mode === 'arrive' ? copy(locale, '抵達', 'Arrive') : copy(locale, '出發', 'Leave')}</button>)}
       {searching && <span className="planner-spinner" aria-label={copy(locale, '正在搜尋', 'Searching')} />}
+      {time.mode === 'now' && <button type="submit" className="time-apply" disabled={!places.origin || !places.destination || searching}>{copy(locale, '搜尋', 'Go')}</button>}
     </div>
+    {time.mode !== 'now' && <div className="journey-time-picker">
+      <label htmlFor="journey-date-time">{time.mode === 'arrive' ? copy(locale, '最遲抵達', 'Arrive by') : copy(locale, '出發時間', 'Leave at')} <small>Hong Kong · UTC+8</small></label>
+      <div><input id="journey-date-time" type="datetime-local" value={time.value} required
+        onInput={event => onTimeChange({ ...time, value: event.currentTarget.value })} />
+        <button type="submit" className="time-apply" disabled={!places.origin || !places.destination || searching || !time.value}>{copy(locale, '搜尋', 'Plan')}</button></div>
+    </div>}
+    <p className="adult-fare-basis">{copy(locale, '普通成人票價 · 港鐵使用成人八達通', 'Normal adult fares · Adult Octopus for rail')}</p>
   </form>;
 }

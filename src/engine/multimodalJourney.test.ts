@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeWindows, findMultimodalJourneys, nextDeparture } from './multimodalJourney';
+import { activeWindows, findMultimodalJourneys, nextDeparture, previousDeparture } from './multimodalJourney';
 import { networkPatterns, networkRoutes, networkStops, hongKongClock, isServiceActive, transportCoverage } from '../data/transportNetwork';
 
 const noon = new Date('2026-11-13T04:00:00Z');
@@ -34,6 +34,12 @@ describe('Official transport snapshot', () => {
 });
 
 describe('Timetables', () => {
+  it('finds the latest frequency before an arrival deadline without using the exclusive endpoint', () => {
+    const windows = [{ start: 0, end: 30, headway: 10, duration: 30 }];
+    expect(previousDeparture(windows, 20, 55)?.wait).toBe(15);
+    expect(previousDeparture(windows, 20, 19)).toBeUndefined();
+    expect(previousDeparture([{ start: -50, end: -50, headway: 0, duration: 30 }], 20, -25)?.wait).toBe(5);
+  });
   it('respects exclusive frequency end and discrete departures', () => {
     const windows = [{ start: 5, end: 25, headway: 10, duration: 30 }];
     expect(nextDeparture(windows, 0, 6)?.wait).toBe(9);

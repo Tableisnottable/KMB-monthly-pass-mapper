@@ -10,7 +10,7 @@ describe('journey display values', () => {
   it('includes walking and live waiting without treating the weighted score as minutes', () => {
     const route = scored([{ operator: 'KMB', mode: 'BUS', journeyTimeMinutes: 20, realtimeEta: { isLive: true, etaMinutes: 4, dataTime: '', source: 'DATAGOVHK' } }], 5);
     expect(journeyMinutes(route)).toBe(29);
-    expect(route.finalScore).toBe(28);
+    expect(route.finalScore).toBe(30.95);
   });
 
   it('includes half-headway waiting for every transit leg without a live ETA', () => {

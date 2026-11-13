@@ -27,6 +27,9 @@ SOURCES = {
     'mtr-lines.csv': 'https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv',
     'light-rail.csv': 'https://opendata.mtr.com.hk/data/light_rail_routes_and_stops.csv',
     'mtr-fares.csv': 'https://opendata.mtr.com.hk/data/mtr_lines_fares.csv',
+    'airport_express_fares.csv': 'https://opendata.mtr.com.hk/data/airport_express_fares.csv',
+    'light_rail_fares.csv': 'https://opendata.mtr.com.hk/data/light_rail_fares.csv',
+    'mtr_bus_fares.csv': 'https://opendata.mtr.com.hk/data/mtr_bus_fares.csv',
 }
 LOCATION_API = 'https://www.map.gov.hk/gs/api/v1.0.0/locationSearch'
 
@@ -224,10 +227,22 @@ def main():
             rail_fares.append([stop_index['mtr:' + r['SRC_STATION_ID']], stop_index['mtr:' + r['DEST_STATION_ID']],
                                round(float(r['OCT_ADT_FARE']) * 100)])
         except (KeyError, ValueError): pass
+    for filename, prefix, src, dest, price in [
+        ('airport_express_fares.csv', 'mtr:', 'ST_FROM_ID', 'ST_TO_ID', 'OCT_ADT_FARE'),
+        ('light_rail_fares.csv', 'lrt:', 'from_station_id', 'to_station_id', 'fare_octo_adult')]:
+        for r in csv.DictReader((cache / filename).open(encoding='utf-8-sig')):
+            rail_fares.append([stop_index[prefix + r[src]], stop_index[prefix + r[dest]], round(float(r[price]) * 100)])
+    bus_adult = {r['ROUTE_ID']: round(float(r['FARE_OCTO_ADULT']) * 100)
+                 for r in csv.DictReader((cache / 'mtr_bus_fares.csv').open(encoding='utf-8-sig'))}
+    full_fares = {}
+    for r, _, groups in fares:
+        full_fares[r] = max(full_fares.get(r, 0), *(cents for cents, _ in groups))
+    for i, r in enumerate(routes):
+        if r[1] == 'LRTFeeder' and r[2] in bus_adult: full_fares[i] = bus_adult[r[2]]
     out = ROOT / 'src/data/transport'; out.mkdir(exist_ok=True)
     files = {}
     for name, values in [('stops', stops), ('routes', routes), ('patterns', patterns), ('fares', fares),
-                         ('rail-fares', rail_fares), ('calendar', calendar), ('exceptions', exceptions)]:
+                         ('rail-fares', rail_fares), ('full-fares', sorted(full_fares.items())), ('calendar', calendar), ('exceptions', exceptions)]:
         files[name] = split_write(out, name, values)
     imports, exports = [], []
     for name, paths in files.items():
@@ -242,7 +257,7 @@ def main():
                            'operators': dict(collections.Counter(r[1] for r in routes)), 'modes': dict(collections.Counter(r[5] for r in routes))},
                 'limitations': ['Rail topology has estimated journey times; service availability requires live verification.',
                  'TD intermediate stop times are interpolated between published timepoints.',
-                 'Published schedules are not live vehicle positions. Map lines connect stops schematically.',
+                 'Published schedules are not live vehicle positions. Adult Octopus fares are used where available; unverified interchange discounts are excluded.',
                  'Red minibuses, taxis, Ngong Ping 360 and private services absent from the imported feeds are not included.'],
                 'files': files}
     (out / 'manifest.json').write_bytes(encoded(manifest))

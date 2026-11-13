@@ -9,6 +9,7 @@ import { PlannerIcon } from './PlannerIcon';
 import { HongKongArtwork } from './HongKongArtwork';
 import { LiveTransitSearch } from './LiveTransitSearch';
 import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { type JourneyTimeSelection } from '../../engine/journeyTime';
 
 interface JourneyMeta {
   source?: string;
@@ -26,6 +27,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<JourneyMeta | null>(null);
   const [searched, setSearched] = useState(false);
+  const [time, setTime] = useState<JourneyTimeSelection>({ mode: 'now', value: '' });
   const [arrivalsOpen, setArrivalsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [places, setPlaces] = useState<JourneyLocations>({ origin: null, destination: null });
@@ -52,6 +54,8 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     const timeout = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng), lang: locale });
+      params.set('timeMode', time.mode);
+      if (time.mode !== 'now') params.set('time', time.value + ':00+08:00');
       const response = await fetch('/api/journey?' + params, { cache: 'no-store', signal: controller.signal });
       const payload = await response.json() as { data?: ScoredRoute[]; meta?: JourneyMeta; error?: string };
       if (!response.ok || !Array.isArray(payload.data)) throw new Error(payload.error ?? copy(locale, '暫時無法搜尋行程。', 'Journey search is temporarily unavailable.'));
@@ -106,7 +110,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     <div className="city-banner"><HongKongArtwork /><div><h1>Hong Kong</h1><button type="button" className="city-switch" disabled title={copy(locale, '目前提供香港路線規劃', 'Journey planning currently covers Hong Kong')}>{copy(locale, '切換城市', 'Switch City')}</button></div></div>
     <JourneyPlaceSearch places={places} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}
       onSwap={swap} onSearch={() => { if (places.origin && places.destination) void handleSearch(places.origin, places.destination); }}
-      searching={searching} locale={locale} />
+      searching={searching} locale={locale} time={time} onTimeChange={value => { resetJourney(); setTime(value); }} />
     {error && <p className="planner-notice notice-error" role="alert">{error}</p>}
     {notice && <p className="planner-notice notice-warning" role="status">{notice}</p>}
   </aside>;
@@ -130,9 +134,10 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       <div className="dialog-heading"><strong>Transit Compass HK</strong><button type="button" onClick={() => setMenuOpen(false)} aria-label={copy(locale, '關閉選單', 'Close menu')}><PlannerIcon name="close" size={22} /></button></div>
       <nav aria-label={copy(locale, '更多選項', 'More options')}><a href={locale === 'en' ? '/en' : '/'}>{copy(locale, '規劃行程', 'Get Me Somewhere')}</a><button type="button" onClick={() => { setMenuOpen(false); setArrivalsOpen(true); }}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href="/traffic">{copy(locale, '交通消息', 'Service alerts')}</a><a href="/updates">{copy(locale, '路線更新', 'Route updates')}</a><a href={locale === 'en' ? '/' : '/en'}>{locale === 'en' ? '繁體中文' : 'English'}</a></nav>
       <details className="weight-method"><summary>{copy(locale, '路線權重', 'Route weighting')}<PlannerIcon name="chevron" size={14} /></summary>
-        <p>{copy(locale, '使用原有權重公式，分數越低越優先。', 'Your original weighted formula is unchanged. Lower scores rank first.')}</p>
+        <p>{copy(locale, '改良權重綜合車程、候車、步行、轉乘及普通成人票價。分數越低越優先。', 'Enhanced weighting balances ride time, waiting, walking, transfers and normal adult fare. Lower scores rank first.')}</p>
         <p>{copy(locale, '每次轉乘 +8；候車倍率：繁忙 1.0、非繁忙 1.3、深夜 1.8。', 'Each transfer adds 8. Waiting multipliers: peak 1.0, off-peak 1.3, overnight 1.8.')}</p>
         <p>KMB −1 · LWB −0.46 · MTR +0.5 · CTB +1</p>
+        <p>{copy(locale, '步行 ×1.35；每 HK$1 票價 +0.45；未核實服務每段 +4。', 'Walking ×1.35; +0.45 per HK$1 fare; +4 per unverified service leg.')}</p>
       </details>
       <div className="menu-footnote"><a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a><p><a href="/api/sources">{copy(locale, '資料來源及鳴謝', 'Data sources & attribution')}</a></p><p>{copy(locale, '獨立交通規劃原型。鐵路、巴士、小巴、電車、渡輪及步行。車程及票價為估算。', 'Independent transit prototype. Rail, buses, minibuses, trams, ferries and walking. Times and fares are estimates.')}</p></div>
     </dialog>

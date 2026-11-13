@@ -12,13 +12,13 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 
 The main page and `/en` share a Citymapper-style web workspace: a green search/results sidebar, an edge-to-edge interactive map, compact journey rows, and a full journey detail view. Start and End stay empty until the user chooses places, and planning starts automatically once both are selected. Locations can also be picked on the map. Mobile uses Show Map / Back to journeys controls. The interface retains the independent Transit Compass identity, original artwork, system fonts and OpenStreetMap tiles; it does not use Citymapper's proprietary assets, map service or backend.
 
-The planner currently supports leaving now. Arrive/Leave scheduling, switching cities, cycling and taxi routing are visibly disabled rather than presenting unsupported results. The menu contains the existing station-arrival lookup, traffic/update links and weighting explanation. Journey details retain the score breakdown and monthly-pass estimate.
+The planner supports Now, Leave at and Arrive by, with editable dates/times explicitly in Hong Kong (UTC+8). Arrive-by uses a backwards timetable search and reports the actual suggested departure and arrival. Scheduled trips never use current live ETAs. Switching cities, cycling and taxi routing remain disabled. The menu contains the existing station-arrival lookup, traffic/update links and weighting explanation. Journey details retain the score breakdown and monthly-pass estimate.
 
-The existing `UpgradedScoringEngine` formula and operator adjustments are unchanged. `/api/journey` searches the imported public-transport graph with up to three transfers. The 2026-11-13 snapshot contains 2,487 routes/variants and 9,626 stops: KMB, Long Win, Citybus and joint services, New Lantao Bus, MTR Bus, Discovery Bay and Ma Wan buses, published cross-boundary coaches, green minibuses, ferries, Hong Kong Tramways, Peak Tram, MTR and Light Rail. These are the networks in the official feeds, not a claim that every private service or live feed exists.
+Enhanced weighting version 2 uses ride time + actual wait × time multiplier + walking × 1.35 + 8 per transfer + normal adult fare × 0.45 + 4 per unverified service leg, retaining the operator adjustments. A separate broad direct/one-transfer scan preserves cheaper feeders alongside bounded deeper searches. The results board offers up to 40 diverse alternatives; Show all expands beyond the first 12. `/api/journey` searches the imported public-transport graph with up to three transfers. The 2026-11-13 snapshot contains 2,487 routes/variants and 9,626 stops: KMB, Long Win, Citybus and joint services, New Lantao Bus, MTR Bus, Discovery Bay and Ma Wan buses, published cross-boundary coaches, green minibuses, ferries, Hong Kong Tramways, Peak Tram, MTR and Light Rail. These are the networks in the official feeds, not a claim that every private service or live feed exists.
 
 Displayed journey minutes are separate from weighted scores. They include stop-to-stop run times, access/transfer walking and predicted or scheduled waiting. KMB/LWB, Citybus, MTR, Light Rail and green minibus live arrivals enrich the initial boarding where a fresh matching prediction is available. Later connections use published timetables or estimates; connections are rechecked after the initial live arrival changes. Rail run times/headways are estimates; rail service is explicitly unverified when the live feed cannot confirm it. TD intermediate stop times are interpolated between published timepoints. A required leg with no upcoming connection is marked unavailable.
 
-Published adult OD fares are retained, including sectional fares; missing fares display **Fare unavailable**, not Free. Interchange discounts and monthly-pass coverage retain the existing prototype model and require operator confirmation. Map lines connect the actual ordered stops schematically; walking links use distance estimates and do not check a pedestrian/accessibility graph. Red minibuses, taxis, Ngong Ping 360 and private services absent from the imported fixed-route feeds are not included. See `/coverage` and `/api/network?resource=coverage` for counts, attribution and limits.
+Published normal adult OD fares are retained, including sectional fares and adult Octopus MTR, Airport Express and Light Rail fares. Paid-area rail line changes share one OD fare. No same-operator discount is assumed. If only a full-route fare is known, it is clearly marked as an upper bound; missing fares are never shown as Free. Monthly-pass analysis remains a separate prototype estimate. The map uses 3,429 official TD/CSDI bus/minibus road alignments and OpenStreetMap tracks/water routes, with OSRM walking paths and road fallback constrained through ordered stops. Missing geometry is hidden rather than replaced with straight chords. Walking durations remain estimates; paths do not certify step-free accessibility or temporary closures. Red minibuses, taxis, Ngong Ping 360 and private services absent from the imported fixed-route feeds are not included. See `/coverage` and `/api/network?resource=coverage` for counts, attribution and limits.
 
 Map tiles use OpenStreetMap with visible attribution. No map API key is required. Place search and official transit upstreams still require network access. The arrivals lookup retains its existing Traditional Chinese interface in both locales.
 
@@ -115,9 +115,11 @@ src/
 ```text
 Final score
   = sum(segment scores)
-  + walking transfer time
+  + walking transfer time * 1.35
   + long-distance transfer surcharge
   + (transfer count * 8)
+  + normal adult fare * 0.45
+  + unverified service legs * 4
 ```
 
 每個交通段的計算方式是 journey time 加上 ETA/waiting cost 及 operator adjustment / Each segment score combines journey time, ETA or waiting cost, and the operator adjustment:
@@ -146,24 +148,11 @@ Segment score
 | MTR / 港鐵 | `+0.50` |
 | CTB / Citybus 城巴 | `+1.00` |
 
-如果 `realtimeEta.isLive === true`，系統會使用 live ETA 取代 scheduled waiting cost / When `realtimeEta.isLive === true`, live ETA replaces the scheduled waiting-cost calculation.
+Waiting uses a reachable fresh live arrival minus access walking, or the actual published departure gap, multiplied by the Hong Kong time-of-day multiplier. Half the headway is only a fallback when no actual gap is available. The API normalizes all times to Hong Kong independently of server/browser timezone.
 
-沒有 live ETA 時，fallback wait cost 使用 scheduled interval、`0.5` 及 time-of-day multiplier 計算 / Without live ETA, fallback wait cost is calculated as scheduled interval multiplied by `0.5` and the time-of-day multiplier:
+### Normal adult fares
 
-```text
-scheduled interval * 0.5 * time-of-day multiplier
-```
-
-引擎接受 caller-provided JavaScript `Date`；如需嚴格香港時間，應在 application boundary normalize timezone / The engine accepts a caller-provided JavaScript `Date`; applications requiring strict Hong Kong time should normalize timezone at the application boundary.
-
-### Fare and BBI prototype / 車費及八達通轉乘優惠原型
-
-`calculateFare` 會合計所有 supplied leg fares，並對相鄰且由同一 operator 營運的交通段套用每段最高 `HK$4.20` 的 prototype discount / `calculateFare` totals supplied leg fares and applies a prototype discount of up to `HK$4.20` to each adjacent same-operator pair.
-
-- `discountedFare` 是 final estimated fare / is the final estimated fare。
-- `bbiDiscountApplied` 是 applied discount / is the total applied discount。
-
-這是 explainable prototype rule，不代表正式票價保證；production version 需要 dated、route-aware fare ruleset / This is an explainable prototype rule, not a fare guarantee; production requires a dated, route-aware fare ruleset.
+`calculateFare` sums the published adult leg fares. Paid-area MTR/Light Rail changes are combined into one published OD fare before scoring. The planner uses adult Octopus rail fares and normal adult fares for other modes; it does not invent interchange offers, concessions or pass discounts. `discountedFare` retains its existing API field name but is the undiscounted normal adult total; `bbiDiscountApplied` is zero. Full-fare fallbacks are marked as upper bounds. Operator-specific interchange rules and pass eligibility still need a dated, verified ruleset.
 
 ## Data sources and API behaviour / 資料來源及 API 行為
 
@@ -184,7 +173,7 @@ API route handlers 會代理 upstream calls，令 client 不需知道 upstream U
 - 有 `RATE_LIMITER` binding 時使用 Cloudflare rate limiting / Cloudflare rate limiting is used when the binding is available。
 - Local runtime 沒有 binding 時仍可運行 / local runtime continues without the binding through `src/lib/cloudflare.ts`。
 
-Citybus journey discovery uses a complete route/stop snapshot from the official Citybus API, including airport and local services. Refresh both matching catalogs together with `npm run data:citybus`. The importer checks every referenced stop, retries upstream failures, and refuses to write incomplete or oversized snapshots (maximum 1 MB per generated file). Live arrivals are fetched separately at journey time; a missing ETA does not remove a known Citybus connection. Final journey scores still use the existing weighting formula. Transfers remain the existing bounded KMB search; this is not a complete multimodal routing graph.
+Citybus live-arrival matching uses a route/stop snapshot from the official Citybus API, including airport and local services. Refresh both matching catalogs together with `npm run data:citybus`. The importer checks every referenced stop, retries upstream failures, and refuses to write incomplete or oversized snapshots (maximum 1 MB per generated file). Journey discovery uses the broader imported multimodal graph and enhanced weighting described above; a missing ETA does not remove a known timetable connection.
 
 Place suggestions also match official Citybus stop names, including when geocoding fails. Airport searches offer the ground transport centre before the aerodrome's polygon centre; the original geocoded landmark remains selectable.
 
@@ -308,15 +297,15 @@ npm run cf:deploy
 ## Current limitations and roadmap / 目前限制及 roadmap
 
 1. `/api/routes` 目前回傳小型 scored-route fixture，並非 complete route graph / currently returns a small scored-route fixture, not a complete route graph。
-2. Multimodal search is bounded to three transfers and a limited set of labels/alternatives. Walking is schematic; rail timings/headways are estimated and live status may be unavailable. No claim of exhaustive path discovery is made.
-3. BBI handling 是 simplified same-operator prototype，production launch 前需要正式 fare rules / is a simplified same-operator prototype requiring production fare rules。
+2. Multimodal search is bounded to three transfers and a limited set of labels/alternatives. Rail timings/headways and walking durations are estimated. Topology-only rail searches use conservative estimated 06:00–00:00 terminal windows, explicitly unverified; these are not official first/last-train times. No claim of exhaustive path discovery is made.
+3. Normal adult totals exclude unverified interchange offers. A full published fare is used as an upper bound when sectional pricing is missing; monthly-pass coverage remains a separate prototype model.
 4. Place search 依賴 Nominatim availability 及 usage policy / depends on Nominatim availability and usage policy。
 5. Map embed 及 external links 受第三方 browser/network policies 影響 / depend on third-party browser and network policies。
 6. Traffic alerts 及 source catalogues 需要 maintained refresh process / require a maintained data-refresh process。
 
 Recommended next steps / 建議後續工作：
 
-- Add pedestrian/accessibility routing and road/track-level geometry.
+- Add verified accessibility and temporary-closure information to physical route geometry.
 - Add published rail journey times, full rail operating calendars and additional operator live feeds where available.
 - Introduce versioned fare rules and effective dates / 加入版本化 fare rules 及生效日期。
 - Add recorded upstream fixtures and integration tests / 加入 recorded upstream fixtures 及 integration tests。
@@ -330,3 +319,15 @@ Recommended next steps / 建議後續工作：
 - OpenStreetMap data and Nominatim use 受 OpenStreetMap Foundation policies 及 attribution requirements 約束 / are subject to OpenStreetMap Foundation policies and attribution requirements。
 - Google Maps links and embeds 受 Google Maps Platform terms 約束 / are subject to Google Maps Platform terms。
 - Next.js、React、Tailwind CSS、OpenNext、Wrangler 及其他 dependencies 保留各自 licenses / retain their respective licenses。
+
+## Alignment data and scheduling
+
+Import official road alignments and OpenStreetMap tracks/ferry ways with:
+
+```powershell
+python scripts/import-alignments.py --cache C:/path/outside/repository/cache
+```
+
+Install `osmium` in that cache's `python-libs` directory first. The importer downloads CSDI line features and the Geofabrik Hong Kong PBF into the external cache. Only compact derived chunks smaller than 890 KB are committed. Track data is ODbL 1.0; see `src/data/alignments/NOTICE.md`. Raw downloads, dependencies, logs and builds stay out of Git.
+
+`/api/journey` accepts `timeMode=now|depart|arrive` and an explicit-offset ISO timestamp in `time` for scheduled modes. `/api/journey-geometry` loads physical paths for the selected result. The default public OSRM service is cached and serialized; production can set `OSRM_FOOT_URL` and `OSRM_CAR_URL` to private services. Road fallback follows roads through stops and may differ from the operator's exact alignment. Missing paths are reported and suppressed. Public service availability and per-process rate limiting are not a production SLA.
