@@ -353,8 +353,12 @@ routes retain their machine-readable timetables and routing support.
 `/updates` and `/traffic` now use the TD Special Traffic News XML feed, refreshed
 at most once a minute per server process. They preserve source wording and
 reference timestamps; these timestamps are not labelled as event start dates.
-The updates page filters for messages mentioning public transport and links to
-operator sites; it does not claim complete coverage of operator notices. No
+The updates page shows bus/minibus service notices; the traffic page shows road
+incidents, works, closures and congestion. A mixed bus/road source message is
+assigned to buses only, so no notice ID appears on both pages. Other transport
+service announcements (such as rail and ferry notices) are excluded from these
+two sections. Classification follows source-text keywords; the bus page links
+to operator sites and does not claim complete coverage of operator notices. No
 demo notices, inferred affected routes or invented severity are displayed.
 Feed failure is distinct from an empty feed, and an earlier successful display
 is explicitly marked as potentially outdated if a later refresh fails.

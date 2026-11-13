@@ -1,5 +1,6 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { TRAFFIC_NEWS_URL, type TrafficFeed, type TrafficNotice } from './trafficAlerts';
+import { classifyTrafficNotice } from './trafficNoticeCategories';
 
 /** ReferenceDate is a source reference, not an event start or effective date. */
 export function parseTrafficReference(value: string): string | null {
@@ -35,6 +36,7 @@ export function parseTrafficNews(xml: string): TrafficNotice[] {
     const publicTransport = /\b(?:bus(?:es)?|minibus(?:es)?|MTR|rail(?:way)?|train(?:s)?|tram(?:way)?)\b|\bferry\s+(?:service|route|sailing|operator)|\bferries\s+(?:are|will)|巴士|小巴|港鐵|鐵路|列車|電車|渡輪(?:服務|航線|班次)/i.test(textTc + ' ' + textEn);
     notices.set(id, { id: 'td:' + id, textTc, textEn, sourceReference: reference,
       sourceReferenceAt: parseTrafficReference(reference), sourceStatus: string('CurrentStatus'), publicTransport,
+      category: classifyTrafficNotice(textTc + '\n' + textEn),
       sourceName: '運輸署特別交通消息', sourceUrl: TRAFFIC_NEWS_URL });
   }
   return Array.from(notices.values()).sort((a, b) => (b.sourceReferenceAt ?? '').localeCompare(a.sourceReferenceAt ?? '')
