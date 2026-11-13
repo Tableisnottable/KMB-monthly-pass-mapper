@@ -53,6 +53,8 @@ export interface KmbStopEtaRecord {
   dest_en: string;
   eta: string | null;
   rmk_tc: string;
+  rmk_en?: string;
+  data_timestamp?: string;
 }
 
 export interface CitybusRouteStopRecord {
@@ -72,6 +74,10 @@ export interface CitybusEtaRecord {
   dest_tc: string;
   eta: string | null;
   remarks_tc: string;
+  rmk_tc?: string;
+  rmk_en?: string;
+  remarks_en?: string;
+  data_timestamp?: string;
 }
 
 export interface CitybusStopEtaRecord extends CitybusEtaRecord {

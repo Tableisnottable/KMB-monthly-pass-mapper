@@ -9,12 +9,14 @@ import { RouteDetails } from './RouteDetails';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, modeIcon, modeLabel, routeBadgeStyle, routeSignColours, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { combinedLegChoices, groupDurationLabel, groupFareLabel, groupJourneysByStops, type JourneyGroup, type JourneySort } from './journeyGroups';
+import { AddedDeparture } from './AddedDeparture';
+import { operatorName } from '../../data/transportOperators';
 
 function RouteSymbols({ route, locale, choices, compact = false }: { route: ScoredRoute; locale: PlannerLocale; choices?: TransitLeg[][]; compact?: boolean }) {
   return <span className="route-symbols">{(choices ?? route.legs.map(leg => [leg])).map((legs, index) => <span className="leg-symbol-group" key={index}>
     {index > 0 && <span className="leg-separator">·</span>}
     {(compact ? legs.slice(0, 6) : legs).map((leg, option) => <span className="leg-route-choice" key={option}>{option > 0 && <span className="leg-alternative-divider">/</span>}
-    {leg.mode === 'WALK' ? <PlannerIcon name="walk" size={21} /> : <span className="route-badge route-stop-plate" title={legOperator(leg) + ' · ' + leg.routeNumber + (routeSignColours(legOperator(leg), leg.routeNumber).verified ? '' : ' · ' + copy(locale, '站牌顏色未核實', 'Stop-plate colour not verified'))} style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}>
+    {leg.mode === 'WALK' ? <PlannerIcon name="walk" size={21} /> : <span className="route-badge route-stop-plate" title={operatorName(legOperator(leg), locale) + ' · ' + leg.routeNumber + (routeSignColours(legOperator(leg), leg.routeNumber).verified ? '' : ' · ' + copy(locale, '公司顏色未核實', 'Company colour not verified'))} style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}>
       <span className="route-badge-icon"><PlannerIcon name={modeIcon(leg.mode)} size={18} /></span>
       <strong>{leg.routeNumber || modeLabel(leg.mode, locale)}</strong>
     </span>}</span>)}{compact && legs.length > 6 && <small className="combined-more-services">+{legs.length - 6}</small>}
@@ -33,7 +35,7 @@ function JourneyRow({ route, locale, onSelect, selected = false }: { route: Scor
     {route.departureTime && route.arrivalTime && <span className="route-clock-line">{hongKongTimeLabel(route.departureTime)} → {hongKongTimeLabel(route.arrivalTime)} <small>HKT · {copy(locale, '普通成人', 'Normal adult')}</small></span>}
     <span className="route-service-line">{ended ? <span className="service-ended">{copy(locale, '暫無班次', 'No upcoming service')}</span>
       : isWalk ? copy(locale, '全程步行', 'Walk all the way')
-        : live ? <><PlannerIcon name="signal" size={13} /><span>{copy(locale, '約 ', 'in ')}{first.realtimeEta?.etaMinutes} {copy(locale, '分鐘到站', 'min from')} {first.originStop?.name}</span></>
+        : live ? <><PlannerIcon name="signal" size={13} /><span>{copy(locale, '約 ', 'in ')}{first.realtimeEta?.etaMinutes} {copy(locale, '分鐘到站', 'min from')} {first.originStop?.name}</span><AddedDeparture departure={first.liveDepartures?.[0]} locale={locale} /></>
           : first?.serviceStatus === 'UNVERIFIED' ? <span>{copy(locale, '班次未能核實 · 時間估算', 'Service unverified · estimated times')}</span>
             : first?.departureTime ? <span>{copy(locale, '時間表 · 上車 ', 'Timetable · board at ')}{hongKongTimeLabel(first.departureTime)}</span>
               : <span>{copy(locale, '班距約 ', 'Every ')}{first?.scheduledIntervalMinutes ?? 12} min</span>}</span>

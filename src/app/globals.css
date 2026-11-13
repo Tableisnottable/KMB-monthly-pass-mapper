@@ -184,7 +184,7 @@ button {
 .route-badge strong { font-size: 14px; font-weight: 800; padding: 0 5px; color: #696969; white-space: nowrap; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
 .route-stop-plate { border-color: #0003; }
 .route-stop-plate strong, .route-stop-plate .route-badge-icon { color: inherit; }
-.route-stop-plate .route-badge-icon { border-right: 1px solid #0002; }
+.route-stop-plate .route-badge-icon { border-right: 1px solid #0002; background-color: var(--route-icon-background); color: var(--route-icon-colour); }
 .route-option-price { font-size: 14px; font-weight: 800; color: var(--green); white-space: nowrap; margin-left: auto; }
 .route-duration { position: relative; min-width: 38px; text-align: right; color: var(--text); font-size: 23px; font-weight: 800; line-height: 23px; }
 .route-duration > svg { position: absolute; top: 0; left: -13px; color: #e6d443; }
@@ -218,6 +218,45 @@ button {
 .directions-list li:last-child { border-bottom: 0; }
 .step-marker { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; color: #999; }
 .step-operator-marker { border: 1px solid #0003; border-radius: 4px; }
+.added-departure { display: inline-block; color: #8b4600; background: #fff0cf; border: 1px solid #e8bc71; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-weight: 700; line-height: 1.5; white-space: nowrap; }
+.departure-timetable-link { color: var(--green); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+.station-departures > div > strong small { display: block; font-size: 11px; font-weight: 400; margin-top: 3px; white-space: nowrap; }
+.timetables-page { max-width: 1180px; margin: 0 auto; padding: 24px; color: var(--text); }
+.timetables-page > header { display: flex; justify-content: space-between; gap: 16px; color: var(--green); margin-bottom: 25px; }
+.timetables-page h1 { font-size: 30px; font-weight: 800; }
+.timetables-page h2 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+.timetables-page p { margin: 12px 0; line-height: 1.6; }
+.timetable-company-summary { margin: 24px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+.timetable-company-summary p { font-size: 13px; color: #666; }
+.timetable-company-summary summary { color: var(--green); font-weight: 700; cursor: pointer; }
+.timetable-company-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 20px; }
+.timetable-company-list > div { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 13px; }
+.timetable-company-list a { color: var(--green); text-decoration: underline; }
+.timetable-company-list small { color: #666; }
+.timetable-layout { display: grid; grid-template-columns: minmax(240px, 340px) minmax(0, 1fr); gap: 24px; }
+.timetable-layout > section { min-width: 0; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; }
+.timetable-layout label { display: block; margin-bottom: 16px; font-size: 13px; font-weight: 700; }
+.timetable-layout select, .timetable-layout input { display: block; width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 5px; margin-top: 6px; min-height: 42px; font-weight: 400; background: #fff; }
+.timetable-route-list { max-height: 650px; overflow-y: auto; }
+.timetable-route-list button { display: flex; align-items: flex-start; width: 100%; gap: 10px; padding: 13px 6px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
+.timetable-route-list button[aria-pressed="true"] { background: #edf6e9; box-shadow: inset 3px 0 var(--green); }
+.timetable-route-list button > span:last-child { min-width: 0; }
+.timetable-route-list small { display: block; color: #666; margin-top: 5px; }
+.timetable-route-list .route-badge { flex-shrink: 0; }
+.timetable-note, .timetable-count { font-size: 12px; color: #666; }
+.timetable-note a { color: var(--green); text-decoration: underline; }
+.timetable-table { width: 100%; text-align: left; font-size: 14px; border-collapse: collapse; }
+.timetable-table th, .timetable-table td { border-bottom: 1px solid #e5e5e5; padding: 12px 8px; vertical-align: top; }
+.timetable-table th { background: #f3f5f1; font-size: 12px; }
+.timetable-table td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.timetable-table td:last-child small { display: block; color: #666; margin-top: 4px; font-size: 11px; }
+@media (max-width: 700px) {
+  .timetables-page { padding: 18px 12px; }
+  .timetable-layout { grid-template-columns: 1fr; gap: 16px; }
+  .timetable-route-list { max-height: 240px; }
+  .timetable-layout > section { padding: 15px; }
+  .timetables-page h1 { font-size: 25px; }
+}
 .directions-list strong { display: block; font-size: 15px; font-weight: 700; }
 .directions-list small { display: block; font-size: 13px; line-height: 1.65; margin-top: 8px; color: #888; }
 .transfer-note { color: #aa893a !important; }
@@ -271,8 +310,10 @@ button {
 .station-matches button span { flex: 1; }
 .station-lookup small { display: block; font-size: 11px; color: #647166; }
 .station-lookup h3 { font-weight: bold; font-size: 19px; margin: 10px 0; }
-.station-departures > div { display: grid; grid-template-columns: 76px 1fr 56px; gap: 8px; align-items: center; padding: 12px 0; border-bottom: 1px solid #e4e8e2; }
+.station-departures > div { display: grid; grid-template-columns: minmax(90px, max-content) minmax(0, 1fr) max-content; gap: 8px; align-items: center; padding: 12px 0; border-bottom: 1px solid #e4e8e2; }
 .station-departures > div > span:first-child { display: flex; gap: 6px; align-items: center; }
+.station-departures > div > .route-badge:first-child { gap: 0; justify-self: start; }
+.station-departures .route-badge strong { flex-shrink: 0; max-width: none; }
 .station-data-note { margin-top: 16px; color: #647166; font-size: 12px; }
 .station-data-note a, .route-estimate-note a { text-decoration: underline; }
 .route-option-price { max-width: 90px; font-size: 12px; }

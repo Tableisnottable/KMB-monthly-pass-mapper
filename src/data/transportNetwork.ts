@@ -59,6 +59,12 @@ export function isServiceActive(id: number, date: Date): boolean {
   return !!row && String(row[2]) <= day && String(row[3]) >= day && String(row[1])[weekday] === '1';
 }
 
+export function serviceCalendarStatus(id: number, date: Date) {
+  const { day } = hongKongClock(date), row = calendars.get(id), exception = changes.get(`${id}:${day}`);
+  return { covered: exception !== undefined || !!row && String(row[2]) <= day && day <= String(row[3]),
+    active: isServiceActive(id, date), added: exception === 1 };
+}
+
 export function publishedFare(routeIndex: number, from: number, to: number): number | undefined {
   const row = fareRows.get(`${routeIndex}:${from}`);
   // A pair can have different fares on special variants: return the highest

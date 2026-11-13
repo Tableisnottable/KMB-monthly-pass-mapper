@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
+import { networkPatterns, networkRoutes, networkStops } from '../../../data/transportNetwork';
+import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
 vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
 const lookup = (params: string) => GET(new NextRequest('http://localhost/api/network?' + params));
+afterEach(() => { vi.mocked(enrichJourneyArrivals).mockReset(); vi.useRealTimers(); });
 
 describe('All-network catalogue', () => {
   it('reports the actual snapshot coverage', async () => {
@@ -37,5 +40,40 @@ describe('All-network catalogue', () => {
   it('rejects unknown stops and resources', async () => {
     expect((await lookup('resource=departures&stop=unknown')).status).toBe(400);
     expect((await lookup('resource=unknown')).status).toBe(400);
+  });
+  it('publishes source-provided company names and actual timetable coverage', async () => {
+    const { data } = await (await lookup('resource=operators')).json();
+    expect(data).toHaveLength(16);
+    expect(data.find((row: { id: string }) => row.id === 'KMB')).toMatchObject({ nameEn: 'Kowloon Motor Bus', liveArrivals: true });
+    expect(data.find((row: { id: string }) => row.id === 'MTR').timetablePatterns).toBe(0);
+  });
+  it('returns complete timetable records for a selected route, not just its next trip', async () => {
+    const index = networkPatterns.findIndex(pattern => pattern.w.length > 5);
+    const pattern = networkPatterns[index];
+    const params = new URLSearchParams({ resource: 'timetable', route: networkRoutes[pattern.r][0], pattern: pattern.id, date: '2026-11-13' });
+    const data = await (await lookup(params.toString())).json();
+    expect(data.entries.length).toBeGreaterThan(1);
+    expect(data.meta.allPublishedWindows).toBe(true);
+    expect(data.company.id).toBe(networkRoutes[pattern.r][1]);
+    expect((await lookup('resource=timetable&route=missing&date=2026-02-30')).status).toBe(400);
+  });
+  it('keeps live added departures for routes with no next scheduled departure', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T04:00:00Z'));
+    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][1] === 'KMB' && pattern.s.length > 1);
+    const pattern = networkPatterns[index], saved = pattern.w; pattern.w = [];
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      for (const route of routes) {
+        const leg = route.legs![0];
+        if (networkPatterns[leg.networkPattern!].r !== pattern.r) continue;
+        leg.serviceEnded = false; leg.serviceStatus = 'LIVE';
+        leg.liveDepartures = [3, 9].map(minutes => ({ minutes, time: new Date(Date.now() + minutes * 60000).toISOString(), scheduleMatch: 'ADDED', addedReason: 'PROVIDER' }));
+      }
+    });
+    try {
+      const { data } = await (await lookup('resource=departures&stop=' + encodeURIComponent(networkStops[pattern.s[0]][0]))).json();
+      const added = data.filter((row: { routeId: string; status: string }) => row.routeId === networkRoutes[pattern.r][0] && row.status === 'LIVE');
+      expect(added.some((row: { minutes: number; scheduleMatch: string }) => row.minutes === 3 && row.scheduleMatch === 'ADDED')).toBe(true);
+      expect(added.some((row: { minutes: number }) => row.minutes === 9)).toBe(true);
+    } finally { pattern.w = saved; }
   });
 });

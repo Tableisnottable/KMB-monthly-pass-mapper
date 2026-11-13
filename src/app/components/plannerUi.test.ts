@@ -49,81 +49,43 @@ describe('journey display values', () => {
   });
 });
 
-describe('Real stop-plate colour conventions', () => {
-  it('uses burgundy / white for Cityflyer A routes and navy / yellow for Long Win A routes', () => {
-    for (const number of ['A20', 'A21', 'A23', 'A28']) {
-      expect(routeBadgeStyle('CTB', number)).toMatchObject({ backgroundColor: '#7b2335', color: '#ffffff' });
-    }
-    expect(routeBadgeStyle('LWB', 'A31')).toMatchObject({ backgroundColor: '#002b5c', color: '#ffdf00' });
-  });
-
-  it('distinguishes airport E services by route, not just the bus company', () => {
-    expect(routeColor('CTB', 'E21')).toBe('#d71920');
-    expect(routeColor('CTB', 'E11A')).toBe('#007d40');
-    expect(routeColor('CTB', 'E18')).toBe('#007d40');
-    expect(routeColor('LWB', 'E32')).toBe('#f58220');
-    expect(routeIconColor('LWB', 'E32')).toBe('#ffffff');
-  });
-
-  it('uses tunnel colours for joint services and retains the route-number exceptions', () => {
-    expect(routeColor('KMB+CTB', '171')).toBe('#d71920');
-    expect(routeColor('KMB+CTB', '970')).toBe('#007d40');
-    expect(routeColor('KMB', '600X')).toBe('#d71920');
-    expect(routeColor('KMB', '603')).toBe('#d71920');
-    expect(routeSignColours('CTB', '382').verified).toBe(false);
-    expect(routeColor('CTB', '629')).toBe('#005da6');
-    expect(routeColor('CTB', '314')).toBe('#005da6');
-    expect(routeColor('CTB', 'B4')).toBe('#005da6');
-    expect(routeColor('CTB', 'B5')).toBe('#d71920');
-  });
-
-  it('keeps ordinary KMB and MTR Bus numbers black on white instead of using the body livery', () => {
-    for (const [operator, number] of [['KMB', '2A'], ['LRTFeeder', 'K51']]) {
-      expect(routeBadgeStyle(operator, number)).toMatchObject({ backgroundColor: '#ffffff', color: '#111111' });
-      expect(routeColor(operator, number)).toBe('#111111');
+describe('Company colours for all bus routes', () => {
+  it('keeps company colours across local, tunnel, airport, overnight and premium routes', () => {
+    for (const number of ['2A', '104', '301', '600X', '936', 'A23', 'E21', 'N241', 'P960']) {
+      expect(routeBadgeStyle('KMB', number)).toMatchObject({ backgroundColor: '#e62232', color: '#ffffff' });
+      expect(routeBadgeStyle('CTB', number)).toMatchObject({ backgroundColor: '#f7b500', color: '#17212b' });
+      expect(routeColor('LWB', number)).toBe('#ef8528');
     }
   });
-
-  it('uses white or yellow numbers on black for the corresponding overnight services', () => {
-    expect(routeBadgeStyle('CTB', 'NA21')).toMatchObject({ backgroundColor: '#111111', color: '#ffdf00' });
-    expect(routeBadgeStyle('CTB', '796S')).toMatchObject({ backgroundColor: '#005da6', color: '#ffffff' });
-    expect(routeBadgeStyle('CTB', '701S')).toMatchObject({ backgroundColor: '#005da6', color: '#ffffff' });
-    expect(routeBadgeStyle('KMB', '270S')).toMatchObject({ backgroundColor: '#ffffff', color: '#111111' });
-    expect(routeBadgeStyle('KMB', 'N241')).toMatchObject({ backgroundColor: '#111111', color: '#ffffff' });
-    expect(routeBadgeStyle('LWB', 'NA31')).toMatchObject({ backgroundColor: '#111111', color: '#ffffff' });
-    expect(routeSignColours('CTB', 'NR61').verified).toBe(false);
+  it('shows both companies for joint routes without an invented joint colour', () => {
+    expect(routeBadgeStyle('KMB+CTB', '914')).toMatchObject({ backgroundColor: '#e62232', color: '#ffffff',
+      '--route-icon-background': '#f7b500', '--route-icon-colour': '#17212b' });
+    expect(routeIconColor('KMB+CTB', '104')).toBe('#17212b');
+    expect(routeColor('KMB+CTB', '914')).toBe(routeColor('KMB'));
+    expect(routeBadgeStyle('LWB+CTB', 'S1')).toMatchObject({ backgroundColor: '#ef8528', '--route-icon-background': '#f7b500' });
   });
-
-  it('keeps New Lantao, shuttle, sightseeing and premium plate conventions separate', () => {
-    expect(routeBadgeStyle('NLB', 'A35')).toMatchObject({ backgroundColor: '#d71920', color: '#ffdf00' });
-    expect(routeBadgeStyle('NLB', '3M')).toMatchObject({ backgroundColor: '#005da6', color: '#ffffff' });
-    expect(routeBadgeStyle('NLB', 'B2')).toMatchObject({ backgroundColor: '#ffffff', color: '#111111' });
-    expect(routeBadgeStyle('LWB+CTB', 'S1')).toMatchObject({ backgroundColor: '#f58220', color: '#002b5c' });
-    expect(routeColor('KMB', 'P960')).toBe('#a25466');
-    expect(routeSignColours('KMB', 'HK1').verified).toBe(false);
-  });
-
-  it('uses an explicit neutral fallback when the actual sign design is not verified', () => {
-    for (const operator of ['DB', 'PI', 'XB', 'unknown']) {
-      expect(routeSignColours(operator, 'example')).toMatchObject({ background: '#ffffff', foreground: '#111111', line: '#656565', verified: false });
-    }
-  });
-
-  it('produces valid, visible styles for every imported route without drawing white map lines', () => {
+  it('has readable number and icon colours for every imported bus operator', () => {
+    const luminance = (hex: string) => hex.slice(1).match(/../g)!.map(part => parseInt(part, 16) / 255)
+      .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+      .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
     for (const route of catalogue) {
       const colours = routeSignColours(route[1], route[2]);
       for (const colour of [colours.background, colours.foreground, colours.line]) expect(colour).toMatch(/^#[\da-f]{6}$/i);
       expect(colours.line).not.toBe('#ffffff');
-      expect(colours.foreground).not.toBe(colours.background);
+      if (route[5] !== 'BUS') continue;
+      const contrast = (a: string, b: string) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+      expect(contrast(colours.background, colours.foreground)).toBeGreaterThanOrEqual(3);
+      expect(contrast(colours.iconBackground ?? colours.background, colours.iconForeground ?? colours.foreground)).toBeGreaterThanOrEqual(3);
     }
   });
-
-  it('retains joint-service identity without changing the weighting operator or score', () => {
+  it('retains a neutral fallback for an unknown company', () => {
+    expect(routeSignColours('unknown')).toMatchObject({ line: '#656565', verified: false });
+  });
+  it('preserves joint-service scoring and catalogue identity', () => {
     const leg = { operator: 'KMB', routeNumber: '171', mode: 'BUS', journeyTimeMinutes: 20, scheduledWaitMinutes: 0 };
     const original = scored([leg]), joint = scored([{ ...leg, networkOperator: 'KMB+CTB' }]);
     expect(legOperator(joint.legs[0])).toBe('KMB+CTB');
     expect(joint.legs[0].operator).toBe('KMB');
     expect(joint.finalScore).toBe(original.finalScore);
-    expect(routeColor(legOperator(joint.legs[0]), '171')).toBe(routeColor('KMB', '171'));
   });
 });

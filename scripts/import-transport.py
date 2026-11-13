@@ -43,6 +43,14 @@ def clean(value):
 def rows(archive, name):
     return csv.DictReader(io.TextIOWrapper(archive.open(name), encoding='utf-8-sig'))
 
+def agency_records(en, tc):
+    chinese = {r['agency_id']: r for r in rows(tc, 'agency.txt')}
+    return [{'id': r['agency_id'], 'nameEn': r['agency_name'].replace('|', ' / '),
+             'nameTc': chinese[r['agency_id']]['agency_name'].replace('|', '／'),
+             'urls': list(dict.fromkeys(r['agency_url'].split('|') + chinese[r['agency_id']]['agency_url'].split('|'))),
+             'timezone': r['agency_timezone'], 'source': SOURCES['td-gtfs-en.zip']}
+            for r in rows(en, 'agency.txt')]
+
 def minute(value):
     h, m, s = map(int, value.split(':'))
     return h * 60 + m + s / 60
@@ -124,9 +132,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cache', type=Path, required=True)
     parser.add_argument('--refresh', action='store_true', help='Redownload source archives')
+    parser.add_argument('--agencies-only', action='store_true', help='Import bilingual agency metadata without rebuilding the network')
     args = parser.parse_args(); cache = args.cache.resolve(); cache.mkdir(parents=True, exist_ok=True)
     if cache == ROOT or ROOT in cache.parents:
         raise ValueError('Raw cache must be outside the repository')
+    if args.agencies_only:
+        for name in ['td-gtfs-en.zip', 'td-gtfs-tc.zip']:
+            if args.refresh or not (cache / name).exists(): urllib.request.urlretrieve(SOURCES[name], cache / name)
+        with zipfile.ZipFile(cache / 'td-gtfs-en.zip') as en, zipfile.ZipFile(cache / 'td-gtfs-tc.zip') as tc:
+            agencies = agency_records(en, tc)
+        out = ROOT / 'src/data/transport'
+        files = split_write(out, 'agencies', agencies)
+        manifest = json.loads((out / 'manifest.json').read_text('utf-8'))
+        manifest['files']['agencies'] = files
+        manifest['agencyImportedOn'] = datetime.date.today().isoformat()
+        (out / 'manifest.json').write_bytes(encoded(manifest))
+        print('Imported', len(agencies), 'government agency records', flush=True)
+        return
     for name, url in SOURCES.items():
         if args.refresh or not (cache / name).exists():
             urllib.request.urlretrieve(url, cache / name)
@@ -242,7 +264,8 @@ def main():
     out = ROOT / 'src/data/transport'; out.mkdir(exist_ok=True)
     files = {}
     for name, values in [('stops', stops), ('routes', routes), ('patterns', patterns), ('fares', fares),
-                         ('rail-fares', rail_fares), ('full-fares', sorted(full_fares.items())), ('calendar', calendar), ('exceptions', exceptions)]:
+                         ('rail-fares', rail_fares), ('full-fares', sorted(full_fares.items())), ('calendar', calendar), ('exceptions', exceptions),
+                         ('agencies', agency_records(en, tc))]:
         files[name] = split_write(out, name, values)
     imports, exports = [], []
     for name, paths in files.items():

@@ -141,7 +141,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
           if (!fareCache.has(fareKey)) fareCache.set(fareKey, normalAdultFare(pattern.r, pattern.s[start], pattern.s[end]));
           const adult = fareCache.get(fareKey)!;
           const leg: Segment = {
-            id: `${pattern.id}:${start}:${end}`, operator, networkOperator: route[1], mode: route[5], routeNumber: route[2], routeName: route[locale === 'en' ? 4 : 3],
+            id: `${pattern.id}:${start}:${end}`, operator, networkOperator: route[1], networkRouteId: route[0], networkPatternId: pattern.id, mode: route[5], routeNumber: route[2], routeName: route[locale === 'en' ? 4 : 3],
             originStop: networkStop(pattern.s[start], locale), destinationStop: networkStop(pattern.s[end], locale),
             journeyTimeMinutes: ride, scheduledIntervalMinutes: interval, realtimeEta: null, ...adult,
             serviceStatus: rail ? 'UNVERIFIED' : 'TIMETABLE', scheduledDepartureMinutes: reverse ? -elapsed : label.elapsed + wait,

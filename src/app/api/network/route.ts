@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { networkPatterns, networkRoutes, networkStops, networkStop, transportCoverage } from '../../../data/transportNetwork';
-import { activeWindows, nextDeparture } from '../../../engine/multimodalJourney';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
+import { operatorInfo, transportOperators } from '../../../data/transportOperators';
+import { hongKongServiceDate, nextPublishedDeparture, routeTimetable } from '../../../data/networkTimetable';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
@@ -14,6 +15,20 @@ export async function GET(request: NextRequest) {
   }
   const p = request.nextUrl.searchParams, resource = p.get('resource') ?? 'coverage';
   if (resource === 'coverage') return NextResponse.json(transportCoverage);
+  if (resource === 'operators') return NextResponse.json({ data: transportOperators.map(operator => ({ ...operator,
+    routeCount: networkRoutes.filter(route => route[1] === operator.id).length,
+    timetablePatterns: networkPatterns.filter(pattern => networkRoutes[pattern.r][1] === operator.id && pattern.w.length > 0).length,
+    scheduleRecords: networkPatterns.filter(pattern => networkRoutes[pattern.r][1] === operator.id).reduce((sum, pattern) => sum + pattern.w.length, 0),
+    liveArrivals: ['KMB', 'LWB', 'CTB', 'KMB+CTB', 'LWB+CTB', 'MTR', 'LRT', 'GMB'].includes(operator.id),
+  })) });
+  if (resource === 'timetable') {
+    try {
+      const data = routeTimetable(p.get('route') ?? '', p.get('date') ?? hongKongServiceDate(), p.get('pattern') ?? undefined, p.get('stop') ?? undefined);
+      return NextResponse.json({ ...data, company: operatorInfo(data.route[1]), meta: { timezone: 'Asia/Hong_Kong',
+        importedOn: transportCoverage.importedOn, source: transportCoverage.sources['td-gtfs-en.zip'],
+        frequencyEndExclusive: true, allPublishedWindows: true } });
+    } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid timetable lookup.' }, { status: 400 }); }
+  }
   const query = (p.get('q') ?? '').trim().toLowerCase();
   const operator = p.get('operator'), mode = p.get('mode');
   const limit = Math.min(500, Math.max(1, Number(p.get('limit')) || 50));
@@ -21,8 +36,9 @@ export async function GET(request: NextRequest) {
   if (resource === 'routes') {
     const data = networkRoutes.filter(r => (!operator || r[1] === operator) && (!mode || r[5] === mode)
       && (!query || [r[2], r[3], r[4]].join(' ').toLowerCase().includes(query)));
-    return NextResponse.json({ data: data.slice(0, limit).map(r => ({ id: r[0], operator: r[1], number: r[2],
-      nameTc: r[3], nameEn: r[4], mode: r[5] })), total: data.length });
+    const offset = Math.max(0, Math.floor(Number(p.get('offset')) || 0));
+    return NextResponse.json({ data: data.slice(offset, offset + limit).map(r => ({ id: r[0], operator: r[1], number: r[2],
+      nameTc: r[3], nameEn: r[4], mode: r[5], company: operatorInfo(r[1]) })), total: data.length, hasMore: offset + limit < data.length });
   }
   if (resource === 'stops') {
     const needle = normalizeTransitQuery(query);
@@ -33,7 +49,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: data.slice(0, limit).map(({ s }) => ({ id: s[0], nameTc: s[1], nameEn: s[2],
       lat: s[3], lng: s[4], mode: s[6] })), total: data.length });
   }
-  if (resource !== 'departures') return NextResponse.json({ error: 'resource must be coverage, routes, stops or departures.' }, { status: 400 });
+  if (resource !== 'departures') return NextResponse.json({ error: 'resource must be coverage, operators, routes, stops, timetable or departures.' }, { status: 400 });
   const stop = p.get('stop'), stopIndex = networkStops.findIndex(s => s[0] === stop);
   if (stopIndex < 0) return NextResponse.json({ error: 'Unknown transport stop.' }, { status: 400 });
   const now = new Date(), locale = p.get('lang') === 'en' ? 'en' : 'zh';
@@ -42,26 +58,33 @@ export async function GET(request: NextRequest) {
     const r = networkRoutes[pattern.r], rail = r[5] === 'SUBWAY' || r[5] === 'LIGHT_RAIL';
     pattern.s.forEach((s, position) => {
       if (s !== stopIndex || pattern.p[position] !== 0 || position === pattern.s.length - 1) return;
-      const next = rail ? undefined : nextDeparture(activeWindows(pattern, now), pattern.t[position], 0);
-      if (!rail && !next) return;
+      const next = rail ? undefined : nextPublishedDeparture(index, position, now);
       const dest = pattern.s.length - 1;
       candidates.push({ id: pattern.id, originWalkMinutes: 0, legs: [{
-        id: pattern.id, operator: r[1] === 'KMB+CTB' ? 'KMB' : r[1], mode: r[5], routeNumber: r[2],
+        id: pattern.id, operator: r[1] === 'KMB+CTB' ? 'KMB' : r[1] === 'LWB+CTB' ? 'LWB' : r[1], networkOperator: r[1], mode: r[5], routeNumber: r[2],
         originStop: networkStop(s, locale), destinationStop: networkStop(pattern.s[dest], locale),
         networkPattern: index, boardingIndex: position, alightingIndex: dest,
-        scheduledDepartureMinutes: next ? Math.ceil(next.wait) : undefined, serviceStatus: rail ? 'UNVERIFIED' : 'TIMETABLE',
+        scheduledDepartureMinutes: next ? Math.ceil(next.minutes) : undefined, serviceStatus: rail ? 'UNVERIFIED' : 'TIMETABLE',
+        departureTime: next?.time,
+        serviceEnded: !rail && !next,
       }] });
     });
   });
-  const unique = candidates.filter((r, i, all) => all.findIndex(other =>
+  const unique = candidates.sort((a, b) => (a.legs![0].scheduledDepartureMinutes ?? Infinity) - (b.legs![0].scheduledDepartureMinutes ?? Infinity)).filter((r, i, all) => all.findIndex(other =>
     networkPatterns[other.legs![0].networkPattern!].r === networkPatterns[r.legs![0].networkPattern!].r
-    && other.legs![0].destinationStop!.id === r.legs![0].destinationStop!.id) === i).slice(0, 24);
+    && other.legs![0].destinationStop!.id === r.legs![0].destinationStop!.id) === i);
   await enrichJourneyArrivals(unique, now);
-  return NextResponse.json({ data: unique.map(r => {
+  return NextResponse.json({ data: unique.flatMap(r => {
     const leg = r.legs![0];
-    return { id: r.id, operator: leg.operator, number: leg.routeNumber, mode: leg.mode,
+    const pattern = networkPatterns[leg.networkPattern!], route = networkRoutes[pattern.r];
+    const base = { operator: leg.networkOperator ?? leg.operator, company: operatorInfo(leg.networkOperator ?? leg.operator),
+      routeId: route[0], patternId: pattern.id, stopId: stop, number: leg.routeNumber, mode: leg.mode,
       destination: leg.destinationStop!.name, minutes: leg.realtimeEta?.etaMinutes ?? leg.scheduledDepartureMinutes ?? null,
       status: leg.serviceEnded ? 'NO_UPCOMING' : leg.serviceStatus };
-  }).sort((a,b) => (a.minutes ?? 999) - (b.minutes ?? 999)), meta: { fetchedAt: now.toISOString(), stop: networkStop(stopIndex, locale) } },
+    return leg.liveDepartures?.length ? leg.liveDepartures.map((departure, index) => ({ ...base, ...departure,
+      company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
+      id: `${r.id}:live:${index}`, status: 'LIVE' })) : [{ ...base, id: r.id,
+      time: leg.departureTime ?? (base.minutes === null ? null : new Date(now.getTime() + base.minutes * 60000).toISOString()), scheduleMatch: 'UNVERIFIED' }];
+  }).sort((a,b) => (a.minutes ?? Infinity) - (b.minutes ?? Infinity)), meta: { fetchedAt: now.toISOString(), stop: networkStop(stopIndex, locale) } },
   { headers: { 'Cache-Control': 'no-store' } });
 }

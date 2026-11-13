@@ -1,3 +1,5 @@
+import type { LiveDeparture } from '../data/networkTimetable';
+
 export type Operator = 'KMB' | 'LWB' | 'MTR' | 'CTB' | string;
 export type RouteMode = 'BUS' | 'SUBWAY' | 'WALK' | 'FERRY' | string;
 
@@ -20,6 +22,8 @@ export interface Segment {
   operator: Operator;
   /** Original catalogue identity for display, including joint services. */
   networkOperator?: string;
+  networkRouteId?: string;
+  networkPatternId?: string;
   mode?: RouteMode;
   routeName?: string;
   routeNumber?: string;
@@ -28,6 +32,8 @@ export interface Segment {
   scheduledIntervalMinutes?: number;
   realtimeEtaMinutes?: number;
   realtimeEta?: RealtimeEta | null;
+  /** All upcoming provider predictions at this boarding stop. */
+  liveDepartures?: LiveDeparture[];
   isEtaFresh?: boolean;
   /**
    * The provider serves this route but has no upcoming trip for it, e.g. an
