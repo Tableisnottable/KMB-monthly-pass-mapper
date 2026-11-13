@@ -162,6 +162,10 @@ API route handlers 會代理 upstream calls，令 client 不需知道 upstream U
 - 有 `RATE_LIMITER` binding 時使用 Cloudflare rate limiting / Cloudflare rate limiting is used when the binding is available。
 - Local runtime 沒有 binding 時仍可運行 / local runtime continues without the binding through `src/lib/cloudflare.ts`。
 
+Citybus journey discovery uses a complete route/stop snapshot from the official Citybus API, including airport and local services. Refresh both matching catalogs together with `npm run data:citybus`. The importer checks every referenced stop, retries upstream failures, and refuses to write incomplete or oversized snapshots (maximum 1 MB per generated file). Live arrivals are fetched separately at journey time; a missing ETA does not remove a known Citybus connection. Final journey scores still use the existing weighting formula. Transfers remain the existing bounded KMB search; this is not a complete multimodal routing graph.
+
+Place suggestions also match official Citybus stop names, including when geocoding fails. Airport searches offer the ground transport centre before the aerodrome's polygon centre; the original geocoded landmark remains selectable.
+
 ## API examples / API 使用例子
 
 ### Place search / 地點搜尋

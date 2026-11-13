@@ -72,7 +72,8 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
     function flag(place: PlaceResult, label: string) {
       const p: Leaflet.LatLngTuple = [place.lat, place.lng];
       const text = document.createElement('span'); text.className = 'map-endpoint-flag'; text.textContent = label;
-      L.marker(p, { icon: L.divIcon({ html: text, className: 'map-flag-icon', iconSize: [46, 39], iconAnchor: [23, 39] }), interactive: false }).addTo(routeLayer);
+      const width = locale === 'zh' ? 60 : 46;
+      L.marker(p, { icon: L.divIcon({ html: text, className: 'map-flag-icon', iconSize: [width, 39], iconAnchor: [width / 2, 39] }), interactive: false }).addTo(routeLayer);
       points.push(p);
     }
     if (route) {

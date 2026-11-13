@@ -97,8 +97,9 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const notice = uncovered
     ? copy(locale, (meta?.originUncovered ? '起點' : '目的地') + '附近沒有可規劃的九巴或城巴站點。', 'No supported KMB or Citybus stops were found near your ' + (meta?.originUncovered ? 'origin' : 'destination') + '.')
     : meta?.tooCloseToRide ? copy(locale, '兩個地點很接近，步行即可到達。', 'These places are close enough to walk between.')
-      : allClosed ? copy(locale, '行程有已收班的路段，請留意服務狀態。', 'These options contain ended services. Check service status before travelling.') : null;
-  const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可用路線', 'No journeys found')
+      : allClosed ? copy(locale, '行程有已收班的路段，請留意服務狀態。', 'These options contain ended services. Check service status before travelling.')
+        : searched && routes.length === 0 ? copy(locale, '已選擇兩個地點，但未找到支援的巴士連接。搜尋暫未涵蓋港鐵及所有轉乘組合；可嘗試附近車站。', 'Both places are selected, but no supported bus connection was found. Search does not yet cover MTR or every transfer combination. Try nearby stops.') : null;
+  const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的巴士路線', 'No supported bus journey found')
     : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
 
   const searchPanel = <aside className="planner-sidebar" id="journey">

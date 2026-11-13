@@ -222,17 +222,16 @@ export async function GET(request: NextRequest) {
     // the origin.
     const toStops = nearestStops(stops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
-    // Citybus has no bulk stop-list endpoint (returns an empty object), so
-    // use the static cross-harbour stop catalog (fetched by
-    // scripts/fetch-citybus-stops.mjs) for coordinates, then scan route-stop
-    // sequences to match origin/destination stops in order.
+    // Citybus has no bulk stop-list endpoint. The complete catalog is built
+    // from its official route-stop and individual-stop endpoints by
+    // scripts/fetch-citybus-data.mjs, including airport and local routes.
     const citybusStops = getStaticCitybusStops();
+    const citybusStopById = new Map(citybusStops.map(stop => [stop.stop, stop]));
     const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT_WIDE);
     const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
 
-    // Lantau and the airport are served by LWB and Citybus, neither of which
-    // is in the catalogs we can plan with. Say so instead of returning an
-    // unexplained empty list.
+    // Report genuinely uncovered endpoints separately from a pair of places
+    // that are known but cannot be connected by the supported route search.
     if (fromStops.length === 0 && cityFromStops.length === 0) {
       return NextResponse.json(
         {
@@ -276,8 +275,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch cross-harbour route-stop sequences from the static catalog
-    // (fetched by scripts/fetch-citybus-route-stops.mjs).
+    // Read route topology independently of live ETA availability. Otherwise
+    // missing arrivals can hide routes that serve the selected places.
     const citybusRouteRows = STATIC_CITYBUS_ROUTES.flatMap((routeNum) =>
       (['outbound', 'inbound'] as const).map((bound) => ({
         routeNum,
@@ -296,17 +295,15 @@ export async function GET(request: NextRequest) {
     }[] = [];
     const seenCitybus = new Set<string>();
     const scanCitybusStops = async () => {
-      // For each cross-harbour route, find origin/destination stops in order
-      // using geographic distance from the origin/destination points.
-      let scanCount = 0;
+      // Scan the full catalog before applying a candidate budget, so airport
+      // routes near the end of the catalog cannot be starved by earlier rows.
       for (const result of citybusRouteRows) {
-        if (citybusCandidates.length >= MAX_CANDIDATE_ROUTES) break;
         const { routeNum, bound, rows } = result;
         if (!rows || rows.length === 0) continue;
         const fromMatch: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = (() => {
           let best: { entry: (typeof citybusStops)[number]; index: number; walk: number } | null = null;
           for (const row of rows) {
-            const stop = citybusStops.find((s) => s.stop === row.stop);
+            const stop = citybusStopById.get(row.stop);
             if (!stop) continue;
             const walk = Math.round(haversineKm(fromLat, fromLon, Number(stop.lat), Number(stop.long)) / WALK_KM_PER_MIN);
             if (walk > MAX_WALK_MINUTES) continue;
@@ -320,7 +317,7 @@ export async function GET(request: NextRequest) {
         for (const row of rows) {
           const index = rows.findIndex((r) => r.stop === row.stop);
           if (index <= fromMatch.index) continue;
-          const stop = citybusStops.find((s) => s.stop === row.stop);
+          const stop = citybusStopById.get(row.stop);
           if (!stop) continue;
           const walk = Math.round(haversineKm(toLat, toLon, Number(stop.lat), Number(stop.long)) / WALK_KM_PER_MIN);
           if (walk > MAX_WALK_MINUTES) continue;
@@ -353,6 +350,13 @@ export async function GET(request: NextRequest) {
           toWalk: toMatch.walk,
         });
       }
+      // This bounds live lookups using an estimated journey duration; final
+      // ranking still uses the existing scoring engine and actual live ETAs.
+      citybusCandidates.sort((a, b) =>
+        (a.fromWalk + a.toWalk + estimateRideMinutes(a.fromStop, a.toStop)) -
+        (b.fromWalk + b.toWalk + estimateRideMinutes(b.fromStop, b.toStop)),
+      );
+      citybusCandidates.splice(MAX_CANDIDATE_ROUTES);
     };
 
     const toIds = new Set(toStops.map((s) => s.stop.stop));
@@ -755,7 +759,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Build direct Citybus journey routes for cross-harbour coverage.
+    // Build direct Citybus journeys, including airport and local coverage.
     const citybusEtaResults = await Promise.all(
       citybusCandidates.slice(0, MAX_RESULTS * 2).map(async (candidate) => {
         try {

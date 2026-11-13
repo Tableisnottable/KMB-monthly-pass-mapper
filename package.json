@@ -10,7 +10,8 @@
     "cf:deploy": "opennextjs-cloudflare build && wrangler deploy",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "data:citybus": "node scripts/fetch-citybus-data.mjs"
   },
   "keywords": [],
   "author": "",
