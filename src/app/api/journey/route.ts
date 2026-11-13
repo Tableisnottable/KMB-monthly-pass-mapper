@@ -56,16 +56,25 @@ async function getJourneyKmbRouteStops(
 
 /**
  * Places the walk-only option where it reads best: after the rides that are
- * faster end-to-end, before the ones that are slower.
+ * faster end-to-end, before the ones that are slower. Journeys whose every
+ * leg has finished for the day always sit last, since their score carries an
+ * unbounded-wait penalty that is not comparable to a running service.
  */
-function mergeWalkCandidate<T extends { finalScore: number }>(
+function mergeWalkCandidate<T extends { finalScore: number; legs?: { serviceEnded?: boolean }[] }>(
   routes: T[],
   walk: T | undefined,
 ): T[] {
-  if (!walk) return routes;
-  const insertAt = routes.findIndex((route) => route.finalScore > walk.finalScore);
-  if (insertAt < 0) return [...routes, walk];
-  return [...routes.slice(0, insertAt), walk, ...routes.slice(insertAt)];
+  const isEnded = (route: T) =>
+    (route.legs ?? []).length > 0 && (route.legs ?? []).every((leg) => leg.serviceEnded);
+  const running = routes.filter((route) => !isEnded(route));
+  const ended = routes.filter(isEnded);
+
+  if (walk) {
+    const insertAt = running.findIndex((route) => route.finalScore > walk.finalScore);
+    if (insertAt < 0) running.push(walk);
+    else running.splice(insertAt, 0, walk);
+  }
+  return [...running, ...ended];
 }
 
 // A journey is identified for display purposes by the routes it uses: the
@@ -220,6 +229,52 @@ export async function GET(request: NextRequest) {
     const citybusStops = getStaticCitybusStops();
     const cityFromStops = nearestStops(citybusStops, fromLat, fromLon, NEARBY_STOP_LIMIT_WIDE);
     const cityToStops = nearestStops(citybusStops, toLat, toLon, NEARBY_STOP_LIMIT_WIDE);
+
+    // Lantau and the airport are served by LWB and Citybus, neither of which
+    // is in the catalogs we can plan with. Say so instead of returning an
+    // unexplained empty list.
+    if (fromStops.length === 0 && cityFromStops.length === 0) {
+      return NextResponse.json(
+        {
+          data: [],
+          meta: {
+            source: 'KMB/Citybus route/stop/ETA APIs',
+            live: true,
+            durationMs: Date.now() - journeyStartedAt,
+            candidates: 0,
+            kmbCandidates: 0,
+            citybusCandidates: 0,
+            originUncovered: true,
+            fromStops: [],
+            toStops: [],
+          },
+        },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    if (toStops.length === 0 && cityToStops.length === 0) {
+      return NextResponse.json(
+        {
+          data: [],
+          meta: {
+            source: 'KMB/Citybus route/stop/ETA APIs',
+            live: true,
+            durationMs: Date.now() - journeyStartedAt,
+            candidates: 0,
+            kmbCandidates: 0,
+            citybusCandidates: 0,
+            destinationUncovered: true,
+            fromStops: fromStops.map((s) => ({
+              stop: s.stop.stop,
+              name: s.stop.name_tc || s.stop.name_en,
+              walkMinutes: s.walkMinutes,
+            })),
+            toStops: [],
+          },
+        },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
     // Fetch cross-harbour route-stop sequences from the static catalog
     // (fetched by scripts/fetch-citybus-route-stops.mjs).

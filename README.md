@@ -8,6 +8,14 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 
 ## Product scope / 產品範圍
 
+### Journey workspace / 行程介面
+
+The main page and `/en` now share a responsive journey workspace: origin and destination search, weighted route comparison, an interactive OpenStreetMap map, selectable journey details, a score breakdown and the existing station-arrival lookup. Fields stay empty until the user chooses places. Mobile places the map between the search and route results.
+
+The existing `UpgradedScoringEngine` formula and operator adjustments are unchanged. Displayed journey minutes are separate from weighted scores: they include leg travel time, access/transfer walking and live waiting (or half the estimated headway). A required leg with ended service is clearly marked. Fares, ride times, interchange discounts and monthly-pass coverage remain prototype estimates. Map lines connect supplied stop coordinates schematically; they are not street-level geometry or turn-by-turn navigation. No MTR or ferry routing is claimed by the current KMB/Citybus journey endpoint.
+
+Map tiles use OpenStreetMap with visible attribution. No map API key is required. Place search and official transit upstreams still require network access. The arrivals lookup retains its existing Traditional Chinese interface in both locales.
+
 - 搜尋香港地標、商場、屋苑、街道、地址及車站，不要求預先儲存地點 / Search Hong Kong landmarks, malls, estates, streets, addresses, and stations without requiring saved places.
 - 起點及目的地預設為空白，讓每次 journey 都由使用者主動開始 / Keep origin and destination blank by default so every journey starts with an intentional user search.
 - 使用清晰的 map-first route-planning layout，但不複製 Citymapper branding、code、assets 或 protected content / Use a clear map-first route-planning layout without copying Citymapper branding, code, assets, or protected content.
@@ -29,6 +37,7 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 | `/api/transit` | KMB 及 Citybus routes、stops、ETA proxy / KMB and Citybus route, stop, and ETA proxy |
 | `/api/eta` | Allowlisted ETA lookup / 受 allowlist 限制的 ETA 查詢 |
 | `/api/routes` | Prototype scored-route response / 原型評分路線回應 |
+| `/api/journey` | Coordinate-based KMB/Citybus journey candidates ranked by the existing weighted engine / 使用現有權重引擎排列的九巴及城巴行程 |
 | `/api/traffic` | Traffic information response / 交通資訊回應 |
 | `/api/updates` | Service update response / 服務更新回應 |
 | `/api/sources` | Data-source catalogue / 資料來源清單 |

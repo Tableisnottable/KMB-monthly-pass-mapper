@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { copy, type PlannerLocale } from './plannerUi';
+import { PlannerIcon } from './PlannerIcon';
 
 export interface PlaceResult {
   id: string;
@@ -12,92 +14,92 @@ export interface PlaceResult {
   googleMapsUrl: string;
 }
 
-interface PlaceAutocompleteProps {
+export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect, locale = 'zh' }: {
   label: string;
   value: string;
   colorClass: string;
   onChange: (value: string) => void;
   onSelect?: (place: PlaceResult) => void;
-}
-
-export function PlaceAutocomplete({
-  label,
-  value,
-  colorClass,
-  onChange,
-  onSelect,
-}: PlaceAutocompleteProps) {
+  locale?: PlannerLocale;
+}) {
+  const id = useId();
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [active, setActive] = useState(-1);
+  const selected = useRef<string | null>(null);
 
   useEffect(() => {
     const query = value.trim();
-    if (query.length < 2) {
-      setResults([]);
+    setResults([]);
+    setActive(-1);
+    setError(false);
+    if (query.length < 2 || selected.current === value) {
+      setLoading(false);
       return;
     }
+    const controller = new AbortController();
+    setLoading(true);
     const timer = window.setTimeout(async () => {
-      setLoading(true);
       try {
-        const response = await fetch(`/api/places?q=${encodeURIComponent(query)}`, {
-          cache: 'no-store',
-        });
-        const payload = (await response.json()) as { data?: PlaceResult[] };
-        setResults(payload.data ?? []);
-        setOpen(true);
+        const response = await fetch('/api/places?q=' + encodeURIComponent(query), { signal: controller.signal });
+        if (!response.ok) throw new Error('Place lookup failed');
+        const payload = await response.json() as { data?: PlaceResult[] };
+        if (!controller.signal.aborted) setResults(payload.data ?? []);
       } catch {
-        setResults([]);
-        setOpen(true);
+        if (!controller.signal.aborted) setError(true);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
-    }, 350);
-    return () => window.clearTimeout(timer);
+    }, 400);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [value]);
 
+  function choose(place: PlaceResult) {
+    selected.current = place.name;
+    onChange(place.name);
+    onSelect?.(place);
+    setOpen(false);
+  }
+
   return (
-    <div className="relative flex-1">
-      <label className="flex items-center gap-3 rounded-2xl bg-cm-paper px-4 py-3 ring-1 ring-cm-line">
-        <span className={`flex h-3 w-3 rounded-full ${colorClass}`} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[10px] uppercase tracking-[0.2em] text-cm-muted">{label}</span>
-          <input
-            aria-label={label}
-            className="w-full bg-transparent text-base font-bold outline-none"
-            onChange={(event) => {
-              onChange(event.target.value);
-              setOpen(true);
-            }}
-            onFocus={() => setOpen(results.length > 0)}
-            placeholder="搜尋地點、地址或地標"
-            value={value}
-          />
+    <div className="place-field" onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+    }}>
+      <label className="place-input" htmlFor={id}>
+        <span className={'place-dot ' + colorClass} />
+        <span className="place-text">
+          <span className="field-label">{label}</span>
+          <input id={id} role="combobox" aria-autocomplete="list" aria-expanded={open && value.trim().length >= 2 && selected.current !== value}
+            aria-controls={id + '-list'} aria-activedescendant={active >= 0 ? id + '-' + active : undefined}
+            autoComplete="off" value={value} placeholder={copy(locale, '地點、地址或車站', 'Place, address or station')}
+            onChange={event => { selected.current = null; onChange(event.target.value); setOpen(true); }}
+            onFocus={() => { if (selected.current !== value) setOpen(true); }}
+            onKeyDown={event => {
+              if (event.key === 'Escape') { setOpen(false); return; }
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault(); setOpen(true);
+                setActive(index => results.length ? (index + (event.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length : -1);
+              }
+              if (event.key === 'Enter' && open && active >= 0 && results[active]) {
+                event.preventDefault(); choose(results[active]);
+              }
+            }} />
         </span>
-        {loading && <span className="text-xs text-cm-muted">搜尋中</span>}
       </label>
-      {open && results.length > 0 && (
-        <div className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl bg-white p-1 shadow-pop ring-1 ring-cm-line">
-          {results.map((place) => (
-            <button
-              className="block w-full rounded-xl px-3 py-2 text-left hover:bg-cm-paper"
-              key={place.id}
-              onClick={() => {
-                onChange(place.name);
-                onSelect?.(place);
-                setOpen(false);
-              }}
-              type="button"
-            >
-              <span className="block text-sm font-bold text-cm-ink">{place.name}</span>
-              <span className="block truncate text-xs text-cm-muted">{place.address}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {open && !loading && value.trim().length >= 2 && results.length === 0 && (
-        <div className="absolute inset-x-0 top-full z-30 mt-2 rounded-2xl bg-white p-3 text-xs text-cm-muted shadow-pop ring-1 ring-cm-line">
-          找不到完全相同的名稱，請試輸入街道、商場、屋苑或英文名稱。
+      {value && <button type="button" className="field-clear" aria-label={copy(locale, '清除', 'Clear') + ' ' + label}
+        onClick={() => { selected.current = null; onChange(''); setOpen(false); }}><PlannerIcon name="close" size={14} /></button>}
+      {open && value.trim().length >= 2 && selected.current !== value && (
+        <div className="place-results" id={id + '-list'} role="listbox" aria-label={label}>
+          {loading ? <p role="status">{copy(locale, '正在搜尋地點…', 'Finding places…')}</p>
+            : error ? <p role="status">{copy(locale, '地點搜尋暫時無法使用，請稍後再試。', 'Place search is unavailable. Please try again shortly.')}</p>
+            : results.length === 0 ? <p>{copy(locale, '找不到地點，請試另一個名稱。', 'No places found. Try another name.')}</p>
+            : results.map((place, index) => <button type="button" role="option" aria-selected={active === index}
+              id={id + '-' + index} key={place.id} className={active === index ? 'active' : ''}
+              onMouseDown={event => event.preventDefault()} onClick={() => choose(place)}>
+              <PlannerIcon name="pin" size={18} /><span><strong>{place.name}</strong><small>{place.address}</small></span>
+            </button>)}
         </div>
       )}
     </div>
