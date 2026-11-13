@@ -79,8 +79,8 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
         const a = point(leg.originStop?.lat, leg.originStop?.lng);
         const b = point(leg.destinationStop?.lat, leg.destinationStop?.lng);
         if (!a || !b) return;
-        mark(a, leg.originStop?.name ?? '', routeColor(legOperator(leg)));
-        mark(b, leg.destinationStop?.name ?? '', routeColor(legOperator(leg)));
+        mark(a, leg.originStop?.name ?? '', routeColor(legOperator(leg), leg.routeNumber));
+        mark(b, leg.destinationStop?.name ?? '', routeColor(legOperator(leg), leg.routeNumber));
       });
     }
     if (origin) flag(origin, copy(locale, '起點', 'Start'));
@@ -107,7 +107,7 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
       for (const piece of payload.pieces) {
         if (piece.source === 'UNAVAILABLE') continue;
         const leg = route!.legs[piece.legIndex];
-        const color = piece.walk ? '#72827d' : routeColor(leg ? legOperator(leg) : '');
+        const color = piece.walk ? '#72827d' : routeColor(leg ? legOperator(leg) : '', leg?.routeNumber);
         for (const path of piece.paths) {
           if (path.length < 2 || path.some(p => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) continue;
           L.polyline(path, { color: '#fff', weight: piece.walk ? 6 : 9, opacity: .9, interactive: false }).addTo(routeLayer);

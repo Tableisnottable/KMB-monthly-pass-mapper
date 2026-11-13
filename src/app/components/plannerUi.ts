@@ -1,4 +1,5 @@
 import type { ScoredRoute, Segment } from '../../engine/UpgradedScoringEngine';
+export { routeColor, routeIconColor, routeBadgeStyle, routeSignColours } from './routeColours';
 
 export type PlannerLocale = 'zh' | 'en';
 export type JourneyField = 'origin' | 'destination';
@@ -21,30 +22,9 @@ export function hasEndedService(route: ScoredRoute): boolean {
   return route.legs.some(leg => leg.serviceEnded);
 }
 
-/** Shared display colours, including every operator in the imported catalogue. */
-export const operatorColors: Readonly<Record<string, string>> = {
-  KMB: '#e62232', CTB: '#f7b500', LWB: '#ef8528', 'KMB+CTB': '#7950a1', 'LWB+CTB': '#ae651a',
-  NLB: '#317dc1', LRTFeeder: '#ae1734', DB: '#22797a', PI: '#71509c', XB: '#4c617a',
-  MTR: '#ae1734', LRT: '#bf7c22', GMB: '#21835b', FERRY: '#187fbb', TRAM: '#19867a',
-  PTRAM: '#8d3069', WALK: '#9b9b9b',
-};
-
-export function routeColor(operator: string): string {
-  return operatorColors[operator] ?? '#656565';
-}
-
 /** Keep the catalogue identity for joint services without changing scoring operators. */
 export function legOperator(leg: Pick<Segment, 'operator' | 'networkOperator'>): string {
   return leg.networkOperator ?? leg.operator;
-}
-
-export function routeIconColor(operator: string): string {
-  const hex = routeColor(operator).slice(1);
-  const luminance = [0.2126, 0.7152, 0.0722].reduce((sum, weight, i) => {
-    const channel = parseInt(hex.slice(i * 2, i * 2 + 2), 16) / 255;
-    return sum + weight * (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
-  }, 0);
-  return luminance > 0.179 ? '#17212b' : '#ffffff';
 }
 
 export function modeIcon(mode?: string): string {

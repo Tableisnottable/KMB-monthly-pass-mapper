@@ -7,15 +7,15 @@ import { JourneyMap } from './JourneyMap';
 import { PlannerIcon } from './PlannerIcon';
 import { RouteDetails } from './RouteDetails';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
-import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, modeIcon, modeLabel, routeColor, routeIconColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, modeIcon, modeLabel, routeBadgeStyle, routeSignColours, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { combinedLegChoices, groupDurationLabel, groupFareLabel, groupJourneysByStops, type JourneyGroup, type JourneySort } from './journeyGroups';
 
 function RouteSymbols({ route, locale, choices, compact = false }: { route: ScoredRoute; locale: PlannerLocale; choices?: TransitLeg[][]; compact?: boolean }) {
   return <span className="route-symbols">{(choices ?? route.legs.map(leg => [leg])).map((legs, index) => <span className="leg-symbol-group" key={index}>
     {index > 0 && <span className="leg-separator">·</span>}
     {(compact ? legs.slice(0, 6) : legs).map((leg, option) => <span className="leg-route-choice" key={option}>{option > 0 && <span className="leg-alternative-divider">/</span>}
-    {leg.mode === 'WALK' ? <PlannerIcon name="walk" size={21} /> : <span className="route-badge" title={legOperator(leg) + ' · ' + leg.routeNumber} style={{ color: routeColor(legOperator(leg)) }}>
-      <span className="route-badge-icon" style={{ backgroundColor: routeColor(legOperator(leg)), color: routeIconColor(legOperator(leg)) }}><PlannerIcon name={modeIcon(leg.mode)} size={18} /></span>
+    {leg.mode === 'WALK' ? <PlannerIcon name="walk" size={21} /> : <span className="route-badge route-stop-plate" title={legOperator(leg) + ' · ' + leg.routeNumber + (routeSignColours(legOperator(leg), leg.routeNumber).verified ? '' : ' · ' + copy(locale, '站牌顏色未核實', 'Stop-plate colour not verified'))} style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}>
+      <span className="route-badge-icon"><PlannerIcon name={modeIcon(leg.mode)} size={18} /></span>
       <strong>{leg.routeNumber || modeLabel(leg.mode, locale)}</strong>
     </span>}</span>)}{compact && legs.length > 6 && <small className="combined-more-services">+{legs.length - 6}</small>}
   </span>)}</span>;

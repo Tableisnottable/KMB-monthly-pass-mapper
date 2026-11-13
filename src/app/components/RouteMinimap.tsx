@@ -16,10 +16,10 @@ export function RouteMinimap({ route }: { route: ScoredRoute }) {
     const stops = route.legs.flatMap((leg, index) => {
       const list = [];
       if (index === 0 && leg.originStop) {
-        list.push({ stop: leg.originStop, color: routeColor(legOperator(leg)) });
+        list.push({ stop: leg.originStop, color: routeColor(legOperator(leg), leg.routeNumber) });
       }
       if (leg.destinationStop) {
-        list.push({ stop: leg.destinationStop, color: routeColor(legOperator(leg)) });
+        list.push({ stop: leg.destinationStop, color: routeColor(legOperator(leg), leg.routeNumber) });
       }
       return list;
     });

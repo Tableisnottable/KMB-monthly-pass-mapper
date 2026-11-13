@@ -182,6 +182,9 @@ button {
 .route-badge { display: inline-flex; align-items: center; border: 1px solid #e3e3e3; border-radius: 3px; overflow: hidden; line-height: 22px; min-height: 24px; }
 .route-badge-icon { display: grid; place-items: center; color: #fff; width: 24px; height: 24px; flex-shrink: 0; }
 .route-badge strong { font-size: 14px; font-weight: 800; padding: 0 5px; color: #696969; white-space: nowrap; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
+.route-stop-plate { border-color: #0003; }
+.route-stop-plate strong, .route-stop-plate .route-badge-icon { color: inherit; }
+.route-stop-plate .route-badge-icon { border-right: 1px solid #0002; }
 .route-option-price { font-size: 14px; font-weight: 800; color: var(--green); white-space: nowrap; margin-left: auto; }
 .route-duration { position: relative; min-width: 38px; text-align: right; color: var(--text); font-size: 23px; font-weight: 800; line-height: 23px; }
 .route-duration > svg { position: absolute; top: 0; left: -13px; color: #e6d443; }
@@ -214,7 +217,7 @@ button {
 .directions-list li { display: flex; gap: 11px; padding: 21px 0; border-bottom: 1px solid #eee; }
 .directions-list li:last-child { border-bottom: 0; }
 .step-marker { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; color: #999; }
-.step-operator-marker { border-radius: 4px; }
+.step-operator-marker { border: 1px solid #0003; border-radius: 4px; }
 .directions-list strong { display: block; font-size: 15px; font-weight: 700; }
 .directions-list small { display: block; font-size: 13px; line-height: 1.65; margin-top: 8px; color: #888; }
 .transfer-note { color: #aa893a !important; }
