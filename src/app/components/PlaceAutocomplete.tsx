@@ -14,12 +14,14 @@ export interface PlaceResult {
   googleMapsUrl: string;
 }
 
-export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect, locale = 'zh' }: {
+export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect, onFocus, selectedPlace, locale = 'zh' }: {
   label: string;
   value: string;
   colorClass: string;
   onChange: (value: string) => void;
   onSelect?: (place: PlaceResult) => void;
+  onFocus?: () => void;
+  selectedPlace?: PlaceResult | null;
   locale?: PlannerLocale;
 }) {
   const id = useId();
@@ -35,7 +37,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
     setResults([]);
     setActive(-1);
     setError(false);
-    if (query.length < 2 || selected.current === value) {
+    if (query.length < 2 || selected.current === value || selectedPlace?.name === value) {
       setLoading(false);
       return;
     }
@@ -46,7 +48,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
         const response = await fetch('/api/places?q=' + encodeURIComponent(query), { signal: controller.signal });
         if (!response.ok) throw new Error('Place lookup failed');
         const payload = await response.json() as { data?: PlaceResult[] };
-        if (!controller.signal.aborted) setResults(payload.data ?? []);
+        if (!controller.signal.aborted) { setResults(payload.data ?? []); setActive(payload.data?.length ? 0 : -1); }
       } catch {
         if (!controller.signal.aborted) setError(true);
       } finally {
@@ -54,7 +56,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
       }
     }, 400);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [value]);
+  }, [value, selectedPlace]);
 
   function choose(place: PlaceResult) {
     selected.current = place.name;
@@ -68,14 +70,13 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
       if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
     }}>
       <label className="place-input" htmlFor={id}>
-        <span className={'place-dot ' + colorClass} />
+        <span className={'field-label ' + colorClass}>{label}</span>
         <span className="place-text">
-          <span className="field-label">{label}</span>
-          <input id={id} role="combobox" aria-autocomplete="list" aria-expanded={open && value.trim().length >= 2 && selected.current !== value}
-            aria-controls={id + '-list'} aria-activedescendant={active >= 0 ? id + '-' + active : undefined}
-            autoComplete="off" value={value} placeholder={copy(locale, '地點、地址或車站', 'Place, address or station')}
+          <input id={id} aria-label={label} role="combobox" aria-autocomplete="list" aria-expanded={open && value.trim().length >= 2 && selected.current !== value && selectedPlace?.name !== value}
+            aria-controls={id + '-list'} aria-activedescendant={open && results[active] && selected.current !== value && selectedPlace?.name !== value ? id + '-' + active : undefined}
+            autoComplete="off" value={value}
             onChange={event => { selected.current = null; onChange(event.target.value); setOpen(true); }}
-            onFocus={() => { if (selected.current !== value) setOpen(true); }}
+            onFocus={() => { onFocus?.(); if (selected.current !== value && selectedPlace?.name !== value) setOpen(true); }}
             onKeyDown={event => {
               if (event.key === 'Escape') { setOpen(false); return; }
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -90,7 +91,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
       </label>
       {value && <button type="button" className="field-clear" aria-label={copy(locale, '清除', 'Clear') + ' ' + label}
         onClick={() => { selected.current = null; onChange(''); setOpen(false); }}><PlannerIcon name="close" size={14} /></button>}
-      {open && value.trim().length >= 2 && selected.current !== value && (
+      {open && value.trim().length >= 2 && selected.current !== value && selectedPlace?.name !== value && (
         <div className="place-results" id={id + '-list'} role="listbox" aria-label={label}>
           {loading ? <p role="status">{copy(locale, '正在搜尋地點…', 'Finding places…')}</p>
             : error ? <p role="status">{copy(locale, '地點搜尋暫時無法使用，請稍後再試。', 'Place search is unavailable. Please try again shortly.')}</p>

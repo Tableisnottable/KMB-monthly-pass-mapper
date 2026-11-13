@@ -10,7 +10,9 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 
 ### Journey workspace / 行程介面
 
-The main page and `/en` now share a responsive journey workspace: origin and destination search, weighted route comparison, an interactive OpenStreetMap map, selectable journey details, a score breakdown and the existing station-arrival lookup. Fields stay empty until the user chooses places. Mobile places the map between the search and route results.
+The main page and `/en` share a Citymapper-style web workspace: a green search/results sidebar, an edge-to-edge interactive map, compact journey rows, and a full journey detail view. Start and End stay empty until the user chooses places, and planning starts automatically once both are selected. Locations can also be picked on the map. Mobile uses Show Map / Back to journeys controls. The interface retains the independent Transit Compass identity, original artwork, system fonts and OpenStreetMap tiles; it does not use Citymapper's proprietary assets, map service or backend.
+
+The planner currently supports leaving now. Arrive/Leave scheduling, switching cities, cycling and taxi routing are visibly disabled rather than presenting unsupported results. The menu contains the existing station-arrival lookup, traffic/update links and weighting explanation. Journey details retain the score breakdown and monthly-pass estimate.
 
 The existing `UpgradedScoringEngine` formula and operator adjustments are unchanged. Displayed journey minutes are separate from weighted scores: they include leg travel time, access/transfer walking and live waiting (or half the estimated headway). A required leg with ended service is clearly marked. Fares, ride times, interchange discounts and monthly-pass coverage remain prototype estimates. Map lines connect supplied stop coordinates schematically; they are not street-level geometry or turn-by-turn navigation. No MTR or ferry routing is claimed by the current KMB/Citybus journey endpoint.
 

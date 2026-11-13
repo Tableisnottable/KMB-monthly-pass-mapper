@@ -1,6 +1,12 @@
 import type { CSSProperties } from 'react';
 
 const paths: Record<string, React.ReactNode> = {
+  menu: <path d="M4 6h16M4 12h16M4 18h16"/>,
+  monitor: <><rect x="3" y="3" width="18" height="13" rx="1"/><path d="M12 16v5m-5 0h10"/></>,
+  back: <path d="m14 5-7 7 7 7"/>,
+  cycle: <><circle cx="5" cy="17" r="4"/><circle cx="19" cy="17" r="4"/><path d="m5 17 5-9 4 9H5m6-13h3l5 13M8 8h4"/></>,
+  car: <><path d="m4 10 2-6h12l2 6M3 10h18v9H3zM5 19v2m14-2v2M6 14h2m8 0h2"/></>,
+  signal: <><path d="M4 13a9 9 0 0 1 9-9M4 18A14 14 0 0 1 18 4M9 13a4 4 0 0 1 4-4"/><circle cx="13" cy="13" r="1" fill="currentColor"/></>,
   compass: <><circle cx="12" cy="12" r="9"/><path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8Z"/></>,
   arrow: <><path d="M5 12h14m-6-6 6 6-6 6"/></>,
   swap: <><path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4"/></>,

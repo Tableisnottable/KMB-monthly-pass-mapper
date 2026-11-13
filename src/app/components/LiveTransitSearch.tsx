@@ -267,7 +267,7 @@ export function LiveTransitSearch() {
       </div>
       <p className="mt-2 text-xs text-cm-muted">
         只想查看某個車站有哪些路線、下一班幾時到？在這裡輸入車站名稱即可。
-        要規劃整個行程，請用下方的「帶我去目的地」。
+        要規劃整個行程，請關閉此視窗並填寫行程起點及目的地。
       </p>
       {stops.length > 0 && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">

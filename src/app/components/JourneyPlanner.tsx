@@ -6,8 +6,9 @@ import type { PlaceResult } from './PlaceAutocomplete';
 import { JourneyPlaceSearch } from './JourneyPlaceSearch';
 import { PlannerBoard } from './PlannerBoard';
 import { PlannerIcon } from './PlannerIcon';
+import { HongKongArtwork } from './HongKongArtwork';
 import { LiveTransitSearch } from './LiveTransitSearch';
-import { copy, type PlannerLocale } from './plannerUi';
+import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
 
 interface JourneyMeta {
   source?: string;
@@ -26,14 +27,16 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [meta, setMeta] = useState<JourneyMeta | null>(null);
   const [searched, setSearched] = useState(false);
   const [arrivalsOpen, setArrivalsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [places, setPlaces] = useState<JourneyLocations>({ origin: null, destination: null });
+  const [activeField, setActiveField] = useState<JourneyField>('origin');
   const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult } | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   const arrivalsDialog = useRef<HTMLDialogElement>(null);
+  const menuDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => () => activeSearch.current?.abort(), []);
-  useEffect(() => {
-    if (arrivalsOpen) arrivalsDialog.current?.showModal();
-    else arrivalsDialog.current?.close();
-  }, [arrivalsOpen]);
+  useEffect(() => { if (menuOpen) menuDialog.current?.showModal(); else menuDialog.current?.close(); }, [menuOpen]);
+  useEffect(() => { if (arrivalsOpen) arrivalsDialog.current?.showModal(); else arrivalsDialog.current?.close(); }, [arrivalsOpen]);
 
   function resetJourney() {
     activeSearch.current?.abort(); activeSearch.current = null;
@@ -65,41 +68,75 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     }
   }
 
+  function selectPlace(field: JourneyField, place: PlaceResult) {
+    resetJourney();
+    const next = { ...places, [field]: place };
+    setPlaces(next);
+    if (field === 'origin') setActiveField('destination');
+    if (next.origin && next.destination) void handleSearch(next.origin, next.destination);
+  }
+
+  function editPlace(field: JourneyField) {
+    resetJourney(); setPlaces(current => ({ ...current, [field]: null })); setActiveField(field);
+  }
+
+  function swap() {
+    resetJourney();
+    const next = { origin: places.destination, destination: places.origin };
+    setPlaces(next);
+    if (next.origin && next.destination) void handleSearch(next.origin, next.destination);
+  }
+
+  function pickMapPoint(lat: number, lng: number) {
+    const name = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    selectPlace(activeField, { id: 'map-' + name, name, address: copy(locale, '地圖所選位置', 'Selected map location'), lat, lng, type: 'map', googleMapsUrl: '' });
+  }
+
   const uncovered = meta?.originUncovered || meta?.destinationUncovered;
   const allClosed = routes.length > 0 && routes.every(route => route.legs.some(leg => leg.serviceEnded));
   const notice = uncovered
-    ? copy(locale, (meta?.originUncovered ? '起點' : '目的地') + '附近沒有可規劃的九巴或城巴站點，這一帶暫不在路線涵蓋範圍。', 'No supported KMB or Citybus stops were found near your ' + (meta?.originUncovered ? 'origin' : 'destination') + '. This area is outside current planning coverage.')
-    : meta?.tooCloseToRide
-      ? copy(locale, '兩個地點很接近，步行即可到達。', 'These places are close enough to walk between.')
-      : allClosed ? copy(locale, '每個行程都有已收班的路段，請留意下方服務狀態。', 'Every option has an ended service. Check service status before travelling.') : null;
-  const emptyHint = searching ? copy(locale, '正在尋找你的路線…', 'Finding your way…') : searched ? copy(locale, '未找到可用路線', 'No routes found') : undefined;
+    ? copy(locale, (meta?.originUncovered ? '起點' : '目的地') + '附近沒有可規劃的九巴或城巴站點。', 'No supported KMB or Citybus stops were found near your ' + (meta?.originUncovered ? 'origin' : 'destination') + '.')
+    : meta?.tooCloseToRide ? copy(locale, '兩個地點很接近，步行即可到達。', 'These places are close enough to walk between.')
+      : allClosed ? copy(locale, '行程有已收班的路段，請留意服務狀態。', 'These options contain ended services. Check service status before travelling.') : null;
+  const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可用路線', 'No journeys found')
+    : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
+
+  const searchPanel = <aside className="planner-sidebar" id="journey">
+    <div className="city-banner"><HongKongArtwork /><div><h1>Hong Kong</h1><button type="button" className="city-switch" disabled title={copy(locale, '目前提供香港路線規劃', 'Journey planning currently covers Hong Kong')}>{copy(locale, '切換城市', 'Switch City')}</button></div></div>
+    <JourneyPlaceSearch places={places} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}
+      onSwap={swap} onSearch={() => { if (places.origin && places.destination) void handleSearch(places.origin, places.destination); }}
+      searching={searching} locale={locale} />
+    {error && <p className="planner-notice notice-error" role="alert">{error}</p>}
+    {notice && <p className="planner-notice notice-warning" role="status">{notice}</p>}
+  </aside>;
 
   return <main className="compass-app" lang={locale === 'en' ? 'en' : 'zh-HK'}>
+    <a className="planner-skip-link" href="#journey">{copy(locale, '跳至行程規劃', 'Skip to journey planner')}</a>
     <header className="app-header">
-      <a className="app-brand" href={locale === 'en' ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="compass" size={25} /></span><span>transit<span className="brand-light">compass</span><small>HONG KONG</small></span></a>
-      <nav className="desktop-nav" aria-label={copy(locale, '主選單', 'Main navigation')}><a href="#journey" className="nav-active">{copy(locale, '規劃行程', 'Journey planner')}</a><button type="button" onClick={() => setArrivalsOpen(true)}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href="/traffic">{copy(locale, '交通消息', 'Service alerts')}</a></nav>
-      <div className="header-right"><span className="header-region"><span />HONG KONG</span><a className="language-button" href={locale === 'en' ? '/' : '/en'}>{locale === 'en' ? '繁中' : 'EN'}</a></div>
+      <div className="header-brand-group">
+        <button type="button" className="header-menu-button" onClick={() => setMenuOpen(true)} aria-label={copy(locale, '開啟選單', 'Open menu')}><PlannerIcon name="menu" size={24} /></button>
+        <a className="app-brand" href={locale === 'en' ? '/en' : '/'} aria-label="Transit Compass HK"><span className="brand-symbol"><PlannerIcon name="arrow" size={20} /></span><span>Transit Compass</span></a>
+      </div>
+      <nav className="header-actions" aria-label={copy(locale, '主選單', 'Main navigation')}>
+        <a href={locale === 'en' ? '/' : '/en'} className="language-button" aria-label={locale === 'en' ? '繁體中文' : 'English'}>{locale === 'en' ? '中' : 'EN'}</a>
+        <button type="button" onClick={() => setArrivalsOpen(true)} aria-label={copy(locale, '到站時間', 'Live arrivals')} title={copy(locale, '到站時間', 'Live arrivals')}><PlannerIcon name="clock" size={21} /></button>
+        <a className="get-somewhere" href={locale === 'en' ? '/en' : '/'}><PlannerIcon name="monitor" size={23} /><span>{copy(locale, '帶我去目的地', 'Get Me Somewhere')}</span></a>
+      </nav>
     </header>
-    <div className="workspace-topline"><span><PlannerIcon name="pin" size={14} />{copy(locale, '香港出行，從這裡開始。', 'The city is yours. Let’s find your way.')}</span><span>{copy(locale, '九巴 · 城巴 · 步行', 'KMB · Citybus · Walking')}</span></div>
-    <div className="planner-workspace">
-      <aside className="planner-sidebar" id="journey">
-        <div className="search-intro"><span className="section-overline">{copy(locale, '由這一程開始', 'A GOOD DAY STARTS HERE')}</span><h1>{copy(locale, '下一站，去邊度？', 'Where are we going?')}</h1><p>{copy(locale, '比較路線，找到最適合你的一程。', 'A smarter way from here to there.')}</p></div>
-        <JourneyPlaceSearch onSearch={handleSearch} onEdit={resetJourney} searching={searching} locale={locale} />
-        <details className="weight-method"><summary><PlannerIcon name="layers" size={15} />{copy(locale, '使用現有權重評分', 'Your weighted route ranking')}<PlannerIcon name="chevron" size={13} /></summary><div>
-          <p>{copy(locale, '總分 = 路段時間 + 候車成本 + 營辦商調整 + 步行 + 轉乘調整。分數越低越優先。', 'Score = travel time + waiting cost + operator adjustments + walking + transfer adjustments. Lower scores rank first.')}</p>
-          <p>{copy(locale, '每次轉乘 +8；時段倍率：繁忙 1.0、非繁忙 1.3、深夜 1.8。', 'Each transfer adds 8. Waiting multipliers: peak 1.0, off-peak 1.3, overnight 1.8.')}</p>
-          <p>KMB −1 · LWB −0.46 · MTR +0.5 · CTB +1</p>
-        </div></details>
-        {searching && <p className="planner-notice" role="status"><span className="planner-spinner" />{copy(locale, '正在查詢官方站點及班次…', 'Checking official stops and services…')}</p>}
-        {error && <p className="planner-notice notice-error" role="alert">{error}</p>}
-        {notice && <p className="planner-notice notice-warning" role="status">{notice}</p>}
-        {searched && meta && routes.length > 0 && <p className="search-data-note">{copy(locale, '官方路線及 ETA · 車程及票價為估算', 'Official routes & ETA · travel time and fare estimated')}{typeof meta.durationMs === 'number' ? ' · ' + (meta.durationMs / 1000).toFixed(1) + 's' : ''}</p>}
-      </aside>
-      <PlannerBoard routes={routes} emptyHint={emptyHint} endpoints={endpoints} locale={locale} />
-    </div>
-    <footer className="app-footer"><span>TRANSIT COMPASS HK <span className="footer-dot">·</span> {copy(locale, '你的城市，你的方向。', 'Your city. Your way.')}</span><div><button type="button" onClick={() => setArrivalsOpen(true)}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href="/updates">{copy(locale, '路線更新', 'Route updates')}</a><a href="/traffic">{copy(locale, '交通消息', 'Service alerts')}</a><a href="/api/sources">{copy(locale, '資料來源', 'Data sources')}</a><span>{copy(locale, '獨立交通規劃原型', 'Independent transit prototype')}</span></div></footer>
+    <PlannerBoard routes={routes} searchPanel={searchPanel} emptyHint={emptyHint} endpoints={endpoints}
+      places={places} onMapPick={pickMapPoint} locale={locale} />
+    <dialog className="menu-dialog" ref={menuDialog} onCancel={() => setMenuOpen(false)} onClose={() => setMenuOpen(false)}>
+      <div className="dialog-heading"><strong>Transit Compass HK</strong><button type="button" onClick={() => setMenuOpen(false)} aria-label={copy(locale, '關閉選單', 'Close menu')}><PlannerIcon name="close" size={22} /></button></div>
+      <nav aria-label={copy(locale, '更多選項', 'More options')}><a href={locale === 'en' ? '/en' : '/'}>{copy(locale, '規劃行程', 'Get Me Somewhere')}</a><button type="button" onClick={() => { setMenuOpen(false); setArrivalsOpen(true); }}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href="/traffic">{copy(locale, '交通消息', 'Service alerts')}</a><a href="/updates">{copy(locale, '路線更新', 'Route updates')}</a><a href={locale === 'en' ? '/' : '/en'}>{locale === 'en' ? '繁體中文' : 'English'}</a></nav>
+      <details className="weight-method"><summary>{copy(locale, '路線權重', 'Route weighting')}<PlannerIcon name="chevron" size={14} /></summary>
+        <p>{copy(locale, '使用原有權重公式，分數越低越優先。', 'Your original weighted formula is unchanged. Lower scores rank first.')}</p>
+        <p>{copy(locale, '每次轉乘 +8；候車倍率：繁忙 1.0、非繁忙 1.3、深夜 1.8。', 'Each transfer adds 8. Waiting multipliers: peak 1.0, off-peak 1.3, overnight 1.8.')}</p>
+        <p>KMB −1 · LWB −0.46 · MTR +0.5 · CTB +1</p>
+      </details>
+      <div className="menu-footnote"><a href="/api/sources">{copy(locale, '資料來源及鳴謝', 'Data sources & attribution')}</a><p>{copy(locale, '獨立交通規劃原型。九巴、城巴及步行。車程及票價為估算。', 'Independent transit prototype. KMB, Citybus and walking. Journey times and fares are estimates.')}</p></div>
+    </dialog>
     <dialog className="arrivals-dialog" ref={arrivalsDialog} onCancel={() => setArrivalsOpen(false)} onClose={() => setArrivalsOpen(false)}>
-      <div className="dialog-heading"><div><span className="section-overline">LIVE ARRIVALS</span><h2>{copy(locale, '查詢車站到站時間', 'Station arrivals')}</h2></div><button className="map-tool" type="button" onClick={() => setArrivalsOpen(false)} aria-label={copy(locale, '關閉到站時間', 'Close arrivals')}><PlannerIcon name="close" size={20} /></button></div><LiveTransitSearch />
+      <div className="dialog-heading"><h2>{copy(locale, '查詢車站到站時間', 'Station arrivals')}</h2><button type="button" onClick={() => setArrivalsOpen(false)} aria-label={copy(locale, '關閉到站時間', 'Close arrivals')}><PlannerIcon name="close" size={22} /></button></div><LiveTransitSearch />
     </dialog>
   </main>;
 }

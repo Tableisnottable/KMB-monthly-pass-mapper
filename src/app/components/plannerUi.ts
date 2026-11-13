@@ -1,6 +1,8 @@
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 
 export type PlannerLocale = 'zh' | 'en';
+export type JourneyField = 'origin' | 'destination';
+export type JourneyLocations = Record<JourneyField, import('./PlaceAutocomplete').PlaceResult | null>;
 export const copy = (locale: PlannerLocale, zh: string, en: string) => locale === 'en' ? en : zh;
 
 export function journeyMinutes(route: ScoredRoute): number {
@@ -19,5 +21,5 @@ export function hasEndedService(route: ScoredRoute): boolean {
 }
 
 export function routeColor(operator: string): string {
-  return ({ KMB: '#4265ce', CTB: '#b47118', LWB: '#bc582e', MTR: '#a94471', WALK: '#72827d' } as Record<string, string>)[operator] ?? '#536a78';
+  return ({ KMB: '#e62232', CTB: '#14933f', LWB: '#ef8528', MTR: '#ae1734', WALK: '#9b9b9b' } as Record<string, string>)[operator] ?? '#656565';
 }
