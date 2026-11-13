@@ -245,6 +245,10 @@ button {
 .timetable-route-list .route-badge { flex-shrink: 0; }
 .timetable-note, .timetable-count { font-size: 12px; color: #666; }
 .timetable-note a { color: var(--green); text-decoration: underline; }
+.residents-document-link { color: var(--green); text-decoration: underline; font-weight: 700; }
+.residents-documents { padding: 18px; border: 1px solid #ddd; background: #f5f8f3; border-radius: 5px; margin-top: 16px; }
+.residents-documents a { display: inline-block; margin: 4px 20px 4px 0; color: var(--green); text-decoration: underline; font-weight: 700; }
+.timetable-panel input:disabled { color: #666; background: #f5f5f5; cursor: not-allowed; }
 .timetable-table { width: 100%; text-align: left; font-size: 14px; border-collapse: collapse; }
 .timetable-table th, .timetable-table td { border-bottom: 1px solid #e5e5e5; padding: 12px 8px; vertical-align: top; }
 .timetable-table th { background: #f3f5f1; font-size: 12px; }

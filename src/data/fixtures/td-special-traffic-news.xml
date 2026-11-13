@@ -1,0 +1,310 @@
+<?xml version='1.0' encoding='utf-8'?>
+<body xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xsi:schemaLocation='http://data.one.gov.hk/td http://data.one.gov.hk/xsd/td/specialtrafficnews.xsd' xmlns='http://data.one.gov.hk/td'>
+<message>
+<msgID>281122</msgID>
+<CurrentStatus>2</CurrentStatus>
+<ChinText>因緊急路面維修，東區走廊(往柴灣方向)近北角碼頭的快線現已封閉。
+駕駛人士只可使用餘下行車線行車。</ChinText>
+<ChinShort>因緊急路面維修，東區走廊(往柴灣方向)近北角碼頭的快線現已封閉。
+駕駛人士只可使用餘下行車線行車。</ChinShort>
+<EngText>Due to emergency repair of road surface, the fast lane of Island Eastern Corridor (Chai Wan bound) near North Point Ferry Pier is closed to all traffic.
+Only remaining lanes are available to motorists. </EngText>
+<EngShort>Due to emergency repair of road surface, the fast lane of Island Eastern Corridor (Chai Wan bound) near North Point Ferry Pier is closed to all traffic.
+Only remaining lanes are available to motorists. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>281117</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>因火警，坪輋路(來回方向)近香港浸信會聯會浸會園的全線現已封閉。
+受影響九巴第79K號線須改道行駛。有關個別巴士路線的最新服務情況，市民可參閱巴士公司的網頁或流動應用程式內的資訊。</ChinText>
+<ChinShort>因火警，坪輋路(來回方向)近香港浸信會聯會浸會園的全線現已封閉。
+受影響九巴第79K號線須改道行駛。有關個別巴士路線的最新服務情況，市民可參閱巴士公司的網頁或流動應用程式內的資訊。</ChinShort>
+<EngText>Due to fire, all lanes of Ping Che Road (both bounds) near The Baptist Convention of H.K. Baptist Assembly are closed to all traffic.
+Affected KMB route no. 79K has been diverted. For the latest service arrangement of individual bus route, members of the public can refer to the information on the bus company&#039;s website or mobile application. </EngText>
+<EngShort>Due to fire, all lanes of Ping Che Road (both bounds) near The Baptist Convention of H.K. Baptist Assembly are closed to all traffic.
+Affected KMB route no. 79K has been diverted. For the latest service arrangement of individual bus route, members of the public can refer to the information on the bus company&#039;s website or mobile application. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>281112</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>因水管緊急維修，葵昌路近東海工業大廈的部份行車線現已封閉。
+駕駛人士只可使用餘下行車線行車。</ChinText>
+<ChinShort>因水管緊急維修，葵昌路近東海工業大廈的部份行車線現已封閉。
+駕駛人士只可使用餘下行車線行車。</ChinShort>
+<EngText>Due to watermain emergency works , part of the lanes of Kwai Cheong Road near Eastern Sea Industrial Building is closed to all traffic.
+Only remaining lane is available to motorists. </EngText>
+<EngShort>Due to watermain emergency works , part of the lanes of Kwai Cheong Road near Eastern Sea Industrial Building is closed to all traffic.
+Only remaining lane is available to motorists. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>280942</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>因水管緊急維修，由青田路(往屯門公路方向)通往震寰路 的支路 的慢線現已封閉。
+駕駛人士只可使用餘下行車線行車。
+現時上址交通繁忙。</ChinText>
+<ChinShort>因水管緊急維修，由青田路(往屯門公路方向)通往震寰路 的支路 的慢線現已封閉。
+駕駛人士只可使用餘下行車線行車。
+現時上址交通繁忙。</ChinShort>
+<EngText>Due to watermain emergency works , the slow lane of the slip road leading from Tsing Tin Road (Tuen Mun Road bound) to Tsun Wen Road is closed to all traffic.
+Only remaining lane is available to motorists.
+Traffic is busy now. </EngText>
+<EngShort>Due to watermain emergency works , the slow lane of the slip road leading from Tsing Tin Road (Tuen Mun Road bound) to Tsun Wen Road is closed to all traffic.
+Only remaining lane is available to motorists.
+Traffic is busy now. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>279842</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>公眾人士請留意，和合石墳場內及附近一帶路道（包括大窩西支路、華明路、和興路及百和路等）的交通預計在重陽明節特別交通安排完結後的週末將會較為繁忙，警方會視乎實際情況在上述道路實施臨時交通管制措施。駕駛人士請留意傳媒發放的最新交通消息。如遇交通受阻，駕駛人士請保持忍讓，並遵從警方的指示。</ChinText>
+<ChinShort>公眾人士請留意，和合石墳場內及附近一帶路道（包括大窩西支路、華明路、和興路及百和路等）的交通預計在重陽明節特別交通安排完結後的週末將會較為繁忙，警方會視乎實際情況在上述道路實施臨時交通管制措施。駕駛人士請留意傳媒發放的最新交通消息。如遇交通受阻，駕駛人士請保持忍讓，並遵從警方的指示。</ChinShort>
+<EngText>Members of the public are advised that, the traffic within Wo Hop Shek Cemetery and in its vicinity (including Tai Wo Service Road West, Wah Ming Road, Wo Hing Road and Pak Wo Road, etc.) is expected to be busier on the weekends after completion of the special traffic arrangements for Chung Yeung Festival. The Police will implement temporary traffic control measures depending on actual situation. Motorists are advised to watch out for the latest traffic news through media. In case of traffic congestion, motorists should exercise tolerance and patience, and follow the instructions of the Police. </EngText>
+<EngShort>Members of the public are advised that, the traffic within Wo Hop Shek Cemetery and in its vicinity (including Tai Wo Service Road West, Wah Ming Road, Wo Hing Road and Pak Wo Road, etc.) is expected to be busier on the weekends after completion of the special traffic arrangements for Chung Yeung Festival. The Police will implement temporary traffic control measures depending on actual situation. Motorists are advised to watch out for the latest traffic news through media. In case of traffic congestion, motorists should exercise tolerance and patience, and follow the instructions of the Police. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>260137</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>因水管緊急維修，馬會道(往寶石湖路方向)近北區運動場的部份行車線現已封閉。
+駕駛人士只可使用餘下行車線行車。</ChinText>
+<ChinShort>因水管緊急維修，馬會道(往寶石湖路方向)近北區運動場的部份行車線現已封閉。
+駕駛人士只可使用餘下行車線行車。</ChinShort>
+<EngText>Due to watermain emergency works , part of the lanes of Jockey Club Road (Po Shek Wu Road bound) near North District Sports Ground is closed to all traffic.
+Only remaining lane is available to motorists. </EngText>
+<EngShort>Due to watermain emergency works , part of the lanes of Jockey Club Road (Po Shek Wu Road bound) near North District Sports Ground is closed to all traffic.
+Only remaining lane is available to motorists. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>280412</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>配合客運需求，高速鐵路(香港段)將加開以下臨時列車車次：
+
+由香港西九龍站前往福田站
+-11月15日：G5866
+
+由香港西九龍站前往深圳北站
+-11月15日：G5680
+-11月30日：G9798
+
+由香港西九龍站前往廣州南站
+-11月23日、30日：G9778
+
+由香港西九龍站前往北京西站
+-11月17-19日：G898(臥鋪列車)
+
+由福田站前往香港西九龍站
+-11月15日：G5865
+
+由深圳北站前往香港西九龍站
+-11月15日：G5679
+-11月28日：G9791
+
+由廣州南站前往香港西九龍站
+-11月28日：G9795
+
+由北京西站前往香港西九龍站
+-11月17-19日：G897(臥鋪列車)
+
+你可透過12306官方網站(12306.cn)或手機應用程式、指定代理或前往香港西九龍站購買列車車票。
+
+有關列車服務詳情，請瀏覽12306官方網站(12306.cn)或手機應用程式、高速鐵路網頁及手機應用程式。</ChinText>
+<ChinShort>配合客運需求，高速鐵路(香港段)將加開以下臨時列車車次：
+
+由香港西九龍站前往福田站
+-11月15日：G5866
+
+由香港西九龍站前往深圳北站
+-11月15日：G5680
+-11月30日：G9798
+
+由香港西九龍站前往廣州南站
+-11月23日、30日：G9778
+
+由香港西九龍站前往北京西站
+-11月17-19日：G898(臥鋪列車)
+
+由福田站前往香港西九龍站
+-11月15日：G5865
+
+由深圳北站前往香港西九龍站
+-11月15日：G5679
+-11月28日：G9791
+
+由廣州南站前往香港西九龍站
+-11月28日：G9795
+
+由北京西站前往香港西九龍站
+-11月17-19日：G897(臥鋪列車)
+
+你可透過12306官方網站(12306.cn)或手機應用程式、指定代理或前往香港西九龍站購買列車車票。
+
+有關列車服務詳情，請瀏覽12306官方網站(12306.cn)或手機應用程式、高速鐵路網頁及手機應用程式。</ChinShort>
+<EngText>In response to the demand, the High Speed Rail (Hong Kong Section) will add the following temporary train trips:
+
+From Hong Kong West Kowloon Station to Futian Station
+- 15 Nov: G5866
+
+From Hong Kong West Kowloon Station to Shenzhenbei Station
+- 15 Nov: G5680
+- 30 Nov: G9798
+
+From Hong Kong West Kowloon Station to Guangzhounan Station
+- 23, 30 Nov: G9778
+
+From Hong Kong West Kowloon Station to Beijingxi Station
+- 17-19 Nov: G898 (Sleeper train)
+
+From Futian Station to Hong Kong West Kowloon Station
+- 15 Nov: G5865
+
+From Shenzhenbei Station to Hong Kong West Kowloon Station
+- 15 Nov: G5679
+- 28 Nov: G9791
+
+From Guangzhounan Station to Hong Kong West Kowloon Station:
+- 28 Nov: G9795
+
+From Beijingxi Station to Hong Kong West Kowloon Station
+- 17-19 Nov: G897 (Sleeper train)
+
+Tickets are available for purchase through the 12306 official website (12306.cn) or mobile app; appointed travel agents; or at Hong Kong West Kowloon Station.
+
+For train schedules, please refer to the 12306 official website (12306.cn) or mobile app, or the High Speed Rail website or mobile app. </EngText>
+<EngShort>In response to the demand, the High Speed Rail (Hong Kong Section) will add the following temporary train trips:
+
+From Hong Kong West Kowloon Station to Futian Station
+- 15 Nov: G5866
+
+From Hong Kong West Kowloon Station to Shenzhenbei Station
+- 15 Nov: G5680
+- 30 Nov: G9798
+
+From Hong Kong West Kowloon Station to Guangzhounan Station
+- 23, 30 Nov: G9778
+
+From Hong Kong West Kowloon Station to Beijingxi Station
+- 17-19 Nov: G898 (Sleeper train)
+
+From Futian Station to Hong Kong West Kowloon Station
+- 15 Nov: G5865
+
+From Shenzhenbei Station to Hong Kong West Kowloon Station
+- 15 Nov: G5679
+- 28 Nov: G9791
+
+From Guangzhounan Station to Hong Kong West Kowloon Station:
+- 28 Nov: G9795
+
+From Beijingxi Station to Hong Kong West Kowloon Station
+- 17-19 Nov: G897 (Sleeper train)
+
+Tickets are available for purchase through the 12306 official website (12306.cn) or mobile app; appointed travel agents; or at Hong Kong West Kowloon Station.
+
+For train schedules, please refer to the 12306 official website (12306.cn) or mobile app, or the High Speed Rail website or mobile app. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>280417</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>中國內地鐵路單位通報，由於車務調度，下列於2026年11月16日的高速鐵路列車車次取消：
+
+由香港西九龍站前往廣州南站：G6536,G6526,G6584
+
+由廣州南站前往香港西九龍站：G6535,G6537,G6583
+
+有關車次的資料，請留意12306官方網站(12306.cn)，如已安裝手機應用程式，可按「車站大屏」頁面。您亦可留意於高速鐵路網頁、手機應用程式或香港西九龍站發放的最新資訊。
+
+如需退票，請參閱高速鐵路網頁並於指定日期內辦理。請盡量使用12306官方網站(12306.cn)或手機應用程式，不用急於到香港西九龍站辦理。</ChinText>
+<ChinShort>中國內地鐵路單位通報，由於車務調度，下列於2026年11月16日的高速鐵路列車車次取消：
+
+由香港西九龍站前往廣州南站：G6536,G6526,G6584
+
+由廣州南站前往香港西九龍站：G6535,G6537,G6583
+
+有關車次的資料，請留意12306官方網站(12306.cn)，如已安裝手機應用程式，可按「車站大屏」頁面。您亦可留意於高速鐵路網頁、手機應用程式或香港西九龍站發放的最新資訊。
+
+如需退票，請參閱高速鐵路網頁並於指定日期內辦理。請盡量使用12306官方網站(12306.cn)或手機應用程式，不用急於到香港西九龍站辦理。</ChinShort>
+<EngText>As informed by the Chinese Mainland Railway Authorities, the following High Speed Rail train trips on 16 November 2026 will be cancelled due to traffic control :
+
+From Hong Kong West Kowloon Station to Guangzhounan Station: G6536, G6526, G6584
+
+From Guangzhounan Station to Hong Kong West Kowloon Station: G6535, G6537, G6583
+
+For the latest train schedules, please refer to the official website (12306.cn) or the mobile app. You may also check the latest service updates on the HSR website, mobile app or see the information available at Hong Kong West Kowloon Station.
+
+For ticket refunds, please refer to the information on the High Speed Rail website and process within the stated time. To obtain a refund, please use the 12306 official website (12306.cn) or mobile app. Unless you require assistance, there is no need to go to Hong Kong West Kowloon Station. </EngText>
+<EngShort>As informed by the Chinese Mainland Railway Authorities, the following High Speed Rail train trips on 16 November 2026 will be cancelled due to traffic control :
+
+From Hong Kong West Kowloon Station to Guangzhounan Station: G6536, G6526, G6584
+
+From Guangzhounan Station to Hong Kong West Kowloon Station: G6535, G6537, G6583
+
+For the latest train schedules, please refer to the official website (12306.cn) or the mobile app. You may also check the latest service updates on the HSR website, mobile app or see the information available at Hong Kong West Kowloon Station.
+
+For ticket refunds, please refer to the information on the High Speed Rail website and process within the stated time. To obtain a refund, please use the 12306 official website (12306.cn) or mobile app. Unless you require assistance, there is no need to go to Hong Kong West Kowloon Station. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+<message>
+<msgID>275507</msgID>
+<CurrentStatus>3</CurrentStatus>
+<ChinText>中環至半山自動扶梯系統於2026年11月的例行檢查時間表如下: 詳情請參看: 特別交通消息網頁。
+
+
+
+在上述維修保養工程期間，系統使用者請使用系統內的樓梯、系統外的街道或公共交通工具前往目的地。不便之處，敬請見諒。</ChinText>
+<ChinShort>中環至半山自動扶梯系統於2026年11月的例行檢查時間表如下: 詳情請參看: 特別交通消息網頁。
+
+
+
+在上述維修保養工程期間，系統使用者請使用系統內的樓梯、系統外的街道或公共交通工具前往目的地。不便之處，敬請見諒。</ChinShort>
+<EngText>The routine maintenance schedule of Central to Mid-Levels Escalator and Walkway System in November 2026 is listed as follows:- For more details, please visit: Special Traffic News Page.
+
+
+During the above periods of maintenance, system users are advised to use the staircases within the system, the streets outside the system or public transport to travel to their destinations. We apologize for any inconvenience caused. </EngText>
+<EngShort>The routine maintenance schedule of Central to Mid-Levels Escalator and Walkway System in November 2026 is listed as follows:- For more details, please visit: Special Traffic News Page.
+
+
+During the above periods of maintenance, system users are advised to use the staircases within the system, the streets outside the system or public transport to travel to their destinations. We apologize for any inconvenience caused. </EngShort>
+<ReferenceDate> 2026/11/13 下午 11:54:21</ReferenceDate>
+<IncidentRefNo></IncidentRefNo>
+<CountofDistricts>0</CountofDistricts>
+<ListOfDistrict>
+</ListOfDistrict>
+</message>
+</body>

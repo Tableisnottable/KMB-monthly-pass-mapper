@@ -12,12 +12,14 @@
     "lint": "next lint",
     "test": "vitest run",
     "data:citybus": "node scripts/fetch-citybus-data.mjs",
-    "data:transport": "python scripts/import-transport.py"
+    "data:transport": "python scripts/import-transport.py",
+    "data:residents": "python scripts/import-residents.py"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "fast-xml-parser": "^5.12.1",
     "leaflet": "^1.9.4",
     "next": "^15.5.24",
     "react": "^18.3.1",

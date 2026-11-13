@@ -43,9 +43,22 @@ describe('All-network catalogue', () => {
   });
   it('publishes source-provided company names and actual timetable coverage', async () => {
     const { data } = await (await lookup('resource=operators')).json();
-    expect(data).toHaveLength(16);
+    expect(data).toHaveLength(17);
     expect(data.find((row: { id: string }) => row.id === 'KMB')).toMatchObject({ nameEn: 'Kowloon Motor Bus', liveArrivals: true });
     expect(data.find((row: { id: string }) => row.id === 'MTR').timetablePatterns).toBe(0);
+    expect(data.find((row: { id: string }) => row.id === 'RESIDENTS')).toMatchObject({ officialDocuments: true, liveArrivals: false });
+  });
+  it('serves official residents’ documents and retains GTFS schedules for overlapping routes', async () => {
+    const directory = await (await lookup('resource=residents&route=residents%3ANR10')).json();
+    expect(directory.resident).toMatchObject({ number: 'NR10', nameEn: 'Wah Ming Estate - Central' });
+    expect(new URL(directory.resident.documentUrlTc).hostname).toBe('www.td.gov.hk');
+    expect((await lookup('resource=residents&route=unknown')).status).toBe(404);
+    const { data } = await (await lookup('resource=routes&operator=RESIDENTS&q=NR331')).json();
+    expect(data.map((r: { number: string }) => r.number)).toEqual(['NR331', 'NR331S']);
+    const timetable = await (await lookup('resource=timetable&route=1985&date=2026-11-14')).json();
+    expect(timetable.company.id).toBe('PI');
+    expect(timetable.residentDocument.number).toBe('NR331');
+    expect(timetable.timetablePublished).toBe(true);
   });
   it('returns complete timetable records for a selected route, not just its next trip', async () => {
     const index = networkPatterns.findIndex(pattern => pattern.w.length > 5);

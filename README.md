@@ -333,6 +333,32 @@ Recommended next steps / 建議後續工作：
 
 ## Alignment data and scheduling
 
+The timetable route picker uses natural route-number order (1, 2, 2A, 10;
+A10, A11; NR2, NR10), applied before pagination. Existing GTFS schedules remain
+authoritative when a residents’ directory entry covers the same route.
+
+Approved NR / HR / KR residents’ services are searchable at `/timetables`.
+Refresh their bilingual directory with:
+
+```powershell
+python scripts/import-residents.py --cache C:/path/outside/repository/cache --refresh
+```
+
+Only compact directory metadata and official TD document URLs are committed.
+Directory-only routes show the official timetable/fare/conditions PDF; they are
+not assigned invented companies, fares, stop coordinates or service calendars,
+and are not used for automatic journey planning. Existing GTFS-covered residents’
+routes retain their machine-readable timetables and routing support.
+
+`/updates` and `/traffic` now use the TD Special Traffic News XML feed, refreshed
+at most once a minute per server process. They preserve source wording and
+reference timestamps; these timestamps are not labelled as event start dates.
+The updates page filters for messages mentioning public transport and links to
+operator sites; it does not claim complete coverage of operator notices. No
+demo notices, inferred affected routes or invented severity are displayed.
+Feed failure is distinct from an empty feed, and an earlier successful display
+is explicitly marked as potentially outdated if a later refresh fails.
+
 Import official road alignments and OpenStreetMap tracks/ferry ways with:
 
 ```powershell

@@ -6,6 +6,8 @@ import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
 import { operatorInfo, transportOperators } from '../../../data/transportOperators';
 import { hongKongServiceDate, nextPublishedDeparture, routeTimetable } from '../../../data/networkTimetable';
+import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
+import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
@@ -15,16 +17,26 @@ export async function GET(request: NextRequest) {
   }
   const p = request.nextUrl.searchParams, resource = p.get('resource') ?? 'coverage';
   if (resource === 'coverage') return NextResponse.json(transportCoverage);
-  if (resource === 'operators') return NextResponse.json({ data: transportOperators.map(operator => ({ ...operator,
+  if (resource === 'operators') {
+    const residentPatterns = networkPatterns.filter(pattern => isResidentsService({ number: networkRoutes[pattern.r][2] }));
+    return NextResponse.json({ data: [...transportOperators.map(operator => ({ ...operator,
     routeCount: networkRoutes.filter(route => route[1] === operator.id).length,
     timetablePatterns: networkPatterns.filter(pattern => networkRoutes[pattern.r][1] === operator.id && pattern.w.length > 0).length,
     scheduleRecords: networkPatterns.filter(pattern => networkRoutes[pattern.r][1] === operator.id).reduce((sum, pattern) => sum + pattern.w.length, 0),
     liveArrivals: ['KMB', 'LWB', 'CTB', 'KMB+CTB', 'LWB+CTB', 'MTR', 'LRT', 'GMB'].includes(operator.id),
-  })) });
+    })), { ...residentsOperator, routeCount: timetableRoutes.filter(isResidentsService).length,
+      timetablePatterns: residentPatterns.filter(pattern => pattern.w.length > 0).length,
+      scheduleRecords: residentPatterns.reduce((sum, pattern) => sum + pattern.w.length, 0) }] });
+  }
+  if (resource === 'residents') {
+    const resident = residentsRoute(p.get('route') ?? '');
+    return resident ? NextResponse.json({ resident, meta: residentsDirectoryMeta })
+      : NextResponse.json({ error: 'Unknown residents’ service.' }, { status: 404 });
+  }
   if (resource === 'timetable') {
     try {
       const data = routeTimetable(p.get('route') ?? '', p.get('date') ?? hongKongServiceDate(), p.get('pattern') ?? undefined, p.get('stop') ?? undefined);
-      return NextResponse.json({ ...data, company: operatorInfo(data.route[1]), meta: { timezone: 'Asia/Hong_Kong',
+      return NextResponse.json({ ...data, company: operatorInfo(data.route[1]), residentDocument: residentsRoutes.find(route => route.number === data.route[2]), meta: { timezone: 'Asia/Hong_Kong',
         importedOn: transportCoverage.importedOn, source: transportCoverage.sources['td-gtfs-en.zip'],
         frequencyEndExclusive: true, allPublishedWindows: true } });
     } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid timetable lookup.' }, { status: 400 }); }
@@ -34,11 +46,10 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(500, Math.max(1, Number(p.get('limit')) || 50));
   if (query.length > 120) return NextResponse.json({ error: 'Query is too long.' }, { status: 400 });
   if (resource === 'routes') {
-    const data = networkRoutes.filter(r => (!operator || r[1] === operator) && (!mode || r[5] === mode)
-      && (!query || [r[2], r[3], r[4]].join(' ').toLowerCase().includes(query)));
+    const data = searchTimetableRoutes(query, operator, mode);
     const offset = Math.max(0, Math.floor(Number(p.get('offset')) || 0));
-    return NextResponse.json({ data: data.slice(offset, offset + limit).map(r => ({ id: r[0], operator: r[1], number: r[2],
-      nameTc: r[3], nameEn: r[4], mode: r[5], company: operatorInfo(r[1]) })), total: data.length, hasMore: offset + limit < data.length });
+    return NextResponse.json({ data: data.slice(offset, offset + limit).map(r => ({ ...r,
+      company: r.operator === 'RESIDENTS' ? residentsOperator : operatorInfo(r.operator) })), total: data.length, hasMore: offset + limit < data.length });
   }
   if (resource === 'stops') {
     const needle = normalizeTransitQuery(query);
@@ -49,7 +60,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: data.slice(0, limit).map(({ s }) => ({ id: s[0], nameTc: s[1], nameEn: s[2],
       lat: s[3], lng: s[4], mode: s[6] })), total: data.length });
   }
-  if (resource !== 'departures') return NextResponse.json({ error: 'resource must be coverage, operators, routes, stops, timetable or departures.' }, { status: 400 });
+  if (resource !== 'departures') return NextResponse.json({ error: 'resource must be coverage, operators, routes, stops, timetable, residents or departures.' }, { status: 400 });
   const stop = p.get('stop'), stopIndex = networkStops.findIndex(s => s[0] === stop);
   if (stopIndex < 0) return NextResponse.json({ error: 'Unknown transport stop.' }, { status: 400 });
   const now = new Date(), locale = p.get('lang') === 'en' ? 'en' : 'zh';

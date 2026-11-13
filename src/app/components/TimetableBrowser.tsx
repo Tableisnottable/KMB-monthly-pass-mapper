@@ -5,10 +5,12 @@ import { copy, modeIcon, routeBadgeStyle, type PlannerLocale } from './plannerUi
 import { PlannerIcon } from './PlannerIcon';
 import { hongKongInputValue, hongKongTimeLabel } from '../../engine/journeyTime';
 import type { routeTimetable } from '../../data/networkTimetable';
+import type { residentsRoutes, residentsDirectoryMeta } from '../../data/residentsServices';
 
-interface Company { id: string; nameEn: string; nameTc: string; urls: string[]; routeCount: number; timetablePatterns: number; scheduleRecords: number; liveArrivals: boolean }
+interface Company { id: string; nameEn: string; nameTc: string; urls: string[]; routeCount: number; timetablePatterns: number; scheduleRecords: number; liveArrivals: boolean; officialDocuments?: boolean }
 interface RouteResult { id: string; operator: string; number: string; nameTc: string; nameEn: string; mode: string }
-type Timetable = ReturnType<typeof routeTimetable> & { company?: Company; meta: { importedOn: string; source: string } };
+type Timetable = ReturnType<typeof routeTimetable> & { company?: Company; residentDocument?: typeof residentsRoutes[number]; meta: { importedOn: string; source: string } };
+type ResidentsData = { resident: typeof residentsRoutes[number]; meta: typeof residentsDirectoryMeta };
 
 export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPattern = '', initialStop = '' }:
   { locale?: PlannerLocale; initialRoute?: string; initialPattern?: string; initialStop?: string }) {
@@ -21,6 +23,7 @@ export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPatt
   const [pattern, setPattern] = useState(initialPattern);
   const [stop, setStop] = useState(initialStop);
   const [timetable, setTimetable] = useState<Timetable | null>(null);
+  const [residentsData, setResidentsData] = useState<ResidentsData | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,16 +57,18 @@ export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPatt
   }, [company, query, offset, locale]);
 
   useEffect(() => {
-    if (!routeId || !date) { setTimetable(null); setLoading(false); setError(''); return; }
+    if (!routeId || !date) { setTimetable(null); setResidentsData(null); setLoading(false); setError(''); return; }
     const controller = new AbortController();
-    setLoading(true); setError(''); setTimetable(null);
-    const params = new URLSearchParams({ resource: 'timetable', route: routeId, date });
+    setLoading(true); setError(''); setTimetable(null); setResidentsData(null);
+    const params = new URLSearchParams({ resource: routeId.startsWith('residents:') ? 'residents' : 'timetable', route: routeId, date });
     if (pattern) params.set('pattern', pattern);
     if (stop) params.set('stop', stop);
     fetch('/api/network?' + params, { signal: controller.signal }).then(async response => {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);
-      if (!controller.signal.aborted) setTimetable(payload);
+      if (!controller.signal.aborted) {
+        if (payload.resident) setResidentsData(payload); else setTimetable(payload);
+      }
     }).catch(error => { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : copy(locale, '時間表載入失敗。', 'Could not load timetable.')); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -79,7 +84,7 @@ export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPatt
       <details><summary>{copy(locale, '查看全部 ', 'View all ')}{companies.length}{copy(locale, ' 個營辦商／網絡', ' companies / networks')}</summary>
         <div className="timetable-company-list">{companies.map(item => <div key={item.id}>
           <strong>{name(item)}</strong><span>{item.routeCount} {copy(locale, '條路線／變體', 'routes / variants')}</span>
-          <small>{item.timetablePatterns ? item.scheduleRecords.toLocaleString() + ' ' + copy(locale, '筆時間表／班距記錄', 'schedule / headway records') : copy(locale, '未提供完整班次表', 'Full timetable not published')}
+          <small>{item.officialDocuments ? copy(locale, '官方班次、車費及服務條件文件', 'Official schedule, fare and service condition documents') : item.timetablePatterns ? item.scheduleRecords.toLocaleString() + ' ' + copy(locale, '筆時間表／班距記錄', 'schedule / headway records') : copy(locale, '未提供完整班次表', 'Full timetable not published')}
             {item.liveArrivals ? ' · ' + copy(locale, '可用即時到站', 'Available live arrivals') : ''}</small>
           <a href={item.urls[0]} target="_blank" rel="noreferrer">{copy(locale, '官方營辦商／服務資料', 'Official company / service information')}</a>
         </div>)}</div>
@@ -92,8 +97,9 @@ export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPatt
           <option value="">{copy(locale, '全部營辦商', 'All companies')}</option>{companies.map(item => <option key={item.id} value={item.id}>{name(item)} ({item.routeCount})</option>)}
         </select></label>
         <label>{copy(locale, '路線號碼或目的地', 'Route number or destination')}<input aria-label={copy(locale, '路線號碼或目的地', 'Route number or destination')} value={query}
-          placeholder={copy(locale, '例如 A23、44、機場', 'e.g. A23, 44, Airport')} onChange={event => { setQuery(event.target.value); setOffset(0); setRoutes([]); }} /></label>
+          placeholder={copy(locale, '例如 A23、44、NR331、機場', 'e.g. A23, 44, NR331, Airport')} onChange={event => { setQuery(event.target.value); setOffset(0); setRoutes([]); }} /></label>
         <p className="timetable-count">{total.toLocaleString()} {copy(locale, '條符合路線', 'matching routes')}</p>
+        <p className="timetable-note">{copy(locale, '按路線號碼排序：1、2、2A…10…A10、A11…NR2、NR10', 'Route number order: 1, 2, 2A…10…A10, A11…NR2, NR10')}</p>
         {routeError && <p role="alert">{routeError}</p>}
         <div className="timetable-route-list">{routes.map(route => <button type="button" key={route.id} aria-pressed={route.id === routeId}
           onClick={() => { setRouteId(route.id); setPattern(''); setStop(''); }}>
@@ -104,12 +110,25 @@ export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPatt
         {!routeLoading && routes.length < total && <button className="all-results-button" type="button" onClick={() => setOffset(routes.length)}>{copy(locale, '載入更多路線', 'Load more routes')}</button>}
       </section>
       <section className="timetable-panel" aria-label={copy(locale, '完整班次時間表', 'Full service timetable')}>
-        <label>{copy(locale, '服務日期（香港時間）', 'Service date (Hong Kong time)')}<input type="date" aria-label={copy(locale, '服務日期', 'Service date')} value={date} onInput={event => setDate(event.currentTarget.value)} onChange={event => setDate(event.target.value)} /></label>
+        <label>{copy(locale, '服務日期（香港時間）', 'Service date (Hong Kong time)')}<input type="date" aria-label={copy(locale, '服務日期', 'Service date')} value={date} disabled={routeId.startsWith('residents:')} onInput={event => setDate(event.currentTarget.value)} onChange={event => setDate(event.target.value)} /></label>
         {!routeId && <p>{copy(locale, '選擇路線，查看全部已公布班次及班距。', 'Choose a route to see all published departures and frequency windows.')}</p>}
         {loading && <p role="status">{copy(locale, '正在載入時間表…', 'Loading timetable…')}</p>}
         {error && <p role="alert">{error}</p>}
+        {residentsData && <>
+          <h2><span className="route-badge route-stop-plate" style={routeBadgeStyle('RESIDENTS', residentsData.resident.number)}><span className="route-badge-icon"><PlannerIcon name="bus" size={18} /></span><strong>{residentsData.resident.number}</strong></span> {copy(locale, '居民巴士服務', 'Residents’ service')}</h2>
+          <h3>{residentsData.resident[locale === 'en' ? 'nameEn' : 'nameTc']}</h3>
+          <p>{copy(locale, '地區：', 'District: ')}{residentsData.resident[locale === 'en' ? 'districtEn' : 'districtTc']}</p>
+          <p className="timetable-note">{copy(locale, '此服務以運輸署官方文件列出班次、車費、營辦商及乘搭條件；日期及適用乘客以文件為準。未有可核實的逐站座標及機讀日曆，因此暫不納入自動行程規劃或即時到站。', 'The TD document lists schedules, fares, operator and boarding conditions. Check the document for applicable dates and passenger eligibility. Verified stop coordinates and machine-readable calendars are not available in this directory, so these services are not yet used for automatic journey planning or live arrivals.')}</p>
+          <p><a className="residents-document-link" href={residentsData.resident[locale === 'en' ? 'documentUrlEn' : 'documentUrlTc']} target="_blank" rel="noreferrer">{copy(locale, '開啟官方班次、車費及服務詳情（PDF） ↗', 'Open official timetable, fares and service details (PDF) ↗')}</a></p>
+          <div className="residents-documents"><strong>{copy(locale, '官方服務文件', 'Official service documents')}</strong><p>{copy(locale, '查看完整班次、車費及乘搭條件：', 'View full schedules, fares and boarding conditions:')}</p>
+            <a href={residentsData.resident.documentUrlTc} target="_blank" rel="noreferrer">中文 PDF ↗</a>
+            <a href={residentsData.resident.documentUrlEn} target="_blank" rel="noreferrer">English PDF ↗</a>
+          </div>
+          <p className="timetable-note">{copy(locale, '目錄匯入日期：', 'Directory imported: ')}{residentsData.meta.importedOn} · <a href={residentsData.resident[locale === 'en' ? 'sourceUrlEn' : 'sourceUrlTc']} target="_blank" rel="noreferrer">{copy(locale, '運輸署核准路線目錄', 'TD approved service directory')}</a></p>
+        </>}
         {timetable && <>
           <h2><span className="route-badge route-stop-plate" style={routeBadgeStyle(timetable.route[1], timetable.route[2])}><span className="route-badge-icon"><PlannerIcon name={modeIcon(timetable.route[5])} size={18} /></span><strong>{timetable.route[2] || timetable.route[1]}</strong></span> {timetable.company ? name(timetable.company) : timetable.route[1]}</h2>
+          {timetable.residentDocument && <p className="timetable-note"><a href={timetable.residentDocument[locale === 'en' ? 'documentUrlEn' : 'documentUrlTc']} target="_blank" rel="noreferrer">{copy(locale, '運輸署官方班次、車費及乘搭條件（PDF） ↗', 'TD official schedule, fares and boarding conditions (PDF) ↗')}</a></p>}
           <label>{copy(locale, '方向／服務變體', 'Direction / service variant')}<select aria-label={copy(locale, '方向／服務變體', 'Direction / service variant')} value={timetable.selectedPattern}
             onChange={event => { setPattern(event.target.value); setStop(''); }}>
             {timetable.variants.map((variant, index) => <option key={variant.id} value={variant.id}>{stopName(variant.origin)} → {stopName(variant.destination)} · {index + 1}</option>)}

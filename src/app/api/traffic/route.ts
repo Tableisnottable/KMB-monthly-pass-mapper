@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
-import { trafficEvents } from '../../../data/trafficAlerts';
+import { getTrafficNews } from '../../../data/officialTrafficNews';
 
-export const dynamic = 'force-static';
-
-export function GET() {
-  return NextResponse.json(
-    { data: trafficEvents, meta: { source: 'demo-transport-event-shape', generatedAt: new Date().toISOString() } },
-    { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' } },
-  );
+export const dynamic = 'force-dynamic';
+export async function GET() {
+  return NextResponse.json(await getTrafficNews(), { headers: { 'Cache-Control': 'no-store' } });
 }
