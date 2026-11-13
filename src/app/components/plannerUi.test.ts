@@ -49,12 +49,32 @@ describe('journey display values', () => {
   });
 });
 
-describe('Company colours for all bus routes', () => {
-  it('keeps company colours across local, tunnel, airport, overnight and premium routes', () => {
-    for (const number of ['2A', '104', '301', '600X', '936', 'A23', 'E21', 'N241', 'P960']) {
+describe('Bus display colours', () => {
+  it('keeps company colours across local, tunnel, airport and premium routes', () => {
+    for (const number of ['2A', '104', '301', '600X', '936', 'A23', 'E21', 'P960']) {
       expect(routeBadgeStyle('KMB', number)).toMatchObject({ backgroundColor: '#e62232', color: '#ffffff' });
       expect(routeBadgeStyle('CTB', number)).toMatchObject({ backgroundColor: '#f7b500', color: '#17212b' });
       expect(routeColor('LWB', number)).toBe('#ef8528');
+    }
+  });
+  it('uses black with white text and icons for all N/NA night buses, including joint services', () => {
+    for (const operator of ['KMB', 'CTB', 'LWB', 'NLB', 'KMB+CTB', 'LWB+CTB', 'unknown']) {
+      for (const number of ['N122', 'N241', 'N8P', 'NA11', ' n21 ']) {
+        expect(routeBadgeStyle(operator, number)).toEqual({ backgroundColor: '#000000', color: '#ffffff',
+          '--route-icon-background': '#000000', '--route-icon-colour': '#ffffff' });
+        expect(routeColor(operator, number)).toBe('#000000');
+        expect(routeIconColor(operator, number)).toBe('#ffffff');
+      }
+    }
+    const nightBuses = catalogue.filter(route => route[5] === 'BUS' && /^NA?\d/i.test(route[2]));
+    expect(nightBuses.length).toBeGreaterThan(0);
+    for (const route of nightBuses) expect(routeColor(route[1], route[2])).toBe('#000000');
+  });
+  it('does not treat NR residents routes or non-bus route numbers as night buses', () => {
+    expect(routeSignColours('RESIDENTS', 'NR10')).toMatchObject({ line: '#656565', verified: false });
+    expect(routeColor('NLB', '1')).toBe('#317dc1');
+    for (const operator of ['MTR', 'LRT', 'GMB', 'FERRY', 'TRAM', 'PTRAM', 'WALK']) {
+      expect(routeSignColours(operator, 'N1')).toEqual(routeSignColours(operator));
     }
   });
   it('shows both companies for joint routes without an invented joint colour', () => {

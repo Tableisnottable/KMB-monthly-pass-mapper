@@ -1,4 +1,4 @@
-/** Shared company display palette. Route category and tunnel do not change it. */
+/** Shared company display palette, with black badges and lines for N/NA night buses. */
 export interface RouteSignColours {
   background: string;
   foreground: string;
@@ -27,7 +27,12 @@ const otherModes: Readonly<Record<string, string>> = {
   PTRAM: '#8d3069', WALK: '#9b9b9b',
 };
 
-export function routeSignColours(operator: string, _routeNumber = ''): RouteSignColours {
+export function routeSignColours(operator: string, routeNumber = ''): RouteSignColours {
+  // The night-bus convention takes priority over both members of a joint service.
+  // NR residents' routes and non-bus modes retain their existing palettes.
+  if (!otherModes[operator] && /^NA?\d/i.test(routeNumber.trim())) {
+    return sign('#000000', white, 'N/NA night bus display colours');
+  }
   const members = operator.split('+'), primary = companyPalette[members[0]], secondary = companyPalette[members[1]];
   if (primary) return { background: primary[0], foreground: primary[1], line: primary[0],
     convention: operator + ' company display colours', verified: true,
