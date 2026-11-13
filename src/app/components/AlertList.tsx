@@ -1,5 +1,7 @@
 'use client';
 
+import { transportFetch as fetch } from '../../browser/transportClient';
+
 import { useEffect, useMemo, useState } from 'react';
 import { operatorNoticeLinks, TRAFFIC_NEWS_URL, type TrafficFeed } from '../../data/trafficAlerts';
 

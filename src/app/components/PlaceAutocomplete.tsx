@@ -1,5 +1,7 @@
 'use client';
 
+import { transportFetch as fetch } from '../../browser/transportClient';
+
 import { useEffect, useId, useRef, useState } from 'react';
 import { copy, type PlannerLocale } from './plannerUi';
 import { PlannerIcon } from './PlannerIcon';

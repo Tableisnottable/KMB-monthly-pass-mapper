@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { DocumentLink as Link } from '../components/DocumentLink';
 import coverage from '../../data/transport/manifest.json';
 import alignments from '../../data/alignments/manifest.json';
 import { operatorInfo } from '../../data/transportOperators';

@@ -1,5 +1,7 @@
 'use client';
 
+import { transportFetch as fetch } from '../../browser/transportClient';
+
 import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';

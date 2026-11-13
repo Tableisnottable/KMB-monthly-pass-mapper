@@ -190,6 +190,13 @@ Place suggestions also match official Citybus stop names, including when geocodi
 
 ## API examples / API 使用例子
 
+These HTTP examples apply to the local Next.js server. On the free Cloudflare
+deployment, UI transport queries use `transportFetch` and run the same handlers
+inside browser Web Workers. Only `/api/upstream` (restricted public providers)
+and `/api/sources` (source catalogue) run at the edge. Direct HTTP requests to
+calculation endpoints return `409 BROWSER_COMPUTATION` rather than exhausting
+the free server's CPU budget.
+
 ### Place search / 地點搜尋
 
 ```text
@@ -262,7 +269,7 @@ Available scripts / 可用指令：
 | `npm run build` | Build and type-check production output / 建立及檢查 production build |
 | `npm run start` | Serve the production build / 啟動 production build |
 | `npm run lint` | Run repository lint command / 執行 repository lint |
-| `npm run cf:build` | Build OpenNext Cloudflare worker / 建立 Cloudflare worker |
+| `npm run cf:build` | Build static pages, browser calculator and lightweight Cloudflare proxy |
 | `npm run cf:preview` | Build and run Wrangler preview / 建立並啟動 Wrangler 預覽 |
 | `npm run cf:deploy` | Build and deploy with Wrangler / 建立並使用 Wrangler 部署 |
 
@@ -288,21 +295,28 @@ Cloudflare deployment / Cloudflare 部署：
 
 Use Node.js 22.12 or newer (`.node-version` pins major 22 for hosted builds).
 For the existing Cloudflare Workers Git build, use repository root `/`,
-build command `npm run cf:build`, deploy command `npx opennextjs-cloudflare deploy`,
-and production branch `main`. Do not use a static Pages export: the route planner
-needs its server API routes. The configured Worker name is `kmb-monthly-pass-mapper`.
+build command `npm run cf:build`, deploy command `npx wrangler deploy --config wrangler.jsonc`,
+and production branch `main`. The configured Worker name is `kmb-monthly-pass-mapper`.
 
-`cf:build` stages the original full-resolution road and track chunks under
-`.open-next/assets/__alignments/`. The Worker loads them through its `ASSETS`
-binding, keeping geometry out of the compressed script without simplifying it.
-Local Next.js uses the same source chunks directly. Deploy the staged assets
-together with the Worker; `.open-next` remains ignored by Git.
+The free deployment serves static pages and runs the existing routing, scoring,
+fares, timetables, place matching and geometry handlers in browser Web Workers.
+Journey searches use a dedicated cancellable worker, so the page and catalogue
+remain responsive. Full transport data is downloaded on first use; slower phones
+may take longer to calculate large searches. No route data or geometry is reduced.
+
+`cf:build` stages pages, the generated browser bundle and full-resolution road/
+track chunks in `.free-worker/assets`. The small edge Worker only proxies an
+explicit list of public transport/geocoder/router endpoints, with rate limiting,
+short live-data caching and no upstream redirects or forwarded user credentials.
+Builds and generated public assets are ignored by Git; only source chunks below
+1 MB are committed. `npm run test:browser` exercises the actual generated bundle,
+including the A20, A23, 44→A31 and 44→E32 examples and arrive-by searches.
 
 ```bash
 npm ci
 npm run cf:build
 npx wrangler login
-npm run cf:deploy
+npx wrangler deploy --config wrangler.jsonc
 ```
 
 Joint-operated bus services show a compact dark arrivals board in station results

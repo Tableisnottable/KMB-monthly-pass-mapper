@@ -1,6 +1,9 @@
 node_modules
 .next
 .open-next
+.free-worker
+public/__planner
+public/__alignments
 out
 npm-debug.log*
 .env*

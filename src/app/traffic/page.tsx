@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { DocumentLink as Link } from '../components/DocumentLink';
 import { AlertList } from '../components/AlertList';
 
 export default function TrafficPage() {
