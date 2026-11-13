@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { getStaticCitybusStops } from '../../../data/citybusStopsStatic';
 import { findTransitPlaces, isAirportQuery } from '../../../data/transitPlaceSearch';
+import { findNetworkPlaces } from '../../../data/networkPlaceSearch';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,11 +28,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [] });
   }
 
-  const transitPlaces = findTransitPlaces(query, getStaticCitybusStops());
+  const transitPlaces = [...findTransitPlaces(query, getStaticCitybusStops()), ...findNetworkPlaces(query)];
   const cacheHeaders = { 'Cache-Control': 'public, max-age=300, s-maxage=300' };
   function transitFallback() {
     return transitPlaces.length > 0
-      ? NextResponse.json({ data: transitPlaces, meta: { provider: 'Citybus stop catalogue', geocoderUnavailable: true } }, { headers: cacheHeaders })
+      ? NextResponse.json({ data: transitPlaces.slice(0, 6), meta: { provider: 'HK public transport catalogue', geocoderUnavailable: true } }, { headers: cacheHeaders })
       : NextResponse.json({ error: 'Place search temporarily unavailable.' }, { status: 502 });
   }
 
@@ -70,10 +71,11 @@ export async function GET(request: NextRequest) {
     // of the airport polygon's airfield centre for airport searches.
     const suggestions = isAirportQuery(query)
       ? [...transitPlaces, ...geocodedPlaces]
-      : [...geocodedPlaces.slice(0, 4), ...transitPlaces, ...geocodedPlaces.slice(4)];
+      : [...transitPlaces.filter(p => p.type === 'station').slice(0, 2), ...geocodedPlaces.slice(0, 3), ...transitPlaces, ...geocodedPlaces.slice(3)];
+    const unique = suggestions.filter((p, i, all) => all.findIndex(other => other.id === p.id) === i);
     return NextResponse.json({
-      data: suggestions.slice(0, 6),
-      meta: { provider: 'OpenStreetMap Nominatim', region: 'HK', transitProvider: 'Citybus stop catalogue' },
+      data: unique.slice(0, 6),
+      meta: { provider: 'OpenStreetMap Nominatim', region: 'HK', transitProvider: 'HK public transport catalogue' },
     }, { headers: cacheHeaders });
   } catch {
     return transitFallback();

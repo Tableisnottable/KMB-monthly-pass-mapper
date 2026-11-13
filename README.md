@@ -14,7 +14,11 @@ The main page and `/en` share a Citymapper-style web workspace: a green search/r
 
 The planner currently supports leaving now. Arrive/Leave scheduling, switching cities, cycling and taxi routing are visibly disabled rather than presenting unsupported results. The menu contains the existing station-arrival lookup, traffic/update links and weighting explanation. Journey details retain the score breakdown and monthly-pass estimate.
 
-The existing `UpgradedScoringEngine` formula and operator adjustments are unchanged. Displayed journey minutes are separate from weighted scores: they include leg travel time, access/transfer walking and live waiting (or half the estimated headway). A required leg with ended service is clearly marked. Fares, ride times, interchange discounts and monthly-pass coverage remain prototype estimates. Map lines connect supplied stop coordinates schematically; they are not street-level geometry or turn-by-turn navigation. No MTR or ferry routing is claimed by the current KMB/Citybus journey endpoint.
+The existing `UpgradedScoringEngine` formula and operator adjustments are unchanged. `/api/journey` searches the imported public-transport graph with up to three transfers. The 2026-11-13 snapshot contains 2,487 routes/variants and 9,626 stops: KMB, Long Win, Citybus and joint services, New Lantao Bus, MTR Bus, Discovery Bay and Ma Wan buses, published cross-boundary coaches, green minibuses, ferries, Hong Kong Tramways, Peak Tram, MTR and Light Rail. These are the networks in the official feeds, not a claim that every private service or live feed exists.
+
+Displayed journey minutes are separate from weighted scores. They include stop-to-stop run times, access/transfer walking and predicted or scheduled waiting. KMB/LWB, Citybus, MTR, Light Rail and green minibus live arrivals enrich the initial boarding where a fresh matching prediction is available. Later connections use published timetables or estimates; connections are rechecked after the initial live arrival changes. Rail run times/headways are estimates; rail service is explicitly unverified when the live feed cannot confirm it. TD intermediate stop times are interpolated between published timepoints. A required leg with no upcoming connection is marked unavailable.
+
+Published adult OD fares are retained, including sectional fares; missing fares display **Fare unavailable**, not Free. Interchange discounts and monthly-pass coverage retain the existing prototype model and require operator confirmation. Map lines connect the actual ordered stops schematically; walking links use distance estimates and do not check a pedestrian/accessibility graph. Red minibuses, taxis, Ngong Ping 360 and private services absent from the imported fixed-route feeds are not included. See `/coverage` and `/api/network?resource=coverage` for counts, attribution and limits.
 
 Map tiles use OpenStreetMap with visible attribution. No map API key is required. Place search and official transit upstreams still require network access. The arrivals lookup retains its existing Traditional Chinese interface in both locales.
 
@@ -39,14 +43,32 @@ Map tiles use OpenStreetMap with visible attribution. No map API key is required
 | `/api/transit` | KMB 及 Citybus routes、stops、ETA proxy / KMB and Citybus route, stop, and ETA proxy |
 | `/api/eta` | Allowlisted ETA lookup / 受 allowlist 限制的 ETA 查詢 |
 | `/api/routes` | Prototype scored-route response / 原型評分路線回應 |
-| `/api/journey` | Coordinate-based KMB/Citybus journey candidates ranked by the existing weighted engine / 使用現有權重引擎排列的九巴及城巴行程 |
+| `/api/journey` | Coordinate-based multimodal journeys, up to 3 transfers, ranked by the existing weighted engine; optional `lang=en` |
+| `/coverage` | Bilingual transport coverage, sources and limitations |
+| `/api/network` | Imported coverage, route/stop search and live-or-timetable departures |
 | `/api/traffic` | Traffic information response / 交通資訊回應 |
 | `/api/updates` | Service update response / 服務更新回應 |
 | `/api/sources` | Data-source catalogue / 資料來源清單 |
 
 目前 route search 是 production-shaped prototype，具備清晰 API boundaries，但尚未成為完整 door-to-door geospatial router / The current route search is a production-shaped prototype with clear API boundaries, not yet a complete door-to-door geospatial router.
 
-系統目前會 ranking supplied routes，未來可以接入 route provider 或自行建立 multimodal pathfinding graph / The current system ranks supplied routes; a future version can connect a route provider or build an in-house multimodal pathfinding graph.
+`/api/journey` searches the imported graph; `/api/routes` remains a separate small scoring demonstration. The search keeps a bounded set of time/score labels per stop and round; it does not enumerate every possible path. Direction, pickup/drop-off restrictions, Hong Kong calendar dates, holiday exceptions, frequency windows and previous-day GTFS times above 24:00 are applied. Known timetable waits longer than half a published headway use an equivalent interval as the existing scoring engine's input, so a service starting in an hour is not scored as an immediate five-minute-frequency service. The published headway and estimated wait remain separate metadata.
+
+### Refresh the public transport snapshot
+
+The generated snapshot is checked in so place/route search works without downloading raw archives at runtime. Every generated file is below 900,000 bytes. Keep the raw cache **outside** the repository; do not commit GTFS ZIPs, `node_modules` or build output.
+
+```powershell
+# Python 3; pyproj is used only to convert official railway coordinates.
+python -m pip install --target C:\transport-cache\python-libs pyproj==3.8.0
+npm run data:transport -- --cache C:\transport-cache
+# Redownload source archives on a later refresh:
+npm run data:transport -- --cache C:\transport-cache --refresh
+```
+
+The importer downloads bilingual Transport Department GTFS, MTR/Light Rail topology and MTR adult Octopus fares. It caches exact station/access records from the Lands Department Location Search API, throttled to about one request per second, and converts EPSG:2326 to EPSG:4326. Unresolved station matches fail the import instead of using an unrelated location. Generated data preserves all service windows/calendars and all published fare pairs, grouped compactly by boarding stop and price. Source-owned data and topology can change; refresh and verify before a public deployment.
+
+`/api/network?resource=routes&operator=GMB&q=69`, `resource=stops&q=Mui%20Wo`, and `resource=departures&stop=mtr%3A18&lang=en` expose the catalogue and departure lookup. Search responses are bounded (`limit` up to 500); the complete snapshot remains in `src/data/transport/`. `/api/transit` retains the legacy KMB/Citybus proxy for compatibility.
 
 ## Architecture / 系統架構
 
@@ -286,7 +308,7 @@ npm run cf:deploy
 ## Current limitations and roadmap / 目前限制及 roadmap
 
 1. `/api/routes` 目前回傳小型 scored-route fixture，並非 complete route graph / currently returns a small scored-route fixture, not a complete route graph。
-2. Scoring engine 只會 ranking supplied routes，不會從任意座標探索所有 paths / only ranks supplied routes and does not discover every path from arbitrary coordinates。
+2. Multimodal search is bounded to three transfers and a limited set of labels/alternatives. Walking is schematic; rail timings/headways are estimated and live status may be unavailable. No claim of exhaustive path discovery is made.
 3. BBI handling 是 simplified same-operator prototype，production launch 前需要正式 fare rules / is a simplified same-operator prototype requiring production fare rules。
 4. Place search 依賴 Nominatim availability 及 usage policy / depends on Nominatim availability and usage policy。
 5. Map embed 及 external links 受第三方 browser/network policies 影響 / depend on third-party browser and network policies。
@@ -294,8 +316,8 @@ npm run cf:deploy
 
 Recommended next steps / 建議後續工作：
 
-- Add a route-graph service and multimodal pathfinding / 加入 route-graph service 及多模式 pathfinding。
-- Normalize operator stop geometries and connect stop-to-stop transfers / 統一各營辦商站點 geometry 並建立站到站轉乘。
+- Add pedestrian/accessibility routing and road/track-level geometry.
+- Add published rail journey times, full rail operating calendars and additional operator live feeds where available.
 - Introduce versioned fare rules and effective dates / 加入版本化 fare rules 及生效日期。
 - Add recorded upstream fixtures and integration tests / 加入 recorded upstream fixtures 及 integration tests。
 - Add observability for upstream latency、rate limits and stale-data detection / 加入 upstream latency、rate-limit 及 stale-data observability。

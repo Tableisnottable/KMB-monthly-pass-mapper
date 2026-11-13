@@ -3,7 +3,7 @@
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight } from '../../domain/monthlyPass';
 import { PlannerIcon } from './PlannerIcon';
-import { copy, routeColor, type PlannerLocale } from './plannerUi';
+import { copy, modeIcon, modeLabel, routeColor, type PlannerLocale } from './plannerUi';
 
 export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: PlannerLocale }) {
   const insight = getMonthlyPassInsight(route);
@@ -22,10 +22,13 @@ export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: Pl
     <ol className="directions-list">
       {!walkOnly && (route.originWalkMinutes ?? 0) > 0 && <li><span className="step-marker"><PlannerIcon name="walk" size={15} /></span><div><strong>{copy(locale, '步行至上車站', 'Walk to your stop')}</strong><small>{route.legs[0]?.originStop.name} · {route.originWalkMinutes} min</small></div></li>}
       {route.legs.map((leg, index) => <li key={leg.id}>
-        <span className="step-marker" style={{ color: routeColor(leg.operator) }}><PlannerIcon name={leg.mode === 'WALK' ? 'walk' : 'bus'} size={16} /></span>
-        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : leg.operator + ' · ' + leg.routeNumber}</strong>
+        <span className="step-marker" style={{ color: routeColor(leg.operator) }}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
+        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : leg.operator + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))}</strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>
-          <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + copy(locale, '即時到站', 'Live arrival') + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '班距估算', 'Estimated headway') + ' ' + leg.scheduledIntervalMinutes + ' min' : ''}</small>
+          <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + copy(locale, '即時到站', 'Live arrival') + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
+          {leg.serviceStatus === 'UNVERIFIED' && <small>{copy(locale, '此路段服務未能核實，請向營辦商確認。', 'Service on this leg is unverified. Confirm with the operator.')}</small>}
+          {leg.serviceStatus === 'TIMETABLE' && <small>{copy(locale, '按官方時間表估算，並非即時到站預報。', 'Based on the published timetable, not a live arrival prediction.')}</small>}
+          {leg.fareStatus === 'UNAVAILABLE' && <small>{copy(locale, '此路段票價未有資料。', 'Fare data for this leg is unavailable.')}</small>}
           {index < route.legs.length - 1 && <small className="transfer-note">{copy(locale, '在此轉乘；全程轉乘步行約', 'Change here; total transfer walking about')} {transferWalk} min</small>}
         </div>
       </li>)}

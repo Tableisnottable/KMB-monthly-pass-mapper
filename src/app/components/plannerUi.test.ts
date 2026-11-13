@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scoreRoutes, type Route } from '../../engine/UpgradedScoringEngine';
-import { hasEndedService, journeyMinutes } from './plannerUi';
+import { fareLabel, hasEndedService, journeyMinutes, modeIcon } from './plannerUi';
 
 function scored(legs: Route['legs'], walking = 0) {
   return scoreRoutes([{ id: 'test', legs, walkTransferTimeMinutes: walking }], new Date(2026, 10, 13, 12))[0];
@@ -34,5 +34,16 @@ describe('journey display values', () => {
     const route = scored([{ operator: 'KMB', mode: 'BUS', serviceEnded: true }, { operator: 'CTB', mode: 'BUS' }]);
     expect(hasEndedService(route)).toBe(true);
     expect(hasEndedService(scored([{ operator: 'WALK', mode: 'WALK' }]))).toBe(false);
+  });
+
+  it('never labels missing fare data as free', () => {
+    const route = scored([{ operator: 'LRT', mode: 'LIGHT_RAIL', fare: 0, fareStatus: 'UNAVAILABLE' }]);
+    expect(fareLabel(route, 'en')).toBe('Fare unavailable');
+  });
+
+  it('shows the correct symbols for rail, ferries and minibuses', () => {
+    expect(modeIcon('SUBWAY')).toBe('train');
+    expect(modeIcon('FERRY')).toBe('ferry');
+    expect(modeIcon('MINIBUS')).toBe('minibus');
   });
 });

@@ -51,7 +51,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     setEndpoints({ origin, destination });
     const timeout = window.setTimeout(() => controller.abort(), 60_000);
     try {
-      const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng) });
+      const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng), lang: locale });
       const response = await fetch('/api/journey?' + params, { cache: 'no-store', signal: controller.signal });
       const payload = await response.json() as { data?: ScoredRoute[]; meta?: JourneyMeta; error?: string };
       if (!response.ok || !Array.isArray(payload.data)) throw new Error(payload.error ?? copy(locale, '暫時無法搜尋行程。', 'Journey search is temporarily unavailable.'));
@@ -95,11 +95,11 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const uncovered = meta?.originUncovered || meta?.destinationUncovered;
   const allClosed = routes.length > 0 && routes.every(route => route.legs.some(leg => leg.serviceEnded));
   const notice = uncovered
-    ? copy(locale, (meta?.originUncovered ? '起點' : '目的地') + '附近沒有可規劃的九巴或城巴站點。', 'No supported KMB or Citybus stops were found near your ' + (meta?.originUncovered ? 'origin' : 'destination') + '.')
+    ? copy(locale, (meta?.originUncovered ? '起點' : '目的地') + '附近沒有可規劃的公共交通站點。', 'No supported public transport stops were found near your ' + (meta?.originUncovered ? 'origin' : 'destination') + '.')
     : meta?.tooCloseToRide ? copy(locale, '兩個地點很接近，步行即可到達。', 'These places are close enough to walk between.')
       : allClosed ? copy(locale, '行程有已收班的路段，請留意服務狀態。', 'These options contain ended services. Check service status before travelling.')
-        : searched && routes.length === 0 ? copy(locale, '已選擇兩個地點，但未找到支援的巴士連接。搜尋暫未涵蓋港鐵及所有轉乘組合；可嘗試附近車站。', 'Both places are selected, but no supported bus connection was found. Search does not yet cover MTR or every transfer combination. Try nearby stops.') : null;
-  const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的巴士路線', 'No supported bus journey found')
+        : searched && routes.length === 0 ? copy(locale, '未找到時間表內可用的連接（最多三次轉乘），可嘗試附近站點。', 'No available connection was found within three transfers. Try nearby stops.') : null;
+  const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的公共交通路線', 'No supported transit journey found')
     : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
 
   const searchPanel = <aside className="planner-sidebar" id="journey">
@@ -134,10 +134,10 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
         <p>{copy(locale, '每次轉乘 +8；候車倍率：繁忙 1.0、非繁忙 1.3、深夜 1.8。', 'Each transfer adds 8. Waiting multipliers: peak 1.0, off-peak 1.3, overnight 1.8.')}</p>
         <p>KMB −1 · LWB −0.46 · MTR +0.5 · CTB +1</p>
       </details>
-      <div className="menu-footnote"><a href="/api/sources">{copy(locale, '資料來源及鳴謝', 'Data sources & attribution')}</a><p>{copy(locale, '獨立交通規劃原型。九巴、城巴及步行。車程及票價為估算。', 'Independent transit prototype. KMB, Citybus and walking. Journey times and fares are estimates.')}</p></div>
+      <div className="menu-footnote"><a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a><p><a href="/api/sources">{copy(locale, '資料來源及鳴謝', 'Data sources & attribution')}</a></p><p>{copy(locale, '獨立交通規劃原型。鐵路、巴士、小巴、電車、渡輪及步行。車程及票價為估算。', 'Independent transit prototype. Rail, buses, minibuses, trams, ferries and walking. Times and fares are estimates.')}</p></div>
     </dialog>
     <dialog className="arrivals-dialog" ref={arrivalsDialog} onCancel={() => setArrivalsOpen(false)} onClose={() => setArrivalsOpen(false)}>
-      <div className="dialog-heading"><h2>{copy(locale, '查詢車站到站時間', 'Station arrivals')}</h2><button type="button" onClick={() => setArrivalsOpen(false)} aria-label={copy(locale, '關閉到站時間', 'Close arrivals')}><PlannerIcon name="close" size={22} /></button></div><LiveTransitSearch />
+      <div className="dialog-heading"><h2>{copy(locale, '查詢車站到站時間', 'Station arrivals')}</h2><button type="button" onClick={() => setArrivalsOpen(false)} aria-label={copy(locale, '關閉到站時間', 'Close arrivals')}><PlannerIcon name="close" size={22} /></button></div><LiveTransitSearch locale={locale} />
     </dialog>
   </main>;
 }

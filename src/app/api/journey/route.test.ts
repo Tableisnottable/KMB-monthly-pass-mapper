@@ -1,79 +1,64 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { scoreRoutes } from '../../../engine/UpgradedScoringEngine';
-import { getStaticCitybusRouteStops, getStaticCitybusStops } from '../../../data/citybusStopsStatic';
-import { getCitybusEta, getKmbStops } from '../../../data/hkTransitApi';
+import { networkPatterns, networkRoutes, weightingDate } from '../../../data/transportNetwork';
 import { GET } from './route';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
-vi.mock('../../../data/hkTransitApi', () => ({
-  getKmbStops: vi.fn(async () => []),
-  getKmbStopEta: vi.fn(async () => []),
-  getKmbRouteStops: vi.fn(async () => []),
-  getCitybusRouteStops: vi.fn(async () => []),
-  getCitybusEta: vi.fn(async (_stop: string, route: string) => ['I', 'O'].map(dir => ({
-    route, dir, eta: new Date(Date.now() + 5 * 60000).toISOString(),
-    co: 'CTB', seq: 1, dest_tc: '', remarks_tc: '',
-  }))),
-}));
-
+vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
+const now = new Date('2026-11-13T04:00:00Z');
 const cheungShaWan = { lat: 22.33882, lng: 114.15387 };
 const airport = { lat: 22.31367, lng: 113.93763 };
 
 async function journey(from = cheungShaWan, to = airport) {
-  const params = new URLSearchParams({
-    fromLat: String(from.lat), fromLon: String(from.lng),
-    toLat: String(to.lat), toLon: String(to.lng),
-  });
+  const params = new URLSearchParams({ fromLat: String(from.lat), fromLon: String(from.lng),
+    toLat: String(to.lat), toLon: String(to.lng), lang: 'en' });
   const response = await GET(new NextRequest('http://localhost/api/journey?' + params));
   expect(response.status).toBe(200);
   return response.json();
 }
 
-describe('Citybus journey coverage', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+describe('Multimodal journey API', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
+  afterEach(() => { vi.useRealTimers(); });
 
-  it('finds the airport trip from the reported screenshot', async () => {
+  it('keeps the reported airport journey covered with the unchanged weighted engine', async () => {
     const { data, meta } = await journey();
-    expect(meta.citybusCandidates).toBeGreaterThan(0);
-    expect(data.some((route: { legs: { routeNumber: string }[] }) =>
-      route.legs.some(leg => /^A2[013]/.test(leg.routeNumber)),
-    )).toBe(true);
-    const stops = new Map(getStaticCitybusStops().map(stop => [stop.stop, stop]));
+    expect(data.length).toBeGreaterThan(0);
+    expect(meta.coverage.routes).toBeGreaterThan(2400);
+    expect(meta.candidates).toBeGreaterThan(0);
+    expect(data.some((r: { legs: { operator: string; routeNumber: string }[] }) => r.legs.some(l => l.operator === 'CTB' && /^A2[013]/.test(l.routeNumber)))).toBe(true);
     for (const route of data) {
-      const leg = route.legs[0];
-      expect(leg.operator).toBe('CTB');
-      expect(stops.has(leg.originStop.id)).toBe(true);
-      const sequence = getStaticCitybusRouteStops(leg.routeNumber,
-        route.id.includes('-outbound-') ? 'outbound' : 'inbound')!;
-      expect(sequence.findIndex(row => row.stop === leg.destinationStop.id))
-        .toBeGreaterThan(sequence.findIndex(row => row.stop === leg.originStop.id));
-      expect(leg.realtimeEta.isLive).toBe(true);
-      expect(route.finalScore).toBe(scoreRoutes([route])[0].finalScore);
+      expect(route.finalScore).toBe(scoreRoutes([route], weightingDate(now))[0].finalScore);
+      for (const leg of route.legs) {
+        if (leg.mode === 'WALK') continue;
+        const pattern = networkPatterns[leg.networkPattern];
+        expect(leg.alightingIndex).toBeGreaterThan(leg.boardingIndex);
+        expect(pattern.p[leg.boardingIndex]).toBe(0);
+        expect(pattern.a[leg.alightingIndex]).toBe(0);
+        expect(networkRoutes[pattern.r][2]).toBe(leg.routeNumber);
+      }
     }
-  });
+  }, 20000);
 
-  it('also finds the return trip in the correct direction', async () => {
+  it('also finds the return airport journey', async () => {
     const { data } = await journey(airport, cheungShaWan);
     expect(data.length).toBeGreaterThan(0);
-    expect(data.some((route: { legs: { routeNumber: string }[] }) =>
-      route.legs.some(leg => /^A2[013]/.test(leg.routeNumber)),
-    )).toBe(true);
-  });
+    expect(data.some((r: { legs: { mode: string }[] }) => r.legs.some(l => l.mode === 'BUS' || l.mode === 'SUBWAY'))).toBe(true);
+  }, 20000);
 
-  it('retains topology when live ETA calls fail', async () => {
-    vi.mocked(getCitybusEta).mockRejectedValueOnce(new Error('ETA unavailable'));
-    const { data } = await journey();
-    expect(data.length).toBeGreaterThan(0);
-    expect(data.some((route: { legs: { realtimeEta: unknown; serviceEnded: boolean }[] }) =>
-      route.legs.some(leg => leg.realtimeEta === null && !leg.serviceEnded),
-    )).toBe(true);
-  });
-
-  it('reports uncovered places separately from disconnected places', async () => {
-    vi.mocked(getKmbStops).mockResolvedValueOnce([]);
+  it('reports uncovered endpoints separately from unavailable connections', async () => {
     const { data, meta } = await journey({ lat: 0, lng: 0 }, airport);
-    expect(data).toEqual([]);
-    expect(meta.originUncovered).toBe(true);
+    expect(data).toEqual([]); expect(meta.originUncovered).toBe(true);
   });
+
+  it('rejects missing or invalid coordinates', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=nope'));
+    expect(response.status).toBe(400);
+  });
+
+  it('returns a walking comparison for nearby places', async () => {
+    const { data } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 });
+    expect(data.some((r: { legs: { mode: string }[] }) => r.legs.every(l => l.mode === 'WALK'))).toBe(true);
+  }, 20000);
 });

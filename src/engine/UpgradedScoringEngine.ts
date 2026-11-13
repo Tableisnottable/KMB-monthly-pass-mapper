@@ -36,6 +36,17 @@ export interface Segment {
   originStop?: Stop;
   destinationStop?: Stop;
   fare?: number;
+  /** Metadata from the multimodal snapshot; scoring calculations are unchanged. */
+  fareStatus?: 'PUBLISHED' | 'UNAVAILABLE';
+  serviceStatus?: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED';
+  scheduledDepartureMinutes?: number;
+  scheduledWaitMinutes?: number;
+  publishedHeadwayMinutes?: number;
+  accessWalkMinutes?: number;
+  networkPattern?: number;
+  boardingIndex?: number;
+  alightingIndex?: number;
+  path?: [number, number][];
 }
 
 export interface TransitLeg extends Segment {

@@ -49,4 +49,15 @@ describe('Transit place suggestions', () => {
     const response = await search('Unmatched place xyz');
     expect(response.status).toBe(502);
   });
+
+  it.each(['Mui Wo', '三聖', 'Lo Wu', '港鐵中環站'])(
+    'finds ferry/rail places outside the old Citybus-only catalogue: %s', async query => {
+      vi.stubGlobal('fetch', vi.fn(async () => Response.json([])));
+      const response = await search(query);
+      expect(response.status).toBe(200);
+      const { data } = await response.json();
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.some((p: { id: string }) => p.id.startsWith('network:'))).toBe(true);
+    },
+  );
 });

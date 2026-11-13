@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "data:citybus": "node scripts/fetch-citybus-data.mjs"
+    "data:citybus": "node scripts/fetch-citybus-data.mjs",
+    "data:transport": "python scripts/import-transport.py"
   },
   "keywords": [],
   "author": "",

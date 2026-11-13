@@ -83,7 +83,12 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
         const b = point(leg.destinationStop?.lat, leg.destinationStop?.lng);
         if (!a || !b) return;
         if (previous) connect(previous, a, '#72827d', true);
-        connect(a, b, routeColor(leg.operator), leg.mode === 'WALK');
+        const path = leg.path?.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+        if (path && path.length > 1) {
+          L.polyline(path, { color: '#fff', weight: 9, opacity: .9 }).addTo(routeLayer);
+          L.polyline(path, { color: routeColor(leg.operator), weight: 5, lineCap: 'round' }).addTo(routeLayer);
+          points.push(...path);
+        } else connect(a, b, routeColor(leg.operator), leg.mode === 'WALK');
         mark(a, leg.originStop?.name ?? '', routeColor(leg.operator));
         mark(b, leg.destinationStop?.name ?? '', routeColor(leg.operator));
         previous = b;
