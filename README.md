@@ -291,6 +291,20 @@ NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Hong+Kong&output
 
 不要提交 credentials、API keys 或 private endpoints / Do not commit credentials, API keys, or private endpoints.
 
+### Install on Android / 在 Android 安裝
+
+Open `/install` in Chrome on a Pixel 8 (or `/install?lang=zh` for Chinese).
+Use **Install app** when offered, or Chrome's **⋮ → Install and create shortcut
+→ Install** (some versions show **Add to home screen** or **Install app**).
+The manifest supplies standard and maskable icons, an app identity and standalone
+display, so the installed web app opens from the home screen or app drawer.
+This is a PWA, not a native APK or Play Store release. Hosting stays free.
+
+The service worker caches only an offline help page. It does not cache API
+responses, route calculations, map tiles or old Next.js assets. An internet
+connection remains necessary for data, maps and arrivals; full offline routing
+is not included. Service-worker registration is disabled in development.
+
 Cloudflare deployment / Cloudflare 部署：
 
 Use Node.js 22.12 or newer (`.node-version` pins major 22 for hosted builds).

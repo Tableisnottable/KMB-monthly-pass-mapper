@@ -7,7 +7,7 @@ const assets = join(root, '.free-worker/assets');
 await mkdir(assets, { recursive: true });
 await cp(join(root, 'public'), assets, { recursive: true });
 await cp(join(root, '.next/static'), join(assets, '_next/static'), { recursive: true });
-const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates'];
+const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install'];
 for (const page of pages) await copyFile(join(root, '.next/server/app', page + '.html'), join(assets, page + '.html'));
 await copyFile(join(root, '.next/server/app/_not-found.html'), join(assets, '404.html'));
 await mkdir(join(assets, 'api'), { recursive: true });
@@ -26,6 +26,12 @@ await writeFile(join(assets, '_headers'), `/*
   Permissions-Policy: camera=(), microphone=(), geolocation=(self)
 /__planner/*
   Cache-Control: public, max-age=0, must-revalidate
+/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+/manifest.webmanifest
+  Cache-Control: no-cache
+  Content-Type: application/manifest+json
 `);
 await build({ absWorkingDir: root, entryPoints: ['src/cloudflare/worker.ts'], outfile: '.free-worker/worker.js',
   bundle: true, minify: true, platform: 'browser', format: 'esm', target: 'es2022' });
