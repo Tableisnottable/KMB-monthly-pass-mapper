@@ -286,7 +286,7 @@ NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Hong+Kong&output
 
 Cloudflare deployment / Cloudflare 部署：
 
-Use Node.js 22 or newer (`.node-version` pins major 22 for hosted builds).
+Use Node.js 22.12 or newer (`.node-version` pins major 22 for hosted builds).
 For the existing Cloudflare Workers Git build, use repository root `/`,
 build command `npm run cf:build`, deploy command `npx opennextjs-cloudflare deploy`,
 and production branch `main`. Do not use a static Pages export: the route planner
