@@ -4,7 +4,7 @@ import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight } from '../../domain/monthlyPass';
 import { PlannerIcon } from './PlannerIcon';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
-import { copy, modeIcon, modeLabel, routeColor, type PlannerLocale } from './plannerUi';
+import { copy, legOperator, modeIcon, modeLabel, routeColor, routeIconColor, type PlannerLocale } from './plannerUi';
 
 export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: PlannerLocale }) {
   const insight = getMonthlyPassInsight(route);
@@ -26,8 +26,8 @@ export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: Pl
     <ol className="directions-list">
       {!walkOnly && (route.originWalkMinutes ?? 0) > 0 && <li><span className="step-marker"><PlannerIcon name="walk" size={15} /></span><div><strong>{copy(locale, '步行至上車站', 'Walk to your stop')}</strong><small>{route.legs[0]?.originStop.name} · {route.originWalkMinutes} min</small></div></li>}
       {route.legs.map((leg, index) => <li key={leg.id}>
-        <span className="step-marker" style={{ color: routeColor(leg.operator) }}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
-        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : leg.operator + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))}</strong>
+        <span className="step-marker step-operator-marker" style={{ backgroundColor: routeColor(legOperator(leg)), color: routeIconColor(legOperator(leg)) }}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
+        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : legOperator(leg) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))}</strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>
           {leg.departureTime && leg.arrivalTime && <small>{hongKongTimeLabel(leg.departureTime)} → {hongKongTimeLabel(leg.arrivalTime)} HKT</small>}
           {leg.mode !== 'WALK' && leg.fareStatus !== 'UNAVAILABLE' && <small className="leg-adult-fare">{copy(locale, '成人票價 ', 'Adult fare ')}HK${(leg.fare ?? 0).toFixed(2)}{leg.fareStatus === 'FULL_FARE' ? ' · ' + copy(locale, '全程票價上限', 'full-fare upper bound') : leg.fare === 0 ? ' · ' + copy(locale, '已包括在鐵路票價內', 'included in rail fare') : ''}</small>}

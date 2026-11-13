@@ -137,6 +137,11 @@ button {
 .quick-modes button:hover:not(:disabled) { background: #edf7ec; }
 .route-group { margin-top: 25px; }
 .route-group h2 { font-size: 20px; font-weight: 800; line-height: 24px; color: #fff; margin-bottom: 10px; }
+.route-group-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.route-group-heading h2 { margin-bottom: 0; }
+.journey-sort { display: flex; align-items: center; gap: 6px; color: #fff; font-size: 12px; }
+.journey-sort select { max-width: 160px; min-height: 34px; padding: 5px 24px 5px 8px; color: #25372b; background: #fff; border: 1px solid #d3e3d0; border-radius: 4px; font: inherit; cursor: pointer; }
+.journey-sort select:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .route-list { border: 1px solid #ddd; background: #fff; border-radius: 6px; overflow: hidden; }
 .route-option { display: block; width: 100%; padding: 12px; text-align: left; background: #fff; border-bottom: 1px solid #eee; }
 .route-option:last-child { border-bottom: 0; }
@@ -144,9 +149,9 @@ button {
 .leg-alternative-divider { color: #999; font-size: 12px; }
 .combined-journeys { border-bottom: 1px solid #eee; }
 .combined-journeys:last-child { border-bottom: 0; }
-.combined-journey-summary { display: block; list-style: none; padding: 12px; cursor: pointer; background: #fff; }
+.combined-journey-summary { display: block; list-style: none; padding: 12px; cursor: pointer; background: #eff6ff; box-shadow: inset 4px 0 #4c83bc; }
 .combined-journey-summary::-webkit-details-marker { display: none; }
-.combined-journey-summary:hover { background: #f4f8f2; }
+.combined-journey-summary:hover { background: #e3efff; }
 .combined-journey-summary:focus-visible { outline: 2px solid var(--green-dark); outline-offset: -3px; }
 .combined-option-count { font-size: 12px; color: #707970; }
 .combined-journey-summary .route-option-price { max-width: none; }
@@ -161,7 +166,15 @@ button {
 .combined-expand-label svg { flex-shrink: 0; margin-left: auto; }
 .combined-journeys[open] > summary .combined-expand-label svg { transform: rotate(90deg); }
 .combined-journey-options { border-top: 1px solid #e5eae3; border-left: 3px solid #c0dbb9; }
+.journey-card-labels { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 8px; }
+.combined-card-label { display: inline-flex; align-items: center; gap: 4px; color: #285988; background: #dcecff; border-radius: 3px; padding: 3px 6px; font-size: 11px; line-height: 15px; font-weight: 700; }
+.route-selected-label { display: flex; align-items: center; gap: 4px; color: var(--green-dark); font-size: 11px; line-height: 16px; font-weight: 700; margin-bottom: 6px; }
+.journey-card-labels .route-selected-label { margin-bottom: 0; }
+.combined-selected-journey { display: block; margin-top: 6px; font-size: 11px; line-height: 16px; font-weight: 700; color: var(--green-dark); overflow-wrap: anywhere; }
 .route-option:hover { background: #f4f8f2; }
+.route-option.is-selected { background: #edf7e9; box-shadow: inset 4px 0 var(--green-dark), inset 0 0 0 2px var(--green-dark); }
+.combined-journeys.is-selected > .combined-journey-summary { background: #e7f1ff; box-shadow: inset 4px 0 #4c83bc, inset 0 0 0 2px var(--green-dark); }
+.route-option:focus-visible { outline: 2px solid var(--green-dark); outline-offset: -3px; }
 .route-option-top { display: flex; align-items: center; gap: 10px; min-height: 28px; }
 .route-symbols { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; flex: 1; color: #999; }
 .leg-symbol-group { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
@@ -201,6 +214,7 @@ button {
 .directions-list li { display: flex; gap: 11px; padding: 21px 0; border-bottom: 1px solid #eee; }
 .directions-list li:last-child { border-bottom: 0; }
 .step-marker { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; color: #999; }
+.step-operator-marker { border-radius: 4px; }
 .directions-list strong { display: block; font-size: 15px; font-weight: 700; }
 .directions-list small { display: block; font-size: 13px; line-height: 1.65; margin-top: 8px; color: #888; }
 .transfer-note { color: #aa893a !important; }

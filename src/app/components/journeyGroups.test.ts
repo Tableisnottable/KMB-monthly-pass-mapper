@@ -59,3 +59,43 @@ describe('Combined stop-to-stop journeys', () => {
     expect(groupFareLabel(group, 'en')).toBe('$45.10'); expect(groupDurationLabel(group)).toBe('71–76');
   });
 });
+
+describe('Journey sorting', () => {
+  const candidates = () => {
+    const fast = journey('fast', ['A'], 90, 'fast-stop');
+    fast.walkTransferTimeMinutes = 9; fast.legs![0].journeyTimeMinutes = 10;
+    const walk = journey('short-walk', ['B'], 10, 'nearby-stop');
+    walk.walkTransferTimeMinutes = 2; walk.legs![0].journeyTimeMinutes = 40;
+    const cheap = journey('cheap-transfer', ['C', 'D'], 4, 'transfer-stop');
+    cheap.walkTransferTimeMinutes = 12; cheap.legs!.forEach(leg => { leg.journeyTimeMinutes = 5; });
+    return scoreRoutes([fast, walk, cheap]);
+  };
+
+  it.each([
+    ['recommended', 'cheap-transfer'], ['fastest', 'fast'], ['cheapest', 'cheap-transfer'],
+    ['transfers', 'short-walk'], ['walking', 'short-walk'],
+  ] as const)('sorts by %s without modifying the underlying scores or input order', (sort, firstId) => {
+    const routes = candidates(), before = JSON.stringify(routes);
+    expect(groupJourneysByStops(routes, sort)[0].routes[0].id).toBe(firstId);
+    expect(JSON.stringify(routes)).toBe(before);
+  });
+
+  it('sorts both combined cards and their individual choices by the chosen metric', () => {
+    const slowCheap = journey('slow-cheap', ['2A', 'NA21'], 45);
+    slowCheap.legs![0].journeyTimeMinutes = 40;
+    const fastExpensive = journey('fast-expensive', ['171', 'NA21'], 47);
+    const routes = scoreRoutes([slowCheap, fastExpensive, journey('direct', ['N21'], 46)]);
+    const cheap = groupJourneysByStops(routes, 'cheapest');
+    expect(cheap[0].routes.map(route => route.id)).toEqual(['slow-cheap', 'fast-expensive']);
+    expect(groupJourneysByStops(routes, 'fastest')[0].routes[0].id).toBe('direct');
+    expect(groupJourneysByStops(routes, 'fastest')[1].routes[0].id).toBe('fast-expensive');
+    expect(groupFareLabel(cheap[0], 'en')).toBe('$45.00–$47.00');
+  });
+
+  it('does not rank an unavailable zero fare as the cheapest journey', () => {
+    const unknown = journey('unknown', ['A'], 0, 'unknown-stop');
+    unknown.legs![0].fareStatus = 'UNAVAILABLE';
+    const routes = scoreRoutes([unknown, journey('known', ['B'], 30, 'known-stop')]);
+    expect(groupJourneysByStops(routes, 'cheapest').map(group => group.routes[0].id)).toEqual(['known', 'unknown']);
+  });
+});

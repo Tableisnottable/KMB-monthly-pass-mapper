@@ -18,6 +18,8 @@ export interface RealtimeEta {
 export interface Segment {
   id?: string;
   operator: Operator;
+  /** Original catalogue identity for display, including joint services. */
+  networkOperator?: string;
   mode?: RouteMode;
   routeName?: string;
   routeNumber?: string;

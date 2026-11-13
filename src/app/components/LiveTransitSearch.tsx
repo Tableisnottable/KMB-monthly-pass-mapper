@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PlannerIcon } from './PlannerIcon';
-import { copy, modeIcon, modeLabel, routeColor, type PlannerLocale } from './plannerUi';
+import { copy, modeIcon, modeLabel, routeColor, routeIconColor, type PlannerLocale } from './plannerUi';
 
 interface Stop { id: string; nameTc: string; nameEn: string; mode: string }
 interface Departure { id: string; operator: string; number: string; mode: string; destination: string;
@@ -60,7 +60,7 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
       <button type="button" className="all-results-button" onClick={() => { active.current?.abort(); setLoading(false); setSelected(null); setMessage(''); }}>{copy(locale, '← 所有站點', '← All stops')}</button>
       <h3>{locale === 'en' ? selected.nameEn : selected.nameTc}</h3>
       <div className="station-departures">{departures.map(row => <div key={row.id}>
-        <span style={{ color: routeColor(row.operator) }}><PlannerIcon name={modeIcon(row.mode)} size={21} /><strong>{row.number || modeLabel(row.mode, locale)}</strong></span>
+        <span title={row.operator}><span className="route-badge-icon" style={{ backgroundColor: routeColor(row.operator), color: routeIconColor(row.operator) }}><PlannerIcon name={modeIcon(row.mode)} size={18} /></span><strong>{row.number || modeLabel(row.mode, locale)}</strong></span>
         <span>{row.destination}<small>{row.operator} · {row.status === 'LIVE' ? copy(locale, '即時', 'Live')
           : row.status === 'TIMETABLE' ? copy(locale, '時間表', 'Timetable') : copy(locale, '服務未能核實', 'Service unverified')}</small></span>
         <strong>{row.status === 'NO_UPCOMING' ? '—' : row.minutes === null ? '—' : row.minutes + ' min'}</strong>

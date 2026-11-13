@@ -1,15 +1,26 @@
 import type { ScoredRoute, Segment, TransitLeg } from '../../engine/UpgradedScoringEngine';
-import { copy, fareLabel, hasEndedService, journeyMinutes, type PlannerLocale } from './plannerUi';
+import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, type PlannerLocale } from './plannerUi';
 
 export interface JourneyGroup { id: string; routes: ScoredRoute[] }
+export type JourneySort = 'recommended' | 'fastest' | 'cheapest' | 'transfers' | 'walking';
 
-const serviceKey = (leg: Segment) => JSON.stringify([leg.operator, leg.mode, leg.routeNumber, leg.routeName,
+const serviceKey = (leg: Segment) => JSON.stringify([legOperator(leg), leg.mode, leg.routeNumber, leg.routeName,
   leg.mode === 'MINIBUS' ? leg.networkPattern : undefined]);
 
+function sortValue(route: ScoredRoute, sort: JourneySort): number {
+  switch (sort) {
+    case 'fastest': return journeyMinutes(route);
+    case 'cheapest': return route.legs.some(leg => leg.fareStatus === 'UNAVAILABLE') ? Infinity : route.discountedFare;
+    case 'transfers': return route.transferCount;
+    case 'walking': return route.walkTransferTimeMinutes;
+    default: return route.finalScore;
+  }
+}
+
 /** Combine direct stop pairs or feeders joining the same onward services. */
-export function groupJourneysByStops(routes: ScoredRoute[]): JourneyGroup[] {
+export function groupJourneysByStops(routes: ScoredRoute[], sort: JourneySort = 'recommended'): JourneyGroup[] {
   const groups = new Map<string, JourneyGroup>();
-  [...routes].sort((a, b) => a.finalScore - b.finalScore).forEach((route, index) => {
+  [...routes].sort((a, b) => sortValue(a, sort) - sortValue(b, sort) || a.finalScore - b.finalScore).forEach((route, index) => {
     const first = route.legs[0], last = route.legs.at(-1);
     const originId = first?.originStop?.id, destinationId = last?.destinationStop?.id;
     const canCombine = originId && destinationId

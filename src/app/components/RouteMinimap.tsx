@@ -2,17 +2,7 @@
 
 import { useMemo } from 'react';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
-
-const OPERATOR_COLORS: Record<string, string> = {
-  KMB: '#e4002b',
-  LWB: '#ff6a00',
-  MTR: '#a6192e',
-  CTB: '#f7b500',
-};
-
-function operatorColor(operator: string): string {
-  return OPERATOR_COLORS[operator] ?? '#6b7280';
-}
+import { legOperator, routeColor } from './plannerUi';
 
 interface Point {
   x: number;
@@ -26,10 +16,10 @@ export function RouteMinimap({ route }: { route: ScoredRoute }) {
     const stops = route.legs.flatMap((leg, index) => {
       const list = [];
       if (index === 0 && leg.originStop) {
-        list.push({ stop: leg.originStop, color: operatorColor(leg.operator) });
+        list.push({ stop: leg.originStop, color: routeColor(legOperator(leg)) });
       }
       if (leg.destinationStop) {
-        list.push({ stop: leg.destinationStop, color: operatorColor(leg.operator) });
+        list.push({ stop: leg.destinationStop, color: routeColor(legOperator(leg)) });
       }
       return list;
     });

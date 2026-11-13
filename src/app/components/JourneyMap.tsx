@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import type { PlaceResult } from './PlaceAutocomplete';
-import { copy, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { copy, legOperator, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { PlannerIcon } from './PlannerIcon';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
@@ -79,8 +79,8 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
         const a = point(leg.originStop?.lat, leg.originStop?.lng);
         const b = point(leg.destinationStop?.lat, leg.destinationStop?.lng);
         if (!a || !b) return;
-        mark(a, leg.originStop?.name ?? '', routeColor(leg.operator));
-        mark(b, leg.destinationStop?.name ?? '', routeColor(leg.operator));
+        mark(a, leg.originStop?.name ?? '', routeColor(legOperator(leg)));
+        mark(b, leg.destinationStop?.name ?? '', routeColor(legOperator(leg)));
       });
     }
     if (origin) flag(origin, copy(locale, '起點', 'Start'));
@@ -106,7 +106,8 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
       if (controller.signal.aborted) return;
       for (const piece of payload.pieces) {
         if (piece.source === 'UNAVAILABLE') continue;
-        const color = piece.walk ? '#72827d' : routeColor(route!.legs[piece.legIndex]?.operator ?? '');
+        const leg = route!.legs[piece.legIndex];
+        const color = piece.walk ? '#72827d' : routeColor(leg ? legOperator(leg) : '');
         for (const path of piece.paths) {
           if (path.length < 2 || path.some(p => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) continue;
           L.polyline(path, { color: '#fff', weight: piece.walk ? 6 : 9, opacity: .9, interactive: false }).addTo(routeLayer);
