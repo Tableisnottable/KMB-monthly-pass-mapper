@@ -50,12 +50,29 @@ describe('journey display values', () => {
 });
 
 describe('Bus display colours', () => {
-  it('keeps company colours across local, tunnel, airport and premium routes', () => {
-    for (const number of ['2A', '104', '301', '600X', '936', 'A23', 'E21', 'P960']) {
+  it('keeps company colours across other local, airport and premium routes', () => {
+    for (const number of ['2A', 'A23', 'E21', 'P960']) {
       expect(routeBadgeStyle('KMB', number)).toMatchObject({ backgroundColor: '#e62232', color: '#ffffff' });
       expect(routeBadgeStyle('CTB', number)).toMatchObject({ backgroundColor: '#f7b500', color: '#17212b' });
       expect(routeColor('LWB', number)).toBe('#ef8528');
     }
+  });
+  it('mixes red 1xx/3xx/6xx and green 9xx route numbers with company icons', () => {
+    for (const [number, colour] of [['104', '#d71920'], ['301', '#d71920'], ['600X', '#d71920'], ['936', '#007d40'], ['X970', '#007d40'], [' 914x ', '#007d40']]) {
+      for (const [operator, company, foreground] of [['KMB', '#e62232', '#ffffff'], ['CTB', '#f7b500', '#17212b']]) {
+        expect(routeBadgeStyle(operator, number)).toMatchObject({ backgroundColor: colour, color: '#ffffff',
+          '--route-icon-background': company, '--route-icon-colour': foreground });
+        expect(routeColor(operator, number)).toBe(colour);
+      }
+    }
+  });
+  it('retains known local-service exceptions and other networks', () => {
+    for (const number of ['314', '382', '628', '629', '634']) {
+      expect(routeBadgeStyle('CTB', number)).toMatchObject({ backgroundColor: '#f7b500' });
+    }
+    expect(routeColor('GMB', '104')).toBe(routeColor('GMB'));
+    expect(routeColor('RESIDENTS', 'NR104')).toBe('#656565');
+    expect(routeColor('LWB', '936')).toBe('#ef8528');
   });
   it('uses black with white text and icons for all N/NA night buses, including joint services', () => {
     for (const operator of ['KMB', 'CTB', 'LWB', 'NLB', 'KMB+CTB', 'LWB+CTB', 'unknown']) {
@@ -77,11 +94,13 @@ describe('Bus display colours', () => {
       expect(routeSignColours(operator, 'N1')).toEqual(routeSignColours(operator));
     }
   });
-  it('shows both companies for joint routes without an invented joint colour', () => {
-    expect(routeBadgeStyle('KMB+CTB', '914')).toMatchObject({ backgroundColor: '#e62232', color: '#ffffff',
-      '--route-icon-background': '#f7b500', '--route-icon-colour': '#17212b' });
+  it('retains both company colours alongside the route colour for joint harbour services', () => {
+    expect(routeBadgeStyle('KMB+CTB', '914')).toMatchObject({ backgroundColor: '#007d40', color: '#ffffff',
+      '--route-icon-background': '#f7b500', '--route-icon-colour': '#17212b', '--route-icon-accent': '#e62232' });
+    expect(routeBadgeStyle('KMB+CTB', '104')).toMatchObject({ backgroundColor: '#d71920',
+      '--route-icon-background': '#f7b500', '--route-icon-accent': '#e62232' });
     expect(routeIconColor('KMB+CTB', '104')).toBe('#17212b');
-    expect(routeColor('KMB+CTB', '914')).toBe(routeColor('KMB'));
+    expect(routeColor('KMB+CTB', '914')).toBe('#007d40');
     expect(routeBadgeStyle('LWB+CTB', 'S1')).toMatchObject({ backgroundColor: '#ef8528', '--route-icon-background': '#f7b500' });
   });
   it('has readable number and icon colours for every imported bus operator', () => {

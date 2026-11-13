@@ -88,7 +88,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ data: unique.flatMap(r => {
     const leg = r.legs![0];
     const pattern = networkPatterns[leg.networkPattern!], route = networkRoutes[pattern.r];
-    const base = { operator: leg.networkOperator ?? leg.operator, company: operatorInfo(leg.networkOperator ?? leg.operator),
+    const base = { operator: leg.networkOperator ?? leg.operator, networkOperator: leg.networkOperator ?? leg.operator,
+      company: operatorInfo(leg.networkOperator ?? leg.operator),
       routeId: route[0], patternId: pattern.id, stopId: stop, number: leg.routeNumber, mode: leg.mode,
       destination: leg.destinationStop!.name, minutes: leg.realtimeEta?.etaMinutes ?? leg.scheduledDepartureMinutes ?? null,
       status: leg.serviceEnded ? 'NO_UPCOMING' : leg.serviceStatus };

@@ -1,15 +1,23 @@
-import { roads, tracks } from './alignments/snapshot';
+import { loadAlignmentData } from './alignmentData';
 import { networkPatterns, networkRoutes, networkStops } from './transportNetwork';
 import { haversineKm } from '../engine/journeyHelpers';
 
 export type Coordinate = [number, number]; // Leaflet order: latitude, longitude.
 export type GeometryResult = { paths: Coordinate[][]; source: 'TD_CSDI' | 'OSM_TRACK' | 'OSM_ROAD' | 'OSM_FOOT' | 'UNAVAILABLE' };
-const roadRows = new Map<string, string[][]>();
-for (const [id, direction, lines] of roads as [string, string, string[]][]) {
-  const key = `${id}:${direction}`; roadRows.set(key, [...(roadRows.get(key) ?? []), lines]);
+let roadRows = new Map<string, string[][]>();
+let trackRows = new Map<string, string[]>();
+let alignmentLoading: Promise<void> | undefined;
+function ensureAlignments() {
+  if (!alignmentLoading) alignmentLoading = loadAlignmentData().then(({ roads, tracks }) => {
+    const newRoads = new Map<string, string[][]>(), newTracks = new Map<string, string[]>();
+    for (const [id, direction, lines] of roads) {
+      const key = `${id}:${direction}`; newRoads.set(key, [...(newRoads.get(key) ?? []), lines]);
+    }
+    for (const [key, lines] of tracks) newTracks.set(key, [...(newTracks.get(key) ?? []), ...lines]);
+    roadRows = newRoads; trackRows = newTracks;
+  }).catch(error => { alignmentLoading = undefined; throw error; });
+  return alignmentLoading;
 }
-const trackRows = new Map<string, string[]>();
-for (const [key, lines] of tracks as [string, string[]][]) trackRows.set(key, [...(trackRows.get(key) ?? []), ...lines]);
 const distance = (a: Coordinate, b: Coordinate) => haversineKm(a[0], a[1], b[0], b[1]);
 
 export function decodePolyline(value: string): Coordinate[] {
@@ -135,6 +143,7 @@ export async function transitGeometry(patternIndex: number, board: number, aligh
   if (transitCache.has(key)) return transitCache.get(key)!;
   const p = networkPatterns[patternIndex];
   if (!p || board < 0 || alight >= p.s.length || board >= alight) return missing();
+  try { await ensureAlignments(); } catch { return missing(); }
   const r = networkRoutes[p.r], stops = p.s.map(i => [networkStops[i][3], networkStops[i][4]] as Coordinate);
   let result: GeometryResult = missing();
   if (r[5] === 'BUS' || r[5] === 'MINIBUS') {

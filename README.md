@@ -18,7 +18,7 @@ Enhanced weighting version 2 uses ride time + actual wait × time multiplier + w
 
 Direct journeys with the same physical boarding and alighting stops appear in one expandable card. Feeder alternatives joining the same onward services and final stop are also combined, with different boarding/transfer stops explicitly indicated. Transport modes, leg counts and service availability remain separate. The card shows the minimum–maximum adult fare and duration across its choices; equal fares display once. Expanding preserves each complete journey's exact fares, times, transfer stops, score and selectable map path. Missing fares remain explicit and full-fare estimates remain upper bounds. Route numbers are combined by leg only when every displayed combination exists among the actual results.
 
-Combined cards use a blue tint and a label; the selected map journey has a green highlight and remains identified when returning from its details. Opening an unselected combined card previews its first choice on the map; reopening the selected group preserves its current individual choice. Results can be sorted by weighted recommendation, fastest, cheapest, fewest transfers or least walking. Sorting applies to cards and the choices inside them without changing any score, and unknown fares are placed last for cheapest sorting. Bus badges use company display colours, including airport and tunnel routes. N/NA night-bus routes instead use black badges and map lines with white text and icons, including joint night routes. Other joint services show both companies: the number follows the first company and the icon follows the second. Their maps use the first company colour. See `docs/route-colours.md`. Catalogue operator identity is retained separately from the existing weighting operator.
+Combined cards use a blue tint and a label; the selected map journey has a green highlight and remains identified when returning from its details. Opening an unselected combined card previews its first choice on the map; reopening the selected group preserves its current individual choice. Results can be sorted by weighted recommendation, fastest, cheapest, fewest transfers or least walking. Sorting applies to cards and the choices inside them without changing any score, and unknown fares are placed last for cheapest sorting. Harbour 1xx/3xx/6xx badges mix red route numbers with company-coloured icons; 9xx/X9xx use green route numbers. Joint harbour icons include both company colours, and maps follow the route colour. Known local and mixed-tunnel exceptions retain company colours. Other bus badges use company display colours. N/NA night-bus routes use black badges and map lines with white text and icons, including joint night routes. Other joint services show both companies: the number follows the first company and the icon follows the second. Their maps use the first company colour. See `docs/route-colours.md`. Catalogue operator identity is retained separately from the existing weighting operator.
 
 Displayed journey minutes are separate from weighted scores. They include stop-to-stop run times, access/transfer walking and predicted or scheduled waiting. KMB/LWB, Citybus, MTR, Light Rail and green minibus live arrivals enrich the initial boarding where a fresh matching prediction is available. Later connections use published timetables or estimates; connections are rechecked after the initial live arrival changes. Rail run times/headways are estimates; rail service is explicitly unverified when the live feed cannot confirm it. TD intermediate stop times are interpolated between published timepoints. A required leg with no upcoming connection is marked unavailable.
 
@@ -286,12 +286,30 @@ NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Hong+Kong&output
 
 Cloudflare deployment / Cloudflare 部署：
 
+Use Node.js 22 or newer (`.node-version` pins major 22 for hosted builds).
+For the existing Cloudflare Workers Git build, use repository root `/`,
+build command `npm run cf:build`, deploy command `npx opennextjs-cloudflare deploy`,
+and production branch `main`. Do not use a static Pages export: the route planner
+needs its server API routes. The configured Worker name is `kmb-monthly-pass-mapper`.
+
+`cf:build` stages the original full-resolution road and track chunks under
+`.open-next/assets/__alignments/`. The Worker loads them through its `ASSETS`
+binding, keeping geometry out of the compressed script without simplifying it.
+Local Next.js uses the same source chunks directly. Deploy the staged assets
+together with the Worker; `.open-next` remains ignored by Git.
+
 ```bash
-npm install
+npm ci
 npm run cf:build
 npx wrangler login
 npm run cf:deploy
 ```
+
+Joint-operated bus services show a compact dark arrivals board in station results
+and journey details: each live prediction has its Hong Kong clock time, minutes
+remaining and actual company. Both companies are interleaved chronologically,
+without combining opposite directions or different boarding stops. Missing live
+data stays explicitly unavailable; published headways are not fabricated arrivals.
 
 `wrangler.jsonc` 定義 worker entry point、static asset binding 及 optional `RATE_LIMITER` binding / `wrangler.jsonc` defines the worker entry point, static asset binding, and optional `RATE_LIMITER` binding.
 

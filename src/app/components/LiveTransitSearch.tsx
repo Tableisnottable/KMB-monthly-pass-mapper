@@ -7,9 +7,11 @@ import { operatorName } from '../../data/transportOperators';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { AddedDeparture } from './AddedDeparture';
 import type { LiveDeparture } from '../../data/networkTimetable';
+import { JointArrivalBoard } from './JointArrivalBoard';
+import { groupStationDepartures } from './jointArrivals';
 
 interface Stop { id: string; nameTc: string; nameEn: string; mode: string }
-interface Departure extends Pick<LiveDeparture, 'scheduleMatch' | 'addedReason'> { id: string; operator: string; number: string; mode: string; destination: string;
+interface Departure extends Pick<LiveDeparture, 'scheduleMatch' | 'addedReason'> { id: string; operator: string; networkOperator?: string; number: string; mode: string; destination: string;
   minutes: number | null; time: string | null; routeId: string; patternId: string; stopId: string; remark?: string;
   status: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED' | 'NO_UPCOMING' }
 
@@ -64,14 +66,22 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
     </button>)}</div> : <>
       <button type="button" className="all-results-button" onClick={() => { active.current?.abort(); setLoading(false); setSelected(null); setMessage(''); }}>{copy(locale, '← 所有站點', '← All stops')}</button>
       <h3>{locale === 'en' ? selected.nameEn : selected.nameTc}</h3>
-      <div className="station-departures">{departures.map(row => <div key={row.id}>
-        <span className="route-badge route-stop-plate" title={operatorName(row.operator, locale) + (routeSignColours(row.operator, row.number).verified ? '' : ' · ' + copy(locale, '公司顏色未核實', 'Company colour not verified'))} style={routeBadgeStyle(row.operator, row.number)}><span className="route-badge-icon"><PlannerIcon name={modeIcon(row.mode)} size={18} /></span><strong>{row.number || modeLabel(row.mode, locale)}</strong></span>
-        <span>{row.destination}<small>{operatorName(row.operator, locale)} · {row.status === 'LIVE' ? copy(locale, '即時', 'Live')
+      <div className="station-departures">{groupStationDepartures(departures).map(group => {
+        const row = group.first, displayOperator = group.jointOperator ?? row.operator;
+        return <div key={group.id}>
+        <span className="route-badge route-stop-plate" title={operatorName(displayOperator, locale) + (routeSignColours(displayOperator, row.number).verified ? '' : ' · ' + copy(locale, '公司顏色未核實', 'Company colour not verified'))} style={routeBadgeStyle(displayOperator, row.number)}><span className="route-badge-icon"><PlannerIcon name={modeIcon(row.mode)} size={18} /></span><strong>{row.number || modeLabel(row.mode, locale)}</strong></span>
+        <span>{row.destination}<small>{operatorName(displayOperator, locale)} · {row.status === 'LIVE' ? copy(locale, '即時', 'Live')
           : row.status === 'TIMETABLE' ? copy(locale, '時間表', 'Timetable') : row.status === 'NO_UPCOMING' ? copy(locale, '暫無已公布班次', 'No upcoming published service') : copy(locale, '服務未能核實', 'Service unverified')} <AddedDeparture departure={row} locale={locale} /></small>
           {row.remark && <small>{row.remark}</small>}
           <a className="departure-timetable-link" href={'/timetables?' + new URLSearchParams({ lang: locale, route: row.routeId, pattern: row.patternId, stop: row.stopId })}>{copy(locale, '完整班次時間表', 'Full timetable')}</a></span>
         <strong>{row.status === 'NO_UPCOMING' ? '—' : row.minutes === null ? '—' : row.minutes + ' min'}{row.time && <small>{hongKongTimeLabel(row.time)} HKT</small>}</strong>
-      </div>)}</div>
+        {group.jointOperator && <JointArrivalBoard operator={group.jointOperator} routeNumber={row.number}
+          stopName={locale === 'en' ? selected.nameEn : selected.nameTc} locale={locale}
+          departures={group.rows.flatMap(item => item.status === 'LIVE' && item.time !== null && item.minutes !== null
+            ? [{ time: item.time, minutes: item.minutes, operator: item.operator, remark: item.remark,
+              scheduleMatch: item.scheduleMatch, addedReason: item.addedReason }] : [])} />}
+      </div>;
+      })}</div>
       {!loading && <button type="button" className="all-results-button" onClick={() => void choose(selected)}>{copy(locale, '更新班次', 'Refresh departures')}</button>}
     </>}
     {loading && <p role="status">{copy(locale, '正在載入…', 'Loading…')}</p>}

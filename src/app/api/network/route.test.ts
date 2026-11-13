@@ -89,4 +89,24 @@ describe('All-network catalogue', () => {
       expect(added.some((row: { minutes: number }) => row.minutes === 9)).toBe(true);
     } finally { pattern.w = saved; }
   });
+  it('preserves the actual company on every joint-service arrival and the shared route identity', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T04:00:00Z'));
+    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][1] === 'KMB+CTB' && pattern.s.length > 1);
+    const pattern = networkPatterns[index];
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      for (const route of routes) {
+        const leg = route.legs![0];
+        if (networkPatterns[leg.networkPattern!].r !== pattern.r) continue;
+        leg.serviceEnded = false; leg.serviceStatus = 'LIVE';
+        leg.liveDepartures = ['CTB', 'KMB'].map((operator, i) => ({ operator, minutes: 2 + i * 5,
+          time: new Date(Date.now() + (2 + i * 5) * 60000).toISOString(), scheduleMatch: 'MATCHED' }));
+      }
+    });
+    const { data } = await (await lookup('resource=departures&stop=' + encodeURIComponent(networkStops[pattern.s[0]][0]))).json();
+    const live = data.filter((item: { routeId: string; status: string }) => item.routeId === networkRoutes[pattern.r][0] && item.status === 'LIVE');
+    expect(live.map((item: { operator: string }) => item.operator)).toEqual(['CTB', 'KMB']);
+    expect(live.every((item: { networkOperator: string }) => item.networkOperator === 'KMB+CTB')).toBe(true);
+    expect(live[0].company.id).toBe('CTB');
+    expect(live[1].company.id).toBe('KMB');
+  });
 });

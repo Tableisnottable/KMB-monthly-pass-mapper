@@ -3,11 +3,18 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 export interface RateLimiterBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
 }
+export interface AssetsBinding { fetch(request: Request): Promise<Response> }
 
 declare global {
   interface CloudflareEnv {
     RATE_LIMITER?: RateLimiterBinding;
   }
+}
+
+export async function getAssetsBinding(): Promise<AssetsBinding | undefined> {
+  if (!isCloudflareRuntime()) return undefined;
+  const { env } = await getCloudflareContext({ async: true });
+  return env?.ASSETS;
 }
 
 // The OpenNext worker installs this context on the global scope at startup.

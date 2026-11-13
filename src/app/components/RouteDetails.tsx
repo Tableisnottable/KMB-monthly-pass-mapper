@@ -7,6 +7,7 @@ import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { copy, legOperator, modeIcon, modeLabel, routeBadgeStyle, type PlannerLocale } from './plannerUi';
 import { operatorName } from '../../data/transportOperators';
 import { AddedDeparture } from './AddedDeparture';
+import { JointArrivalBoard } from './JointArrivalBoard';
 
 export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: PlannerLocale }) {
   const insight = getMonthlyPassInsight(route);
@@ -34,6 +35,8 @@ export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: Pl
           {leg.departureTime && leg.arrivalTime && <small>{hongKongTimeLabel(leg.departureTime)} → {hongKongTimeLabel(leg.arrivalTime)} HKT</small>}
           {leg.mode !== 'WALK' && leg.fareStatus !== 'UNAVAILABLE' && <small className="leg-adult-fare">{copy(locale, '成人票價 ', 'Adult fare ')}HK${(leg.fare ?? 0).toFixed(2)}{leg.fareStatus === 'FULL_FARE' ? ' · ' + copy(locale, '全程票價上限', 'full-fare upper bound') : leg.fare === 0 ? ' · ' + copy(locale, '已包括在鐵路票價內', 'included in rail fare') : ''}</small>}
           <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + copy(locale, '即時到站', 'Live arrival') + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
+          {leg.mode === 'BUS' && legOperator(leg).includes('+') && <JointArrivalBoard departures={leg.liveDepartures ?? []}
+            operator={legOperator(leg)} routeNumber={leg.routeNumber} stopName={leg.originStop?.name} locale={locale} />}
           {leg.serviceStatus === 'UNVERIFIED' && <small>{copy(locale, '此路段服務未能核實，請向營辦商確認。', 'Service on this leg is unverified. Confirm with the operator.')}</small>}
           {leg.serviceStatus === 'TIMETABLE' && <small>{copy(locale, '按官方時間表估算，並非即時到站預報。', 'Based on the published timetable, not a live arrival prediction.')}</small>}
           {leg.networkRouteId && <small><a className="departure-timetable-link" href={'/timetables?' + new URLSearchParams({ lang: locale, route: leg.networkRouteId, ...(leg.networkPatternId && leg.originStop ? { pattern: leg.networkPatternId, stop: leg.originStop.id } : {}) })}>{copy(locale, '完整班次時間表', 'Full timetable')}</a></small>}
