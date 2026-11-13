@@ -1,21 +1,23 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
+import type { ScoredRoute, TransitLeg } from '../../engine/UpgradedScoringEngine';
 import type { PlaceResult } from './PlaceAutocomplete';
 import { JourneyMap } from './JourneyMap';
 import { PlannerIcon } from './PlannerIcon';
 import { RouteDetails } from './RouteDetails';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { copy, fareLabel, hasEndedService, journeyMinutes, modeIcon, modeLabel, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { combinedLegChoices, groupDurationLabel, groupFareLabel, groupJourneysByStops, type JourneyGroup } from './journeyGroups';
 
-function RouteSymbols({ route, locale }: { route: ScoredRoute; locale: PlannerLocale }) {
-  return <span className="route-symbols">{route.legs.map((leg, index) => <span className="leg-symbol-group" key={leg.id}>
+function RouteSymbols({ route, locale, choices, compact = false }: { route: ScoredRoute; locale: PlannerLocale; choices?: TransitLeg[][]; compact?: boolean }) {
+  return <span className="route-symbols">{(choices ?? route.legs.map(leg => [leg])).map((legs, index) => <span className="leg-symbol-group" key={index}>
     {index > 0 && <span className="leg-separator">·</span>}
+    {(compact ? legs.slice(0, 6) : legs).map((leg, option) => <span className="leg-route-choice" key={option}>{option > 0 && <span className="leg-alternative-divider">/</span>}
     {leg.mode === 'WALK' ? <PlannerIcon name="walk" size={21} /> : <span className="route-badge" style={{ color: routeColor(leg.operator) }}>
       <span className="route-badge-icon" style={{ backgroundColor: routeColor(leg.operator) }}><PlannerIcon name={modeIcon(leg.mode)} size={18} /></span>
       <strong>{leg.routeNumber || modeLabel(leg.mode, locale)}</strong>
-    </span>}
+    </span>}</span>)}{compact && legs.length > 6 && <small className="combined-more-services">+{legs.length - 6}</small>}
   </span>)}</span>;
 }
 
@@ -37,6 +39,29 @@ function JourneyRow({ route, locale, onSelect }: { route: ScoredRoute; locale: P
   </button>;
 }
 
+function JourneyChoiceGroup({ group, locale, onSelect, searchOrigin }: { group: JourneyGroup; locale: PlannerLocale; onSelect: (route: ScoredRoute) => void; searchOrigin?: string }) {
+  const best = group.routes[0];
+  if (group.routes.length === 1) return <JourneyRow route={best} locale={locale} onSelect={() => onSelect(best)} />;
+  const choices = combinedLegChoices(group);
+  const sameBoarding = group.routes.every(route => route.legs[0].originStop?.id === best.legs[0].originStop?.id);
+  const sameStops = group.routes.every(route => route.legs.every((leg, index) => leg.originStop?.id === best.legs[index].originStop?.id && leg.destinationStop?.id === best.legs[index].destinationStop?.id));
+  return <details className="combined-journeys">
+    <summary className="combined-journey-summary">
+      <span className="route-option-top"><span className="combined-option-count">{group.routes.length} {copy(locale, '個行程', 'journeys')}</span>
+        <span className="route-option-price">{groupFareLabel(group, locale)}</span><span className="route-duration">{groupDurationLabel(group)}<small>min</small></span></span>
+      <span className="combined-route-symbols">{choices ? <RouteSymbols route={best} locale={locale} choices={choices} compact />
+        : group.routes.map((route, index) => <span className="combined-complete-path" key={route.id}>{index > 0 && <small>{copy(locale, '或', 'or')}</small>}<RouteSymbols route={route} locale={locale} /></span>)}</span>
+      <span className="combined-stop-pair">{sameBoarding ? best.legs[0].originStop?.name : searchOrigin ?? copy(locale, '附近上車站', 'Nearby boarding stops')} → {best.legs.at(-1)?.destinationStop?.name}</span>
+      {best.departureTime && best.arrivalTime && <span className="route-clock-line">{copy(locale, '首選 ', 'Best ranked ')}{hongKongTimeLabel(best.departureTime)} → {hongKongTimeLabel(best.arrivalTime)} <small>HKT · {copy(locale, '普通成人', 'Normal adult')}</small></span>}
+      <span className="combined-expand-label">{sameStops ? copy(locale, '同一上落車站 · 查看各行程', 'Same boarding and alighting stops · View journeys')
+        : copy(locale, '接駁上車站及轉乘站不同 · 查看行程', 'Boarding and transfer stops vary · View journeys')}<PlannerIcon name="chevron" size={13} /></span>
+    </summary>
+    <div className="combined-journey-options" role="group" aria-label={copy(locale, '選擇完整行程', 'Choose a complete journey')}>
+      {group.routes.map(route => <JourneyRow key={route.id} route={route} locale={locale} onSelect={() => onSelect(route)} />)}
+    </div>
+  </details>;
+}
+
 export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places, onMapPick, locale = 'zh' }: {
   routes: ScoredRoute[];
   searchPanel: ReactNode;
@@ -56,6 +81,8 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
   const walking = routes.find(route => route.legs.every(leg => leg.mode === 'WALK'));
   const recommended = routes.filter(route => !hasEndedService(route) && route.legs.some(leg => leg.mode !== 'WALK'));
   const ended = routes.filter(hasEndedService);
+  const recommendedGroups = groupJourneysByStops(recommended);
+  const endedGroups = groupJourneysByStops(ended);
   const mapPlaces = endpoints ?? places;
   function choose(route: ScoredRoute) {
     setSelectedId(route.id); setShowDetails(true);
@@ -76,10 +103,10 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
             <div className="quick-modes"><button type="button" disabled={!walking} onClick={() => { if (walking) choose(walking); }}><PlannerIcon name="walk" size={25} /><span>{walking ? journeyMinutes(walking) : '—'}<small>min</small></span><strong>{copy(locale, '步行', 'Walk')}</strong></button>
               <button type="button" disabled title={copy(locale, '目前未提供單車路線', 'Cycle routing is not currently available')}><PlannerIcon name="cycle" size={27} /><span>—</span><strong>{copy(locale, '單車', 'Cycle')}</strong></button>
               <button type="button" disabled title={copy(locale, '目前未提供的士路線', 'Taxi routing is not currently available')}><PlannerIcon name="car" size={25} /><span>—</span><strong>{copy(locale, '的士', 'Cab')}</strong></button></div>
-            {recommended.length > 0 && <div className="route-group"><h2>{copy(locale, '建議', 'Suggested')}</h2><div className="route-list">{(showAllRoutes ? recommended : recommended.slice(0, 12)).map(route => <JourneyRow key={route.id} route={route} locale={locale} onSelect={() => choose(route)} />)}</div>
-              {recommended.length > 12 && <button type="button" className="more-journeys" onClick={() => setShowAllRoutes(value => !value)}>{showAllRoutes ? copy(locale, '顯示較少路線', 'Show fewer options') : copy(locale, '顯示全部 ', 'Show all ') + recommended.length + copy(locale, ' 個選擇', ' options')}</button>}</div>}
+            {recommendedGroups.length > 0 && <div className="route-group"><h2>{copy(locale, '建議', 'Suggested')}</h2><div className="route-list">{(showAllRoutes ? recommendedGroups : recommendedGroups.slice(0, 12)).map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} searchOrigin={mapPlaces.origin?.name} />)}</div>
+              {recommendedGroups.length > 12 && <button type="button" className="more-journeys" onClick={() => setShowAllRoutes(value => !value)}>{showAllRoutes ? copy(locale, '顯示較少路線', 'Show fewer options') : copy(locale, '顯示全部 ', 'Show all ') + recommendedGroups.length + copy(locale, ' 組行程', ' journey groups')}</button>}</div>}
             {walking && <div className="route-group"><h2>{copy(locale, '步行', 'Walk')}</h2><div className="route-list"><JourneyRow route={walking} locale={locale} onSelect={() => choose(walking)} /></div></div>}
-            {ended.length > 0 && <div className="route-group"><h2>{copy(locale, '暫無班次', 'No upcoming service')}</h2><div className="route-list">{ended.map(route => <JourneyRow key={route.id} route={route} locale={locale} onSelect={() => choose(route)} />)}</div></div>}
+            {endedGroups.length > 0 && <div className="route-group"><h2>{copy(locale, '暫無班次', 'No upcoming service')}</h2><div className="route-list">{endedGroups.map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} searchOrigin={mapPlaces.origin?.name} />)}</div></div>}
             <p className="route-estimate-note">{copy(locale, '車程及票價為估算，路線按你的權重排列。', 'Times and fares are estimates. Routes use your weighted ranking.')} <a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a></p>
           </> : <p className="map-instruction" role="status">{emptyHint}</p>}
         </section>
