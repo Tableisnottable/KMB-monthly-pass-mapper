@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PREFERENCES, corridorIds, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, routeRoadsAllowed, type RoutePreferences } from './routePreferences';
+import { DEFAULT_PREFERENCES, corridorChoices, corridorIds, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, routeRoadsAllowed, type RoutePreferences } from './routePreferences';
 import intervals from '../data/corridorSegments.json';
 import { networkPatterns, networkRoutes } from '../data/transportNetwork';
 import { operatorAllowed, parseOperatorSelection } from './operatorSelection';
@@ -8,6 +8,10 @@ const leg = (number: string, operator?: string) => {
   return { operator: 'KMB', networkPatternId: p.id, boardingIndex: 0, alightingIndex: p.s.length - 1 };
 };
 describe('Company and road preferences', () => {
+  it('uses the corrected Nam Wan road label while retaining its saved corridor ID', () => {
+    expect(corridorChoices.airport.find(([id]) => id === 'airporttunnel')?.slice(1)).toEqual(['南灣', 'Nam Wan']);
+    expect(corridorIds).toContain('airporttunnel');
+  });
   it('excludes banned companies and joint services containing a banned company', () => {
     expect(operatorAllowed('KMB', ['KMB'])).toBe(true); expect(operatorAllowed('KMB+CTB', ['KMB'])).toBe(false);
     expect(operatorAllowed('MTR', [])).toBe(false); expect(operatorAllowed('KMB+CTB', ['KMB', 'CTB'])).toBe(true);
