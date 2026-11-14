@@ -180,11 +180,11 @@ button {
 .fare-comparison { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 10px 0; text-align: left; }
 .fare-comparison > span { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-width: 0; padding: 4px 7px; border-radius: 4px; }
 .fare-comparison > span + span { border-top: 1px solid #e9eee6; }
-.fare-comparison > span > span { font-size: 11px; line-height: 16px; color: #647165; font-weight: 400; }
-.fare-comparison strong { font-size: 14px; line-height: 20px; color: #485349; font-weight: 800; overflow-wrap: anywhere; }
-.fare-comparison > .fare-selected { background: #e6f3e0; box-shadow: inset 3px 0 #277f22; }
-.fare-comparison > .fare-selected strong { color: #277f22; }
-.fare-comparison > small { grid-column: 1 / -1; font-size: 10px; line-height: 15px; color: #766333; font-weight: 400; }
+.fare-comparison > span > span { font-size: 12px; line-height: 17px; color: #46535b; font-weight: 500; }
+.fare-comparison strong { font-size: 15px; line-height: 20px; color: #25343c; font-weight: 800; overflow-wrap: anywhere; }
+.fare-comparison > .fare-selected { background: #d8efce; box-shadow: inset 4px 0 #176b20; outline: 1px solid #a5ce96; }
+.fare-comparison > .fare-selected strong { color: #14571b; }
+.fare-comparison > small { grid-column: 1 / -1; font-size: 11px; line-height: 16px; color: #594b27; font-weight: 500; }
 .combined-journey-summary .fare-comparison > span + span { border-color: #a7c2e6; }
 .combined-journey-summary .fare-comparison > .fare-selected { background: #edf4ff; box-shadow: inset 3px 0 #245b9a; }
 .combined-journey-summary .fare-comparison strong, .combined-journey-summary .fare-comparison > span > span,
@@ -197,7 +197,7 @@ button {
 .route-symbols { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; flex: 1; color: #999; }
 .leg-symbol-group { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
 .leg-separator { color: #999; font-size: 20px; font-weight: 700; line-height: 1; }
-.route-badge { display: inline-flex; align-items: center; border: 1px solid #e3e3e3; border-radius: 3px; overflow: hidden; line-height: 22px; min-height: 24px; }
+.route-badge { display: inline-flex; align-items: center; border: 1px solid #69757c; border-radius: 3px; overflow: hidden; line-height: 22px; min-height: 26px; box-shadow: 0 1px 2px #0002; }
 .route-badge-icon { display: grid; place-items: center; color: #fff; width: 24px; height: 24px; flex-shrink: 0; }
 .route-badge strong { font-size: 14px; font-weight: 800; padding: 0 5px; color: #696969; white-space: nowrap; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
 .route-stop-plate { border-color: #0003; }
@@ -207,7 +207,7 @@ button {
 .route-duration { position: relative; min-width: 38px; text-align: right; color: var(--text); font-size: 23px; font-weight: 800; line-height: 23px; }
 .route-duration > svg { position: absolute; top: 0; left: -13px; color: #e6d443; }
 .route-duration > small { display: block; font-size: 13px; line-height: 15px; font-weight: 400; }
-.route-service-line { display: flex; align-items: flex-start; gap: 3px; margin-top: 9px; color: #999; font-size: 13px; line-height: 18px; font-weight: 400; }
+.route-service-line { display: flex; align-items: flex-start; gap: 4px; margin-top: 9px; color: #4c5961; font-size: 13px; line-height: 19px; font-weight: 500; }
 .route-service-line > svg { color: #dfd43c; flex-shrink: 0; margin-top: 2px; }
 .service-ended { color: #a76f56; }
 .route-option.ended { background: #fafafa; }

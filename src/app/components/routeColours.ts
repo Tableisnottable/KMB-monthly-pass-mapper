@@ -82,7 +82,7 @@ export function routeBadgeStyle(operator: string, routeNumber = '') {
     backgroundColor: colours.background,
     color: colours.foreground,
     ...(bands.length > 1 ? { backgroundImage: `linear-gradient(90deg, ${bands.map((colour, index) => `${colour} ${index * 100 / bands.length}% ${(index + 1) * 100 / bands.length}%`).join(', ')})`,
-      backgroundSize: '100% 5px', backgroundPosition: 'bottom', backgroundRepeat: 'no-repeat', paddingBottom: '4px' } : {}),
+      backgroundSize: '100% 8px', backgroundPosition: 'bottom', backgroundRepeat: 'no-repeat', paddingBottom: '7px' } : {}),
     '--route-icon-background': colours.iconBackground ?? colours.background,
     '--route-icon-colour': colours.iconForeground ?? colours.foreground,
     ...(colours.iconAccent ? { '--route-icon-accent': colours.iconAccent } : {}),
