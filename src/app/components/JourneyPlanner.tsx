@@ -20,6 +20,7 @@ import { DEFAULT_CHANGE_MINUTES, defaultComparisons, defaultTransport, type Comp
 import { activeCity, supportedCities } from '../../domain/cities';
 import { useAutoRefresh } from './useAutoRefresh';
 import { DEFAULT_LIMITS, type JourneyLimits } from '../../domain/journeyLimits';
+import { journeyMatchesEndpoints } from '../../domain/journeyEndpointMatch';
 import { PaymentControl } from './PaymentControl';
 import { passActive, paymentChoices, paymentProfile, readPaymentPreferences, type OwnedPass, type PaymentChoice } from '../../domain/payment';
 import coverageSnapshot from '../../data/transport/manifest.json';
@@ -117,7 +118,11 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       const payload = await response.json() as { data?: ScoredRoute[]; meta?: JourneyMeta; error?: string };
       if (!response.ok || !Array.isArray(payload.data)) throw new Error(payload.error ?? copy(locale, '暫時無法搜尋行程。', 'Journey search is temporarily unavailable.'));
       if (activeSearch.current !== controller) return;
-      setRoutes(payload.data); setMeta(payload.meta ?? null); setSearched(true);
+      const matchingRoutes = payload.data.filter(route => journeyMatchesEndpoints(route, origin, destination));
+      setRoutes(matchingRoutes); setMeta(payload.meta ?? null); setSearched(true);
+      if (payload.data.length && !matchingRoutes.length) throw new Error(copy(locale,
+        '路線資料與所選地點不符，已停止顯示錯誤路線。請重新搜尋。',
+        'The route data did not match your selected places, so it was hidden. Please search again.'));
     } catch (err) {
       if (activeSearch.current !== controller) return;
       if (background) throw err;
@@ -186,7 +191,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     ? copy(locale, (meta?.originUncovered ? '起點' : '目的地') + '附近沒有可規劃的公共交通站點。', 'No supported public transport stops were found near your ' + (meta?.originUncovered ? 'origin' : 'destination') + '.')
     : meta?.tooCloseToRide ? copy(locale, '兩個地點很接近，步行即可到達。', 'These places are close enough to walk between.')
       : allClosed ? copy(locale, '行程有已收班的路段，請留意服務狀態。', 'These options contain ended services. Check service status before travelling.')
-        : searched && routes.length === 0 ? copy(locale, '目前交通種類、公司、轉乘及時間設定下未找到可用的公共交通連接（最多三次轉乘）。請放寬設定或嘗試附近站點。', 'No transit connection was found with these transport type, company, transfer and time settings (up to three transfers). Relax the settings or try nearby stops.') : null;
+        : searched && routes.length === 0 ? copy(locale, '未找到符合設定的公共交通路線。請放寬篩選或更改時間。', 'No transit route matches these settings. Try changing the filters or time.') : null;
   const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的公共交通路線', 'No supported transit journey found')
     : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
 
