@@ -13,7 +13,7 @@ describe('Transport and transfer selection', () => {
   it('covers every transit mode present in the imported routing network', () => {
     expect(new Set(transitTypes.map(type => type.id))).toEqual(new Set(networkRoutes.map(route => route[5])));
     expect(Object.values(defaultTransport()).every(level => level === 'normal')).toBe(true);
-    expect(defaultComparisons()).toEqual({ walk: true, cycle: true, taxi: true });
+    expect(defaultComparisons()).toEqual({ walk: true, cycle: true, taxi: true, drive: true });
   });
   it('distinguishes omitted, empty and restricted mode selections', () => {
     expect(parseTransitSelection(null)).toBeUndefined();

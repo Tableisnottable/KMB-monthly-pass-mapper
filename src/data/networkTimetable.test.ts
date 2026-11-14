@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { networkPatterns, networkRoutes, networkStops, serviceCalendarStatus, type NetworkPattern } from './transportNetwork';
 import { exceptions } from './transport/snapshot';
-import { matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, routeTimetable } from './networkTimetable';
+import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, routeTimetable } from './networkTimetable';
 import { operatorInfo, transportOperators } from './transportOperators';
 
 const day = '2026-11-13';
@@ -71,9 +71,10 @@ describe('Added live departures', () => {
   it('shows out-of-window live services as added, with the comparison reason', () => {
     expect(match('16:00:00')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
   });
-  it('does not infer additional buses from provider-scheduled times outside imported windows', () => {
-    expect(match('16:00:00', '原定班次 · Scheduled Bus')).toEqual({ scheduleMatch: 'UNVERIFIED' });
-    expect(match('10:37:00', 'Scheduled Bus')).toEqual({ scheduleMatch: 'MATCHED' });
+  it('compares provider-scheduled terminal times with slots as well as service windows', () => {
+    expect(match('16:00:00', '原定班次 · Scheduled Bus')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
+    expect(match('10:37:00', 'Scheduled Bus')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
+    expect(match('10:40:00', 'Scheduled Bus')).toEqual({ scheduleMatch: 'MATCHED' });
   });
   it('retains provider-confirmed additional services even within a normal service window', () => {
     expect(match('10:37:00', 'Additional departure')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'PROVIDER' });
@@ -88,6 +89,85 @@ describe('Added live departures', () => {
     expect(match('16:00:00').scheduleMatch).toBe('UNVERIFIED');
     networkPatterns[index].w = [[127, 600, 600, 0, 20]];
     expect(matchDepartureToTimetable(index, 0, 2, '2100-01-01T16:00:00+08:00').scheduleMatch).toBe('UNVERIFIED');
+  });
+});
+
+describe('Observed timetable changes', () => {
+  function rows(times: string[], boarding = 0, operator = 'KMB') {
+    return times.map(clock => {
+      const time = day + 'T' + clock + ':00+08:00';
+      return { time, minutes: 0, operator, remark: 'Scheduled Bus', ...matchDepartureToTimetable(index, boarding, 2, time, 'Scheduled Bus') };
+    });
+  }
+  function baseline() {
+    networkPatterns[index].w = [[127, 420, 450, 10, 20], [127, 450, 481, 15, 20]];
+  }
+  it('marks a slower 15-minute revision as inferred, retaining unchanged slots', () => {
+    baseline();
+    const result = classifyDepartureTypes(index, 0, rows(['07:00', '07:15', '07:30', '07:45', '08:00']));
+    expect(result.map(row => row.departureType)).toEqual(['SCHEDULED', 'CHANGED', 'SCHEDULED', 'SCHEDULED', 'SCHEDULED']);
+    expect(result[1].changedReason).toBe('OBSERVED_SPACING');
+  });
+  it('recognises the user example of a slower 20-minute pattern', () => {
+    baseline();
+    const result = classifyDepartureTypes(index, 0, rows(['07:00', '07:20', '07:40', '08:00']));
+    expect(result.map(row => row.departureType)).toEqual(['SCHEDULED', 'SCHEDULED', 'CHANGED', 'SCHEDULED']);
+  });
+  it('keeps faster additional departures separate from slower changed service', () => {
+    networkPatterns[index].w = [[127, 420, 481, 15, 20]];
+    const result = classifyDepartureTypes(index, 0, rows(['07:00', '07:05', '07:10', '07:15']));
+    expect(result.map(row => row.departureType)).toEqual(['SCHEDULED', 'ADDITIONAL', 'ADDITIONAL', 'SCHEDULED']);
+  });
+  it('requires three distinct departures from the same operator and does not mutate its input', () => {
+    baseline();
+    const input = rows(['07:00', '07:15']);
+    const mixed = [...input, ...rows(['07:40'], 0, 'CTB')];
+    expect(classifyDepartureTypes(index, 0, mixed).some(row => row.departureType === 'CHANGED')).toBe(false);
+    expect(classifyDepartureTypes(index, 0, [...input, input[0]]).some(row => row.departureType === 'CHANGED')).toBe(false);
+    expect(input[1]).not.toHaveProperty('changedReason');
+  });
+  it('does not infer changes from intermediate stop interpolation or absent calendars', () => {
+    baseline();
+    expect(classifyDepartureTypes(index, 1, rows(['07:10', '07:30', '07:50'], 1)).some(row => row.departureType === 'CHANGED')).toBe(false);
+    networkPatterns[index].w = [];
+    expect(classifyDepartureTypes(index, 0, rows(['07:00', '07:20', '07:40'])).every(row => row.scheduleMatch === 'UNVERIFIED' && row.departureType === 'SCHEDULED')).toBe(true);
+  });
+  it('never overrides a provider-confirmed extra with an inferred change', () => {
+    baseline();
+    const input = rows(['07:00', '07:15', '07:30', '07:45', '08:00']);
+    input[1] = { ...input[1], remark: 'Extra Scheduled Bus', scheduleMatch: 'ADDED', addedReason: 'PROVIDER' };
+    expect(classifyDepartureTypes(index, 0, input)[1].departureType).toBe('ADDITIONAL');
+  });
+});
+
+describe('Timetable time-difference references', () => {
+  it('compares early and late observed times without claiming a trip-ID match', () => {
+    expect(compareDepartureToTimetable(index, 0, day + 'T10:43:00+08:00')).toEqual({ timetableTime: '2026-11-13T02:40:00.000Z', deviationMinutes: 3, comparisonBasis: 'FREQUENCY' });
+    expect(compareDepartureToTimetable(index, 0, day + 'T10:38:00+08:00').deviationMinutes).toBe(-2);
+    expect(compareDepartureToTimetable(index, 0, day + 'T15:04:00+08:00')).toMatchObject({ deviationMinutes: 4, comparisonBasis: 'FIXED' });
+  });
+  it('labels interpolated references and leaves unrelated shifts unavailable', () => {
+    expect(compareDepartureToTimetable(index, 1, day + 'T10:43:00+08:00').comparisonBasis).toBe('INTERPOLATED');
+    expect(compareDepartureToTimetable(index, 0, day + 'T20:00:00+08:00')).toEqual({});
+    expect(compareDepartureToTimetable(index, 0, 'invalid')).toEqual({});
+    networkPatterns[index].w = [];
+    expect(compareDepartureToTimetable(index, 0, day + 'T10:40:00+08:00')).toEqual({});
+  });
+});
+
+describe('Official B10 timetable correction', () => {
+  const b10 = () => networkPatterns.findIndex(pattern => networkRoutes[pattern.r][2] === 'B10' && networkStops[pattern.s[0]][0] === '13393');
+  it('distinguishes 17:40 additional from the 17:45 published slot', () => {
+    const i = b10(); expect(i).toBeGreaterThanOrEqual(0);
+    const match = (clock: string) => matchDepartureToTimetable(i, 0, 1, day + 'T' + clock + ':00+08:00', '原定班次 · Scheduled Bus');
+    expect(match('17:40')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
+    expect(match('17:45')).toEqual({ scheduleMatch: 'MATCHED' });
+    expect(classifyDepartureTypes(i, 0, ['17:40', '17:45'].map(clock => ({ time: day + 'T' + clock + ':00+08:00', minutes: 0, remark: 'Scheduled Bus', ...match(clock) }))).map(row => row.departureType)).toEqual(['ADDITIONAL', 'SCHEDULED']);
+  });
+  it('changes to 20-minute service at 23:30, not 23:00', () => {
+    const rows = patternTimetable(b10(), day);
+    expect(rows.map(row => [row.startMinute, row.endMinute, row.headwayMinutes])).toEqual([[360, 1410, 15], [1410, 1470, 20]]);
+    expect(nextPublishedDeparture(b10(), 0, new Date(day + 'T23:01:00+08:00'))?.time).toBe('2026-11-13T15:15:00.000Z');
   });
 });
 

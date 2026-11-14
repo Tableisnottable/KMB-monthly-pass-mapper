@@ -20,17 +20,16 @@ function sortValue(route: ScoredRoute, sort: JourneySort, profile: FareProfile, 
   }
 }
 
-/** Combine direct stop pairs or feeders joining the same onward services. */
+const stopSequenceKey = (route: ScoredRoute) => route.legs.length && route.legs.every(leg =>
+  leg.mode && leg.mode !== 'WALK' && leg.originStop?.id && leg.destinationStop?.id)
+  ? JSON.stringify(route.legs.map(leg => [leg.mode, leg.originStop!.id, leg.destinationStop!.id])) : undefined;
+
+/** Combine only identical boarding/alighting stop pairs on every leg. */
 export function groupJourneysByStops(routes: ScoredRoute[], sort: JourneySort = 'recommended', profile: FareProfile = 'adult', preferences: RoutePreferences = DEFAULT_PREFERENCES): JourneyGroup[] {
   const groups = new Map<string, JourneyGroup>();
   [...routes].sort((a, b) => sortValue(a, sort, profile, preferences) - sortValue(b, sort, profile, preferences) || a.finalScore - b.finalScore).forEach((route, index) => {
-    const first = route.legs[0], last = route.legs.at(-1);
-    const originId = first?.originStop?.id, destinationId = last?.destinationStop?.id;
-    const canCombine = originId && destinationId
-      && route.legs.every(leg => leg.mode && leg.mode !== 'WALK');
-    const connection = route.legs.length > 1 ? ['connections', route.legs.slice(1).map(serviceKey)] : ['direct', originId];
-    const id = canCombine ? JSON.stringify([connection, destinationId,
-      route.legs.map(leg => leg.mode), hasEndedService(route)]) : `single:${index}:${route.id}`;
+    const stops = stopSequenceKey(route);
+    const id = stops ? JSON.stringify([stops, hasEndedService(route)]) : `single:${index}:${route.id}`;
     const group = groups.get(id);
     if (group) group.routes.push(route);
     else groups.set(id, { id, routes: [route] });
@@ -75,6 +74,8 @@ export function groupStudentFareLabel(group: JourneyGroup, locale: PlannerLocale
 
 /** Compact A/B → C/D only when every displayed combination really exists. */
 export function combinedLegChoices(group: JourneyGroup): TransitLeg[][] | undefined {
+  const stops = group.routes[0] && stopSequenceKey(group.routes[0]);
+  if (!stops || group.routes.some(route => stopSequenceKey(route) !== stops)) return undefined;
   const options = group.routes[0].legs.map((_, index) => Array.from(new Map(group.routes.map(r => {
     const leg = r.legs[index]; return [serviceKey(leg), leg] as const;
   })).values()));

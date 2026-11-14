@@ -12,10 +12,10 @@ import { PlannerIcon } from './PlannerIcon';
 import { JourneyEndpoints } from './JourneyEndpoints';
 
 export const travelModeLabel = (mode: TravelMode, locale: PlannerLocale) => mode === 'walk' ? copy(locale, '步行', 'Walk')
-  : mode === 'cycle' ? copy(locale, '單車', 'Cycle') : copy(locale, '的士', 'Taxi');
-const icon = (mode: TravelMode) => mode === 'taxi' ? 'car' : mode;
+  : mode === 'cycle' ? copy(locale, '單車', 'Cycle') : mode === 'drive' ? copy(locale, '駕駛', 'Driving') : copy(locale, '的士', 'Taxi');
+const icon = (mode: TravelMode) => mode === 'taxi' || mode === 'drive' ? 'car' : mode;
 
-export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] = ['walk', 'cycle', 'taxi']) {
+export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] = ['walk', 'cycle', 'taxi', 'drive']) {
   const [state, setState] = useState<{ key: string; options: TravelOption[]; loading: boolean }>({ key: '', options: [], loading: false });
   const key = places.origin && places.destination && modes.length ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') + '|' + modes.join(',') : '';
   useEffect(() => {
@@ -36,10 +36,10 @@ export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] =
   return state.key === key ? state : { key, options: [], loading: Boolean(key) };
 }
 
-export function QuickTravelOptions({ options, loading, onChoose, locale, modes = ['walk', 'cycle', 'taxi'] }: {
+export function QuickTravelOptions({ options, loading, onChoose, locale, modes = ['walk', 'cycle', 'taxi', 'drive'] }: {
   options: TravelOption[]; loading: boolean; onChoose: (option: TravelOption) => void; locale: PlannerLocale; modes?: TravelMode[];
 }) {
-  return <div className="quick-modes" style={{ gridTemplateColumns: `repeat(${modes.length}, minmax(0, 1fr))` }} aria-label={copy(locale, '步行、單車及的士時間估算', 'Walking, cycling and taxi time estimates')}>
+  return <div className="quick-modes" data-count={modes.length} style={{ gridTemplateColumns: `repeat(${modes.length}, minmax(0, 1fr))` }} aria-label={copy(locale, '步行、單車、的士及駕駛時間估算', 'Walking, cycling, taxi and driving time estimates')}>
     {modes.map(mode => {
       const option = options.find(o => o.mode === mode);
       return <button key={mode} type="button" disabled={!option?.available} onClick={() => { if (option?.available) onChoose(option); }}
@@ -61,13 +61,16 @@ export function TravelOptionDetails({ option, places, locale, time, profile, onB
     <div className="trip-heading"><button className="all-results-button" onClick={onBack}>{copy(locale, '所有行程結果', 'All journey results')}<PlannerIcon name="chevron" size={14} /></button>
       <JourneyEndpoints places={places} /></div>
     <div className="trip-summary"><PlannerIcon name={icon(option.mode)} size={28} /><strong>{travelModeLabel(option.mode, locale)}</strong><span className="route-duration">{option.minutes}<small>{copy(locale, '分鐘（估算）', 'min (estimated)')}</small></span></div>
-    <div className="trip-fare-comparison"><div className="fare-comparison">{(['adult', 'pass', 'student'] as const).map(value => <span key={value} className={profile === value ? 'fare-selected' : ''}><span>{fareProfileLabel(value, locale)}</span>
-      <strong>{option.mode === 'taxi' ? copy(locale, '按咪錶', 'Metered') : '$0.00'}</strong></span>)}</div></div>
+    <div className="trip-fare-comparison">{option.mode === 'drive' ? <p className="driving-cost-note">{copy(locale, '油費、隧道費及泊車費另計；未有費用估算。', 'Fuel, tolls and parking are extra; no cost estimate is available.')}</p> : <div className="fare-comparison">{(['adult', 'selected'] as const).map(value => <span key={value} className={value === 'selected' ? 'fare-selected' : ''}><span>{value === 'selected' ? copy(locale, '所選付款', 'Selected payment') : fareProfileLabel('adult', locale)}</span>
+      <strong>{option.mode === 'taxi' ? copy(locale, '按咪錶', 'Metered') : '$0.00'}</strong></span>)}</div>}</div>
     <button className="mobile-map-toggle" onClick={onMap}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
     <div className="route-details"><h4>{copy(locale, '路徑時間估算', 'Estimated route time')}</h4>
       {clock && <p className="journey-clock-summary">{hongKongTimeLabel(clock.departure)} → {hongKongTimeLabel(clock.arrival)} <small>Hong Kong time</small></p>}
       <p>{((option.distanceMetres ?? 0) / 1000).toFixed(1)} km · {option.minutes} {copy(locale, '分鐘', 'min')}</p>
-      <p className="fare-explanation">{option.mode === 'taxi'
+      {option.mode === 'drive' && places.origin && places.destination && <p><a className="driving-directions-link" target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?' + new URLSearchParams({ api: '1', origin: `${places.origin.lat},${places.origin.lng}`, destination: `${places.destination.lat},${places.destination.lng}`, travelmode: 'driving' })}>{copy(locale, '開啟駕駛導航', 'Open driving directions')} ↗</a></p>}
+      <p className="fare-explanation">{option.mode === 'drive'
+        ? copy(locale, '私家車道路路徑及時間估算，並非即時交通或車道導航。未計塞車、泊車及油費；公共交通的公司、道路偏好及票價設定不適用。請按實際路牌及道路限制行駛。', 'Estimated private-car route and time, not live traffic or lane guidance. Congestion, parking and fuel are excluded. Public-transport company, road preference and fare settings do not apply. Follow actual road signs and restrictions.')
+        : option.mode === 'taxi'
         ? copy(locale, '以道路行車路徑估算，並非即時交通或叫車服務；不包括候車、塞車及停站時間。車費按咪錶，另有隧道及其他附加費；月票及學生身分不提供的士折扣。', 'Road-route estimate, not live traffic or a taxi booking. Taxi waiting, congestion and stops are excluded. The meter, tolls and other charges determine the fare; the pass and student status do not discount taxis.')
         : option.mode === 'cycle' ? copy(locale, '以單車路徑及一般速度估算，假設自備單車，不包括租車或渡輪費用。出發前請確認道路限制、實際通行及可能的渡輪接駁。', 'Cycling-profile estimate assuming your own bicycle, excluding hire and ferry charges. Check access restrictions, conditions and any ferry connections before travelling.')
           : copy(locale, '以步行路徑及一般步速估算，並非無障礙認證；可能包括樓梯或渡輪，未包括休息及渡輪費用。', 'Footpath estimate at a typical walking pace, not a step-free guarantee. Routes may include stairs or ferries; breaks and ferry fares are excluded.')}</p>

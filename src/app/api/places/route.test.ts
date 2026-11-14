@@ -10,6 +10,11 @@ async function search(query: string) {
 }
 
 describe('Transit place suggestions', () => {
+  it('returns local stop matches immediately without waiting for geocoding', async () => {
+    const fetch = vi.fn(async () => { throw new Error('Must not wait for geocoding'); }); vi.stubGlobal('fetch', fetch);
+    const response = await GET(new NextRequest('http://localhost/api/places?scope=local&q=Airport'));
+    expect(response.status).toBe(200); expect((await response.json()).data.length).toBeGreaterThan(0); expect(fetch).not.toHaveBeenCalled();
+  });
   it('finds CSWCSS without depending on the upstream geocoder', async () => {
     const fetch = vi.fn(async () => { throw new Error('offline'); }); vi.stubGlobal('fetch', fetch);
     const response = await search('CSWCSS');

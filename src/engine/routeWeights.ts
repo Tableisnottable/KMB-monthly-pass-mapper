@@ -2,19 +2,19 @@ export const DEFAULT_WEIGHTS = { ride: 1, wait: 1, walk: 1.35, fare: .45, transf
   unverified: 4, kmb: -1, lwb: -.46, mtr: .5, ctb: 1 };
 export type RouteWeights = typeof DEFAULT_WEIGHTS;
 export const WEIGHT_LIMITS: Record<keyof RouteWeights, [number, number]> = {
-  ride: [.25, 5], wait: [0, 3],
-  walk: [.1, 5], fare: [0, 3], transfer: [0, 60], waitPeak: [0, 5], waitOffPeak: [0, 5], waitNight: [0, 5],
-  unverified: [0, 30], kmb: [-5, 5], lwb: [-5, 5], mtr: [-5, 5], ctb: [-5, 5],
+  ride: [0, 2], wait: [0, 2],
+  walk: [0, 2.7], fare: [0, .9], transfer: [0, 16], waitPeak: [0, 5], waitOffPeak: [0, 5], waitNight: [0, 5],
+  unverified: [0, 8], kmb: [-5, 5], lwb: [-5, 5], mtr: [-5, 5], ctb: [-5, 5],
 };
+export const IMPORTANCE_KEYS = ['ride', 'wait', 'walk', 'fare', 'transfer', 'unverified'] as const;
+export type ImportanceKey = typeof IMPORTANCE_KEYS[number];
 export const customWeights = (weights: RouteWeights) => (Object.keys(DEFAULT_WEIGHTS) as (keyof RouteWeights)[]).some(key => weights[key] !== DEFAULT_WEIGHTS[key]);
 /** Independent relative scales; do not round the stored/default coefficients. */
-export function weightPercent(key: keyof RouteWeights, value: number): number {
-  const [min, max] = WEIGHT_LIMITS[key];
-  return Math.max(0, Math.min(100, (value - min) / (max - min) * 100));
+export function weightPercent(key: ImportanceKey, value: number): number {
+  return Math.max(0, Math.min(200, value / DEFAULT_WEIGHTS[key] * 100));
 }
-export function weightFromPercent(key: keyof RouteWeights, percent: number): number {
-  const [min, max] = WEIGHT_LIMITS[key];
-  return min + Math.max(0, Math.min(100, percent)) / 100 * (max - min);
+export function weightFromPercent(key: ImportanceKey, percent: number): number {
+  return DEFAULT_WEIGHTS[key] * (Math.max(0, Math.min(200, percent)) / 100);
 }
 export function parseRouteWeights(raw: string | null): RouteWeights {
   if (!raw) return { ...DEFAULT_WEIGHTS };

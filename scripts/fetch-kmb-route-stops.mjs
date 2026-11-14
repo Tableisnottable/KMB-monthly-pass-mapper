@@ -57,9 +57,12 @@ async function main() {
     generatedAt: new Date().toISOString(),
     routes: fetched.filter(Boolean),
   };
+  if (fetched.some(row => row === null)) throw new Error('Incomplete KMB download; keeping the previous snapshot.');
+  const json = JSON.stringify(output);
+  if (Buffer.byteLength(json) >= 1_000_000) throw new Error('KMB snapshot exceeds the small-source-file limit.');
   writeFileSync(
     new URL('../src/data/kmbRouteStops.json', import.meta.url),
-    JSON.stringify(output),
+    json,
     'utf8',
   );
   console.log(

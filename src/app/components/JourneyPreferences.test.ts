@@ -5,11 +5,12 @@ import { JourneyPreferences, defaultCompanies, type SettingsSection } from './Jo
 import { DEFAULT_PREFERENCES } from '../../domain/routePreferences';
 import { comparisonTypes, defaultComparisons, defaultTransport, transitTypes } from '../../domain/transportSelection';
 import { selectableOperators } from '../../domain/operatorSelection';
+import { DEFAULT_LIMITS } from '../../domain/journeyLimits';
 
 function render(section: SettingsSection, changeMinutes = 3, locale: 'en' | 'zh' = 'en') {
   return renderToStaticMarkup(createElement(JourneyPreferences, {
     section, changeMinutes, locale, companies: defaultCompanies(), transport: defaultTransport(), comparisons: defaultComparisons(),
-    corridors: DEFAULT_PREFERENCES, onCompanies() {}, onTransport() {}, onComparisons() {}, onCorridors() {}, onChangeMinutes() {},
+    corridors: DEFAULT_PREFERENCES, limits: DEFAULT_LIMITS, onLimits() {}, onCompanies() {}, onTransport() {}, onComparisons() {}, onCorridors() {}, onChangeMinutes() {},
   }));
 }
 describe('Journey settings controls', () => {
@@ -24,7 +25,7 @@ describe('Journey settings controls', () => {
     for (const item of [...transitTypes, ...selectableOperators, ...comparisonTypes]) {
       expect(html).toContain((locale === 'en' ? item.nameEn : item.nameTc).replaceAll('&', '&amp;').replaceAll("'", '&#x27;'));
     }
-    expect(html.match(/type="checkbox"/g)).toHaveLength(3);
+    expect(html.match(/type="checkbox"/g)).toHaveLength(4);
     expect(html).toContain('NR'); expect(html).toContain('/coverage');
   });
 });

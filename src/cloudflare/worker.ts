@@ -1,13 +1,21 @@
 import { proxyProvider, safeProviderUrl } from './upstreamProxy';
+export { JourneyNotifications } from './journeyNotifications';
 interface Environment {
   ASSETS: { fetch(request: Request): Promise<Response> };
   RATE_LIMITER?: { limit(value: { key: string }): Promise<{ success: boolean }> };
+  JOURNEY_NOTIFICATIONS?: { idFromName(name: string): unknown; get(id: unknown): { fetch(request: Request): Promise<Response> } };
 }
 interface Execution { waitUntil(task: Promise<unknown>): void }
 type WorkerCache = { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> };
 export default {
   async fetch(request: Request, env: Environment, ctx: Execution): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/api/notifications') {
+      if (!env.JOURNEY_NOTIFICATIONS) return Response.json({ error: 'Background notifications are not configured.' }, { status: 503 });
+      if (request.method !== 'GET' && request.headers.get('Origin') !== url.origin) return Response.json({ error: 'Same-origin request required' }, { status: 403 });
+      if (env.RATE_LIMITER && !(await env.RATE_LIMITER.limit({ key: 'notifications:' + (request.headers.get('cf-connecting-ip') ?? 'unknown') })).success) return Response.json({ error: 'Please try again shortly.' }, { status: 429 });
+      return env.JOURNEY_NOTIFICATIONS.get(env.JOURNEY_NOTIFICATIONS.idFromName('boarding-updates')).fetch(request);
+    }
     if (url.pathname === '/api/upstream') {
       if (request.method !== 'GET' || !safeProviderUrl(url.searchParams.get('url'))) return proxyProvider(request);
       if (env.RATE_LIMITER && !(await env.RATE_LIMITER.limit({ key: 'provider:' + (request.headers.get('cf-connecting-ip') ?? 'unknown') })).success) {

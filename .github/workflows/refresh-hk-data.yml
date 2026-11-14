@@ -1,0 +1,63 @@
+name: Refresh Hong Kong transport data
+on:
+  schedule:
+    - cron: '15 22 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: refresh-hk-data
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/hk-data/rail-coordinates.json
+          key: hk-rail-coordinates-${{ github.run_id }}
+          restore-keys: hk-rail-coordinates-
+      - run: npm ci
+      - id: cadence
+        run: echo "weekday=$(TZ=Asia/Hong_Kong date +%u)" >> "$GITHUB_OUTPUT"
+      - name: Refresh daily timetables and adult/student fares
+        run: |
+          python -m pip install pyproj==3.8.0
+          python scripts/import-transport.py --cache "$RUNNER_TEMP/hk-data" --refresh
+          python scripts/import-student-fares.py
+      - name: Refresh weekly stops, geometry and place directories
+        if: github.event_name == 'workflow_dispatch' || steps.cadence.outputs.weekday == '7'
+        run: |
+          node scripts/fetch-kmb-route-stops.mjs
+          node scripts/fetch-citybus-data.mjs
+          python -m pip install --target "$RUNNER_TEMP/hk-data/python-libs" osmium
+          python scripts/import-alignments.py --cache "$RUNNER_TEMP/hk-data"
+          python scripts/import-school-places.py
+          python scripts/import-residents.py --cache "$RUNNER_TEMP/hk-data" --refresh
+      - name: Rebuild corridor tags against the current stops
+        run: python scripts/import-corridors.py
+      - name: Verify refreshed data before publishing
+        run: |
+          npx vitest run --maxWorkers=2 --minWorkers=1
+          npm run cf:build
+          node scripts/test-browser-worker.mjs
+      - name: Commit only small verified source snapshots
+        run: |
+          git add src/data/transport src/data/alignments src/data/places src/data/studentFares.json src/data/residentsDirectory.json src/data/corridorSegments.json src/data/kmbRouteStops.json src/data/citybusRouteStops.json src/data/citybusStops.json
+          node scripts/check-staged-sizes.mjs
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: refresh verified Hong Kong transport data'
+          git push origin HEAD:main

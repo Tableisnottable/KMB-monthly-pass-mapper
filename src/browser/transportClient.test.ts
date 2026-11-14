@@ -1,59 +1,41 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-class TestWorker {
-  static instances: TestWorker[] = [];
-  onmessage?: (event: { data: unknown }) => void;
-  onerror?: () => void;
-  postMessage = vi.fn();
-  terminate = vi.fn();
-  constructor() { TestWorker.instances.push(this); }
-  reply(call = 0, body: unknown = { data: [] }) {
-    const { id } = this.postMessage.mock.calls[call][0];
-    this.onmessage?.({ data: { id, status: 200, headers: [['Content-Type', 'application/json']], body: JSON.stringify(body) } });
-  }
+class FakeWorker {
+  static instances: FakeWorker[] = [];
+  onmessage?: (event: { data: unknown }) => void; onerror?: () => void;
+  messages: { id: number; url: string; cancel?: boolean }[] = []; terminated = false;
+  constructor(public url: string, public options?: WorkerOptions) { FakeWorker.instances.push(this); }
+  postMessage(message: { id: number; url: string; cancel?: boolean }) { this.messages.push(message); }
+  terminate() { this.terminated = true; }
+  reply(call = this.messages.length - 1, body: unknown = { data: [] }) { const message = this.messages[call]; this.onmessage?.({ data: { id: message.id, status: 200, headers: [['Content-Type', 'application/json']], body: JSON.stringify(body) } }); }
 }
-beforeEach(() => {
-  vi.resetModules(); TestWorker.instances = [];
-  vi.stubGlobal('Worker', TestWorker);
-  vi.stubGlobal('window', { location: { origin: 'https://planner.example' }, setTimeout, clearTimeout });
-});
+beforeEach(() => { vi.resetModules(); FakeWorker.instances = []; vi.stubGlobal('Worker', FakeWorker); vi.stubGlobal('window', { location: { origin: 'https://planner.example' }, setTimeout, clearTimeout }); });
 afterEach(() => vi.unstubAllGlobals());
-describe('Browser transport request lifecycle', () => {
-  it('returns fetch-compatible responses and releases a completed journey worker', async () => {
+describe('Warm and cancellable background calculators', () => {
+  it('reuses a completed journey worker instead of downloading and rebuilding its data again', async () => {
     const { transportFetch } = await import('./transportClient');
-    const promise = transportFetch('/api/journey?fromLat=22.3');
-    const worker = TestWorker.instances[0]; worker.reply();
-    const response = await promise;
-    expect(response.ok).toBe(true); expect(await response.json()).toEqual({ data: [] });
-    expect(worker.terminate).toHaveBeenCalledOnce();
+    const first = transportFetch('/api/journey?a=1'); FakeWorker.instances[0].reply(); expect((await first).status).toBe(200);
+    const second = transportFetch('/api/journey?a=2'); FakeWorker.instances[0].reply(); await second;
+    expect(FakeWorker.instances).toHaveLength(1); expect(FakeWorker.instances[0].terminated).toBe(false); expect(FakeWorker.instances[0].options?.type).toBe('module');
   });
-  it('cancels expensive searches without stopping catalogue queries', async () => {
-    const { transportFetch } = await import('./transportClient');
-    const catalogue = transportFetch('/api/network?resource=routes');
-    const controller = new AbortController();
-    const journey = transportFetch('/api/journey?fromLat=22.3', { signal: controller.signal });
-    const aborted = expect(journey).rejects.toMatchObject({ name: 'AbortError' });
-    controller.abort(); await aborted;
-    expect(TestWorker.instances[1].terminate).toHaveBeenCalledOnce();
-    expect(TestWorker.instances[0].terminate).not.toHaveBeenCalled();
-    TestWorker.instances[0].reply(); await catalogue;
+  it('keeps place lookup separate and terminates cancelled journey computation', async () => {
+    const { transportFetch } = await import('./transportClient'); const controller = new AbortController();
+    const journey = transportFetch('/api/journey', { signal: controller.signal }); const rejected = expect(journey).rejects.toMatchObject({ name: 'AbortError' });
+    const place = transportFetch('/api/places?q=Central'); FakeWorker.instances[1].reply(); await place;
+    controller.abort(); await rejected; expect(FakeWorker.instances[0].terminated).toBe(true); expect(FakeWorker.instances[1].terminated).toBe(false);
+    const retry = transportFetch('/api/journey'); FakeWorker.instances[2].reply(); await retry;
   });
   it('matches concurrent catalogue replies by request ID', async () => {
     const { transportFetch } = await import('./transportClient');
-    const first = transportFetch('/api/network?resource=routes');
-    const second = transportFetch('/api/places?q=airport');
-    expect(TestWorker.instances).toHaveLength(1);
-    TestWorker.instances[0].reply(1, { data: ['airport'] });
-    TestWorker.instances[0].reply(0, { data: ['104'] });
-    expect(await (await first).json()).toEqual({ data: ['104'] });
-    expect(await (await second).json()).toEqual({ data: ['airport'] });
+    const first = transportFetch('/api/network?resource=routes'), second = transportFetch('/api/places?q=airport');
+    expect(FakeWorker.instances).toHaveLength(1);
+    FakeWorker.instances[0].reply(1, { data: ['airport'] }); FakeWorker.instances[0].reply(0, { data: ['104'] });
+    expect(await (await first).json()).toEqual({ data: ['104'] }); expect(await (await second).json()).toEqual({ data: ['airport'] });
   });
   it('rejects failed loads and creates a fresh worker on retry', async () => {
     const { transportFetch } = await import('./transportClient');
-    const first = transportFetch('/api/network?resource=routes');
-    const failed = expect(first).rejects.toThrow('Could not load');
-    TestWorker.instances[0].onerror?.(); await failed;
-    const retry = transportFetch('/api/network?resource=routes');
-    expect(TestWorker.instances).toHaveLength(2);
-    TestWorker.instances[1].reply(); await retry;
+    const first = transportFetch('/api/network?resource=routes'); const failed = expect(first).rejects.toThrow('Could not load');
+    FakeWorker.instances[0].onerror?.(); await failed;
+    const retry = transportFetch('/api/network?resource=routes'); expect(FakeWorker.instances).toHaveLength(2);
+    FakeWorker.instances[1].reply(); await retry;
   });
 });

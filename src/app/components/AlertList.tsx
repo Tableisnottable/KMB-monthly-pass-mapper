@@ -2,32 +2,22 @@
 
 import { transportFetch as fetch } from '../../browser/transportClient';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { operatorNoticeLinks, TRAFFIC_NEWS_URL, type TrafficFeed } from '../../data/trafficAlerts';
+import { useAutoRefresh } from './useAutoRefresh';
 
 const hkTime = (value: string) => new Date(value).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour12: false });
 export function AlertList({ mode }: { mode: 'updates' | 'events' }) {
   const [query, setQuery] = useState('');
   const [feed, setFeed] = useState<TrafficFeed | null>(null);
   const [error, setError] = useState(false);
-  const [refresh, setRefresh] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchNews = async () => {
-      try {
-        const response = await fetch(mode === 'updates' ? '/api/updates' : '/api/traffic', { signal: controller.signal, cache: 'no-store' });
+  const polling = useAutoRefresh(mode, async signal => {
+        const response = await fetch(mode === 'updates' ? '/api/updates' : '/api/traffic', { signal, cache: 'no-store' });
         if (!response.ok) throw new Error();
         const result = await response.json() as TrafficFeed;
-        if (!controller.signal.aborted) {
-          if (result.meta.status === 'AVAILABLE') setFeed(result);
-          setError(result.meta.status !== 'AVAILABLE');
-        }
-      } catch { if (!controller.signal.aborted) setError(true); }
-    };
-    void fetchNews();
-    const interval = window.setInterval(fetchNews, 60000);
-    return () => { controller.abort(); window.clearInterval(interval); };
-  }, [mode, refresh]);
+        if (result.meta.status !== 'AVAILABLE') { setError(true); throw new Error('Source unavailable'); }
+        if (!signal.aborted) { setFeed(result); setError(false); }
+  }, 60_000);
   const items = useMemo(() => (feed?.data ?? []).filter(item => (item.textTc + ' ' + item.textEn).toLowerCase().includes(query.trim().toLowerCase())), [feed, query]);
   return <div>
     <aside className="mb-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
@@ -38,8 +28,8 @@ export function AlertList({ mode }: { mode: 'updates' | 'events' }) {
       {feed?.meta.fetchedAt && <p className="mt-2">最近成功擷取：{hkTime(feed.meta.fetchedAt)}（HKT）</p>}
     </aside>
     <div className="mb-4 flex gap-2"><input aria-label={mode === 'updates' ? '搜尋巴士消息' : '搜尋道路消息'} className="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200" onChange={event => setQuery(event.target.value)} placeholder={mode === 'updates' ? '搜尋巴士路線、站點或服務' : '搜尋道路、地點或交通事件'} value={query} />
-      <button type="button" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" onClick={() => setRefresh(value => value + 1)}>重新整理</button></div>
-    {error && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">暫時無法核實最新交通消息，不能據此判斷服務正常。{feed?.data.length ? '下方保留上次成功擷取的資料，可能已過時。' : '請查看官方消息來源。'}</p>}
+      <button type="button" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" disabled={polling.loading} onClick={polling.refresh}>重新整理</button></div>
+    {(error || polling.failed) && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">暫時無法核實最新交通消息，不能據此判斷服務正常。{feed?.data.length ? '下方保留上次成功擷取的資料，可能已過時。' : '請查看官方消息來源。'}</p>}
     {!feed && !error && <p role="status">正在載入官方交通消息…</p>}
     <div className="space-y-3">{items.map(item => <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" key={item.id}>
       <div className="mb-3 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><span>運輸署特別交通消息 · {item.id}</span><span>{item.category === 'BUS' ? '巴士／小巴服務' : '道路交通'}</span></div>

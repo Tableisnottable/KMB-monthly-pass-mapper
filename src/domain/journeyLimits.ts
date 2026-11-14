@@ -1,0 +1,32 @@
+import type { Route } from '../engine/UpgradedScoringEngine';
+export interface JourneyLimits {
+  transfers: number | null;
+  change: number | null;
+  walk: number | null;
+  wait: number | null;
+  ride: number | null;
+}
+export const DEFAULT_LIMITS: JourneyLimits = { transfers: null, change: null, walk: null, wait: null, ride: null };
+export const LIMIT_MAX = { transfers: 3, change: 240, walk: 240, wait: 240, ride: 240 };
+export function parseJourneyLimits(raw: string | null): JourneyLimits {
+  if (!raw) return { ...DEFAULT_LIMITS };
+  const input: unknown = JSON.parse(raw);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid journey limits.');
+  const limits = { ...DEFAULT_LIMITS };
+  for (const [key, value] of Object.entries(input)) {
+    if (!Object.hasOwn(LIMIT_MAX, key) || value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > LIMIT_MAX[key as keyof JourneyLimits])) throw new Error('Journey limit outside its allowed range.');
+    limits[key as keyof JourneyLimits] = value as number | null;
+  }
+  return limits;
+}
+export const limitAllows = (maximum: number | null | undefined, value: number) => maximum == null || value <= maximum + .001;
+export function withinJourneyLimits(route: Route, limits: JourneyLimits): boolean {
+  const legs = route.legs ?? route.segments ?? [], transit = legs.filter(leg => leg.mode !== 'WALK');
+  const walk = (route.walkTransferTimeMinutes ?? 0) + legs.filter(leg => leg.mode === 'WALK').reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), 0);
+  return limitAllows(limits.transfers, Math.max(0, transit.length - 1)) && limitAllows(limits.walk, walk)
+    && limitAllows(limits.ride, transit.reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), 0))
+    && transit.every((leg, index) => {
+      const wait = leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 0) / 2;
+      return limitAllows(limits.wait, wait) && (!index || limitAllows(limits.change, wait + (leg.accessWalkMinutes ?? 3)));
+    });
+}

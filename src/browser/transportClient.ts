@@ -2,10 +2,11 @@ type Reply = { id: number; status: number; headers: [string, string][]; body: st
 type Pending = { resolve: (response: Response) => void; reject: (error: Error) => void; cleanup: () => void };
 type Connection = { worker: Worker; pending: Map<number, Pending> };
 let shared: Connection | undefined;
+let journey: Connection | undefined;
 let sequence = 0;
 
 function connect(): Connection {
-  const connection: Connection = { worker: new Worker('/__planner/transport.worker.js'), pending: new Map() };
+  const connection: Connection = { worker: new Worker('/__planner/transport.worker.js', { type: 'module' }), pending: new Map() };
   connection.worker.onmessage = ({ data }: MessageEvent<Reply>) => {
     const pending = connection.pending.get(data.id);
     if (!pending) return;
@@ -19,6 +20,7 @@ function connect(): Connection {
     }
     connection.pending.clear(); connection.worker.terminate();
     if (shared === connection) shared = undefined;
+    if (journey === connection) journey = undefined;
   };
   return connection;
 }
@@ -28,24 +30,26 @@ export async function transportFetch(input: string, init?: RequestInit): Promise
   const url = new URL(input, window.location.origin);
   if (!url.pathname.startsWith('/api/')) return fetch(input, init);
   if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-  // Each journey has its own cancellable worker. Place search and timetables
-  // stay responsive while a large multimodal search is running.
+  // Keep the journey calculator warm between completed searches. Abort still
+  // terminates it, while a separate catalogue worker stays responsive.
   const dedicated = url.pathname === '/api/journey';
-  const connection = dedicated ? connect() : shared ?? (shared = connect());
+  const connection = dedicated ? journey ?? (journey = connect()) : shared ?? (shared = connect());
   const id = ++sequence;
   return new Promise<Response>((resolve, reject) => {
     const abort = () => {
       connection.pending.delete(id); cleanup();
-      if (!dedicated) connection.worker.postMessage({ id, cancel: true });
+      if (dedicated) dispose(); else connection.worker.postMessage({ id, cancel: true });
       reject(new DOMException('Aborted', 'AbortError'));
     };
     const timeout = window.setTimeout(() => {
-      connection.pending.delete(id); cleanup(); reject(new Error('Transport calculation timed out. Please try again.'));
+      connection.pending.delete(id); cleanup();
+      if (dedicated) dispose(); else connection.worker.postMessage({ id, cancel: true });
+      reject(new Error('Transport calculation timed out. Please try again.'));
     }, 60_000);
     const cleanup = () => {
       window.clearTimeout(timeout); init?.signal?.removeEventListener('abort', abort);
-      if (dedicated) connection.worker.terminate();
     };
+    const dispose = () => { connection.worker.terminate(); if (journey === connection) journey = undefined; };
     connection.pending.set(id, { resolve, reject, cleanup });
     init?.signal?.addEventListener('abort', abort, { once: true });
     connection.worker.postMessage({ id, url: url.href });

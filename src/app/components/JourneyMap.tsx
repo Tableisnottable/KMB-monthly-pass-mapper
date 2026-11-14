@@ -10,6 +10,7 @@ import { copy, legOperator, routeColor, type JourneyLocations, type PlannerLocal
 import { PlannerIcon } from './PlannerIcon';
 import type { TravelOption } from '../../domain/travelOptions';
 import { routeLineStyles } from './routeColours';
+import { useLiveLocation } from './useLiveLocation';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
 
@@ -23,7 +24,10 @@ export function JourneyMap({ route, travel, places, onPick, locale }: { route?: 
   const [ready, setReady] = useState(false);
   const [message, setMessage] = useState('');
   const [tileError, setTileError] = useState(false);
-  const [locating, setLocating] = useState(false);
+  const [gpsEnabled, setGpsEnabled] = useState(false);
+  const gps = useLiveLocation(gpsEnabled);
+  const gpsCentered = useRef(false);
+  useEffect(() => { if (origin?.type === 'location') setGpsEnabled(true); }, [origin?.id, origin?.type]);
   const [geometryStatus, setGeometryStatus] = useState<'loading' | 'ready' | 'partial' | 'error'>('loading');
   const [estimatedRoad, setEstimatedRoad] = useState(false);
 
@@ -97,7 +101,7 @@ export function JourneyMap({ route, travel, places, onPick, locale }: { route?: 
     }
     fit();
     if (travel) {
-      const color = travel.mode === 'taxi' ? '#b77d00' : travel.mode === 'cycle' ? '#197daf' : '#72827d';
+      const color = travel.mode === 'taxi' ? '#b77d00' : travel.mode === 'drive' ? '#4a59a4' : travel.mode === 'cycle' ? '#197daf' : '#72827d';
       for (const path of travel.paths) {
         L.polyline(path, { color: '#fff', weight: 8, interactive: false }).addTo(routeLayer);
         L.polyline(path, { color, weight: 4, dashArray: travel.mode === 'walk' ? '5 7' : undefined, interactive: false }).addTo(routeLayer);
@@ -138,26 +142,30 @@ export function JourneyMap({ route, travel, places, onPick, locale }: { route?: 
     return () => { controller.abort(); window.clearTimeout(timeout); };
   }, [ready, route, travel, origin, destination, locale]);
 
-  function locate() {
-    if (!navigator.geolocation) { setMessage(copy(locale, '瀏覽器不支援定位。', 'Location is unavailable in this browser.')); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(position => {
-      const current = state.current;
-      if (current) {
-        const p: Leaflet.LatLngTuple = [position.coords.latitude, position.coords.longitude];
-        current.locationLayer.clearLayers();
-        current.L.circleMarker(p, { radius: 8, color: '#fff', weight: 3, fillColor: '#4265ce', fillOpacity: 1 }).addTo(current.locationLayer);
-        current.map.setView(p, 15);
-      }
-      setLocating(false); setMessage(copy(locale, '已在地圖上顯示你的位置。', 'Your location is shown on the map.'));
-    }, () => { setLocating(false); setMessage(copy(locale, '無法定位，請檢查瀏覽器權限。', 'Could not locate you. Check your browser permissions.')); }, { timeout: 10000, maximumAge: 60000 });
-  }
+  useEffect(() => {
+    const current = state.current;
+    if (!ready || !current) return;
+    current.locationLayer.clearLayers();
+    if (!gpsEnabled || !gps.position) return;
+    const { latitude, longitude, accuracy } = gps.position.coords;
+    const point: Leaflet.LatLngTuple = [latitude, longitude];
+    if (Number.isFinite(accuracy) && accuracy > 0) current.L.circle(point, { radius: Math.min(accuracy, 10000), color: '#3478e5', weight: 1, fillOpacity: .12, interactive: false }).addTo(current.locationLayer);
+    current.L.circleMarker(point, { radius: 8, color: '#fff', weight: 3, fillColor: '#3478e5', fillOpacity: 1, interactive: false })
+      .bindTooltip(copy(locale, '你的位置', 'Your live location')).addTo(current.locationLayer);
+    if (!gpsCentered.current) { current.map.setView(point, 16); gpsCentered.current = true; }
+  }, [ready, gpsEnabled, gps.position, locale]);
+  function locate() { gpsCentered.current = false; setGpsEnabled(value => !value); }
 
   return <section className="journey-map" id="map" aria-label={copy(locale, '行程地圖', 'Journey map')}>
     <div className="map-canvas" ref={container} />
-    <div className="map-tools"><button className="map-tool" onClick={locate} disabled={!ready || locating} aria-label={copy(locale, '在地圖上定位', 'Locate me on the map')}><PlannerIcon name="locate" size={20} /></button>
+    <div className="map-tools"><button className={'map-tool' + (gpsEnabled ? ' gps-active' : '')} onClick={locate} disabled={!ready} aria-pressed={gpsEnabled} aria-label={gpsEnabled ? copy(locale, '停止即時 GPS', 'Stop live GPS') : copy(locale, '顯示即時 GPS', 'Show live GPS')}><PlannerIcon name="locate" size={20} /></button>
       <button className="map-tool" aria-label={copy(locale, '返回香港全境', 'Reset Hong Kong map')} onClick={() => state.current?.map.setView([22.303, 114.164], 14)}><PlannerIcon name="compass" size={20} /></button></div>
     {!ready && !message && <div className="map-loading"><span className="planner-spinner" />{copy(locale, '正在載入地圖…', 'Loading the map…')}</div>}
+    {gpsEnabled && <div className="map-gps-status" role="status">{gps.status === 'live' ? copy(locale, '即時 GPS · 精確度約 ', 'Live GPS · accuracy about ') + Math.round(gps.position?.coords.accuracy ?? 0) + ' m'
+      : gps.status === 'denied' ? copy(locale, 'GPS 權限被拒，請在瀏覽器設定允許定位。', 'GPS permission denied. Allow location in browser settings.')
+        : gps.status === 'unavailable' ? copy(locale, '暫時無法取得 GPS，請檢查定位設定。', 'GPS unavailable. Check your location settings.')
+          : gps.status === 'paused' ? copy(locale, 'GPS 已暫停；返回 App 後恢復。', 'GPS paused; resumes when you return.') : copy(locale, '正在取得即時 GPS…', 'Finding live GPS…')}
+      <small>{copy(locale, '只在此畫面顯示，不會上傳或儲存 GPS 軌跡；App 轉到背景時暫停。', 'Shown on this map only; no GPS trail is uploaded or saved. Pauses in the background.')}</small></div>}
     {(message || tileError) && <div className="map-message" role="status">{tileError ? copy(locale, '底圖暫時無法載入，路線仍可在左側查看。', 'Map tiles are unavailable. Your route details are still available.') : message}<button onClick={() => { setMessage(''); setTileError(false); }} aria-label={copy(locale, '關閉提示', 'Dismiss message')}><PlannerIcon name="close" size={14} /></button></div>}
     {travel && <div className="map-caption" role="status"><PlannerIcon name="info" size={12} /><span>{copy(locale, 'OpenStreetMap 路徑及時間估算 · 非即時交通', 'OpenStreetMap route and time estimates · not live traffic')}</span></div>}
     {!travel && route && <div className="map-caption" role="status"><PlannerIcon name="info" size={12} /><span>{geometryStatus === 'loading'

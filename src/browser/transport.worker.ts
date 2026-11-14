@@ -1,21 +1,17 @@
 import { NextRequest } from './platform';
-import { GET as journey } from '../app/api/journey/route';
-import { GET as geometry } from '../app/api/journey-geometry/route';
-import { GET as network } from '../app/api/network/route';
-import { GET as places } from '../app/api/places/route';
-import { GET as transit } from '../app/api/transit/route';
-import { GET as updates } from '../app/api/updates/route';
-import { GET as traffic } from '../app/api/traffic/route';
-import { GET as travelOptions } from '../app/api/travel-options/route';
-import { GET as placeLabel } from '../app/api/place-label/route';
 
 // Reuse the actual application handlers and scoring engine. Only the execution
 // environment changes: expensive graph searches never run on the free Worker.
-const handlers: Record<string, (request: import('next/server').NextRequest) => Promise<Response>> = {
-  '/api/journey': journey, '/api/journey-geometry': geometry, '/api/network': network,
-  '/api/places': places, '/api/transit': transit, '/api/updates': updates, '/api/traffic': traffic,
-  '/api/travel-options': travelOptions,
-  '/api/place-label': placeLabel,
+const handlers = {
+  '/api/journey': () => import('../app/api/journey/route'),
+  '/api/journey-geometry': () => import('../app/api/journey-geometry/route'),
+  '/api/network': () => import('../app/api/network/route'),
+  '/api/places': () => import('../app/api/places/route'),
+  '/api/transit': () => import('../app/api/transit/route'),
+  '/api/updates': () => import('../app/api/updates/route'),
+  '/api/traffic': () => import('../app/api/traffic/route'),
+  '/api/travel-options': () => import('../app/api/travel-options/route'),
+  '/api/place-label': () => import('../app/api/place-label/route'),
 };
 const worker = self as unknown as {
   location: Location; fetch: typeof fetch;
@@ -34,9 +30,11 @@ worker.onmessage = async ({ data }) => {
   if (data.cancel) { if (active.has(data.id)) cancelled.add(data.id); return; }
   active.add(data.id);
   try {
-    const url = new URL(data.url, worker.location.origin), handler = handlers[url.pathname];
-    if (!handler) throw new Error('Unsupported transport operation.');
-    const response = await handler(new NextRequest(url) as unknown as import('next/server').NextRequest);
+    const url = new URL(data.url, worker.location.origin), load = handlers[url.pathname as keyof typeof handlers];
+    if (!load) throw new Error('Unsupported transport operation.');
+    const { GET } = await load();
+    if (cancelled.has(data.id)) return;
+    const response = await GET(new NextRequest(url) as unknown as import('next/server').NextRequest);
     const body = await response.text();
     if (!cancelled.has(data.id)) worker.postMessage({ id: data.id, status: response.status,
       headers: Array.from(response.headers.entries()), body });

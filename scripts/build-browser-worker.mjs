@@ -11,8 +11,9 @@ for (const file of [...manifest.files.roads, ...manifest.files.tracks]) {
 }
 await build({
   absWorkingDir: root, entryPoints: ['src/browser/transport.worker.ts'],
-  outfile: 'public/__planner/transport.worker.js', bundle: true, minify: true,
-  platform: 'browser', format: 'iife', target: ['es2020'],
+  outdir: 'public/__planner', entryNames: 'transport.worker', chunkNames: 'chunks/[name]-[hash]',
+  bundle: true, minify: true, splitting: true,
+  platform: 'browser', format: 'esm', target: ['es2020'],
   define: { 'process.env.OSRM_FOOT_URL': 'undefined', 'process.env.OSRM_CAR_URL': 'undefined', 'process.env.OSRM_BIKE_URL': 'undefined',
     'process.env.NODE_ENV': '"production"' },
   plugins: [{ name: 'web-platform-adapters', setup(builder) {
@@ -23,4 +24,7 @@ await build({
     });
   } }],
 });
+// Node's smoke-test worker must interpret the same .js chunks as browser ESM.
+const { writeFile } = await import('node:fs/promises');
+await writeFile(resolve(root, 'public/__planner/package.json'), '{"type":"module"}');
 console.log('Built the browser transport worker with the existing scoring engine.');

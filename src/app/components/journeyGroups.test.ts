@@ -21,15 +21,15 @@ describe('Combined stop-to-stop journeys', () => {
     expect(combinedLegChoices(group)?.map(legs => legs.map(l => l.routeNumber))).toEqual([['2A','171','72'], ['NA21']]);
   });
   it('keeps each actual transfer, exact fare, time and score on the selectable journey', () => {
-    const routes = scoreRoutes([journey('one', ['2A','NA21'], 45.1, 'start', 'end', 'change-A'), journey('two', ['171','NA21'], 47, 'start', 'end', 'change-B')]);
+    const routes = scoreRoutes([journey('one', ['2A','NA21'], 45.1, 'start', 'end', 'change-A'), journey('two', ['171','NA21'], 47, 'start', 'end', 'change-A')]);
     const [group] = groupJourneysByStops(routes);
     expect(group.routes).toEqual(routes);
-    expect(group.routes[1].legs[1].originStop.id).toBe('change-B');
+    expect(group.routes[1].legs[1].originStop.id).toBe('change-A');
   });
-  it('combines nearby feeders joining the same onward service and final stop', () => {
+  it('keeps nearby feeders with different boarding or transfer stops separate', () => {
     const groups = combine([journey('one', ['2A','NA21'], 45.1, 'stop-A', 'airport', 'mei-foo'), journey('two', ['37','NA21'], 46, 'stop-B', 'airport', 'kwai-chung')]);
-    expect(groups).toHaveLength(1); expect(groupFareLabel(groups[0], 'en')).toBe('$45.10–$46.00');
-    expect(groups[0].routes[1].legs[0].originStop.id).toBe('stop-B');
+    expect(groups).toHaveLength(2);
+    expect(groups.flatMap(group => group.routes).some(route => route.legs[0].originStop.id === 'stop-B')).toBe(true);
   });
   it('does not combine different direct stop pairs or opposite directions', () => {
     const groups = combine([journey('one', ['2A'], 45), journey('different-start', ['171'], 47, 'other'), journey('different-end', ['37'], 46, 'start', 'other'), journey('reverse', ['2A'], 45, 'end', 'start')]);
@@ -42,10 +42,27 @@ describe('Combined stop-to-stop journeys', () => {
   });
   it('never presents invented independent leg combinations', () => {
     const groups = combine([journey('one', ['44','A31'], 27.2), journey('two', ['42A','E32'], 19)]);
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(1);
     const group = { id: 'incomplete', routes: groups.flatMap(g => g.routes) };
     expect(combinedLegChoices(group)).toBeUndefined();
     expect(group.routes.map(r => r.legs.map(l => l.routeNumber).join('>'))).toEqual(['42A>E32', '44>A31']);
+  });
+  it.each(['first boarding', 'transfer alighting', 'transfer boarding', 'final alighting'])('does not combine a different %s stop even when names match', changed => {
+    const first = journey('first', ['970X', '968'], 25.9), second = journey('second', ['117', '968'], 18.9);
+    const [index, side] = changed === 'first boarding' ? [0, 'originStop'] as const
+      : changed === 'transfer alighting' ? [0, 'destinationStop'] as const
+        : changed === 'transfer boarding' ? [1, 'originStop'] as const : [1, 'destinationStop'] as const;
+    second.legs![index][side] = { ...second.legs![index][side]!, id: 'different-stop' };
+    const routes = scoreRoutes([first, second]);
+    expect(groupJourneysByStops(routes)).toHaveLength(2);
+    expect(combinedLegChoices({ id: 'unsafe', routes })).toBeUndefined();
+  });
+  it('requires complete stop identities and does not combine walking legs', () => {
+    const first = journey('first', ['44', 'A31'], 20), second = journey('second', ['42A', 'A31'], 21);
+    first.legs![1].originStop!.id = ''; second.legs![1].originStop!.id = '';
+    expect(combine([first, second])).toHaveLength(2);
+    first.legs![0].mode = 'WALK'; second.legs![0].mode = 'WALK';
+    expect(combine([first, second])).toHaveLength(2);
   });
   it('does not imply a known range when a fare is missing or only an upper bound', () => {
     const missing = journey('missing', ['37','NA21'], 0); missing.legs![1].fareStatus = 'UNAVAILABLE';

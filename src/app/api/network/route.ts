@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { networkPatterns, networkRoutes, networkStops, networkStop, transportCoverage } from '../../../data/transportNetwork';
-import { enrichJourneyArrivals } from '../../../data/multimodalLive';
+import { enrichJourneyArrivals, notificationTargets } from '../../../data/multimodalLive';
 import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
@@ -8,7 +8,7 @@ import { operatorInfo, transportOperators } from '../../../data/transportOperato
 import { hongKongServiceDate, nextPublishedDeparture, routeTimetable } from '../../../data/networkTimetable';
 import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
 import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
-import { departureType, providerMarksScheduled } from '../../../domain/departureType';
+import { departureTimingType, departureType } from '../../../domain/departureType';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
@@ -33,6 +33,22 @@ export async function GET(request: NextRequest) {
     const resident = residentsRoute(p.get('route') ?? '');
     return resident ? NextResponse.json({ resident, meta: residentsDirectoryMeta })
       : NextResponse.json({ error: 'Unknown residents’ service.' }, { status: 404 });
+  }
+  if (resource === 'pattern-stops') {
+    const pattern = networkPatterns.find(pattern => pattern.id === p.get('pattern'));
+    const board = Number(p.get('board')), alight = Number(p.get('alight'));
+    if (!pattern || p.get('board') === null || p.get('alight') === null || !Number.isInteger(board) || !Number.isInteger(alight)
+      || board < 0 || alight >= pattern.s.length || board >= alight) return NextResponse.json({ error: 'Choose a valid stop interval.' }, { status: 400 });
+    const locale = p.get('lang') === 'en' ? 'en' : 'zh';
+    return NextResponse.json({ data: pattern.s.slice(board, alight + 1).map(stop => networkStop(stop, locale)), stopCount: alight - board });
+  }
+  if (resource === 'notification-target') {
+    const index = networkPatterns.findIndex(pattern => pattern.id === p.get('pattern')), pattern = networkPatterns[index];
+    const board = Number(p.get('board')), alight = Number(p.get('alight'));
+    if (!pattern || p.get('board') === null || p.get('alight') === null || !Number.isInteger(board) || !Number.isInteger(alight) || board < 0 || alight >= pattern.s.length || board >= alight || pattern.p[board] !== 0) return NextResponse.json({ error: 'Invalid boarding interval' }, { status: 400 });
+    const route = networkRoutes[pattern.r];
+    try { return NextResponse.json({ data: await notificationTargets({ operator: route[1].split('+')[0], networkOperator: route[1], routeNumber: route[2], mode: route[5], networkPattern: index, boardingIndex: board, alightingIndex: alight, originStop: networkStop(pattern.s[board]), destinationStop: networkStop(pattern.s[alight]) }) }); }
+    catch { return NextResponse.json({ error: 'Notification stop lookup unavailable' }, { status: 502 }); }
   }
   if (resource === 'timetable') {
     try {
@@ -68,8 +84,10 @@ export async function GET(request: NextRequest) {
   const candidates: Route[] = [];
   networkPatterns.forEach((pattern, index) => {
     const r = networkRoutes[pattern.r], rail = r[5] === 'SUBWAY' || r[5] === 'LIGHT_RAIL';
+    if (p.get('pattern') && pattern.id !== p.get('pattern') || p.get('route') && r[0] !== p.get('route')) return;
     pattern.s.forEach((s, position) => {
       if (s !== stopIndex || pattern.p[position] !== 0 || position === pattern.s.length - 1) return;
+      if (p.get('board') !== null && position !== Number(p.get('board'))) return;
       const next = rail ? undefined : nextPublishedDeparture(index, position, now);
       const dest = pattern.s.length - 1;
       candidates.push({ id: pattern.id, originWalkMinutes: 0, legs: [{
@@ -77,6 +95,7 @@ export async function GET(request: NextRequest) {
         originStop: networkStop(s, locale), destinationStop: networkStop(pattern.s[dest], locale),
         networkPattern: index, boardingIndex: position, alightingIndex: dest,
         scheduledDepartureMinutes: next ? Math.ceil(next.minutes) : undefined, serviceStatus: rail ? 'UNVERIFIED' : 'TIMETABLE',
+        publishedHeadwayMinutes: next?.publishedHeadwayMinutes,
         departureTime: next?.time,
         serviceEnded: !rail && !next,
       }] });
@@ -93,12 +112,16 @@ export async function GET(request: NextRequest) {
       company: operatorInfo(leg.networkOperator ?? leg.operator),
       routeId: route[0], patternId: pattern.id, stopId: stop, number: leg.routeNumber, mode: leg.mode,
       destination: leg.destinationStop!.name, minutes: leg.realtimeEta?.etaMinutes ?? leg.scheduledDepartureMinutes ?? null,
+      publishedHeadwayMinutes: leg.publishedHeadwayMinutes,
       status: leg.serviceEnded ? 'NO_UPCOMING' : leg.serviceStatus };
-    return leg.liveDepartures?.length ? leg.liveDepartures.map((departure, index) => ({ ...base, ...departure,
+    const departures = leg.liveDepartures?.length ? leg.liveDepartures.map((departure, index) => ({ ...base, ...departure,
       company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
-      id: `${r.id}:live:${index}`, departureType: departureType(departure), status: departureType(departure) === 'SCHEDULED' || providerMarksScheduled(departure.remark) ? 'TIMETABLE' : 'LIVE' })) : [{ ...base, id: r.id,
+      id: `${r.id}:live:${index}`, departureType: departureType(departure), timingType: departureTimingType(departure), status: departureTimingType(departure) === 'SCHEDULED' ? 'TIMETABLE' : 'LIVE' })) : [{ ...base, id: r.id,
       departureType: base.status === 'TIMETABLE' ? 'SCHEDULED' : undefined,
       time: leg.departureTime ?? (base.minutes === null ? null : new Date(now.getTime() + base.minutes * 60000).toISOString()), scheduleMatch: 'UNVERIFIED' }];
+    return [...departures, ...(leg.departureNotices ?? []).map((notice, index) => ({ ...base, ...notice,
+      id: `${r.id}:cancelled:${index}`, status: 'UNVERIFIED', minutes: null, time: notice.time ?? null,
+      scheduleMatch: 'UNVERIFIED', company: operatorInfo(notice.operator ?? base.operator) }))];
   }).sort((a,b) => (a.minutes ?? Infinity) - (b.minutes ?? Infinity)), meta: { fetchedAt: now.toISOString(), stop: networkStop(stopIndex, locale) } },
   { headers: { 'Cache-Control': 'no-store' } });
 }

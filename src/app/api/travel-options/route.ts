@@ -19,9 +19,13 @@ export async function GET(request: NextRequest) {
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   if (limiter && !(await limiter.limit({ key: 'travel-options:' + ip })).success) return NextResponse.json({ error: 'Please try again shortly.' }, { status: 429 });
   const points: Coordinate[] = [[values[0], values[1]], [values[2], values[3]]];
-  const modes: [TravelMode, StreetProfile][] = [['walk', 'foot'], ['cycle', 'bike'], ['taxi', 'car']];
+  const modes: [TravelMode, StreetProfile][] = [['walk', 'foot'], ['cycle', 'bike'], ['taxi', 'car'], ['drive', 'car']];
+  const profiles = new Map<StreetProfile, ReturnType<typeof routeOnStreets>>();
   const data = await Promise.all(modes.filter(([mode]) => selected === undefined || selected.includes(mode))
-    .map(async ([mode, profile]) => travelOption(mode, await routeOnStreets(points, profile))));
+    .map(async ([mode, profile]) => {
+      if (!profiles.has(profile)) profiles.set(profile, routeOnStreets(points, profile));
+      return travelOption(mode, await profiles.get(profile)!);
+    }));
   return NextResponse.json({ data, attribution: '© OpenStreetMap contributors; routing by FOSSGIS / OSRM. Estimated travel times, not live traffic.' },
     { headers: { 'Cache-Control': 'public, max-age=3600' } });
 }

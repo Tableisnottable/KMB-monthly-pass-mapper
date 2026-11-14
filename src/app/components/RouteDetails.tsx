@@ -8,11 +8,13 @@ import { copy, legOperator, modeIcon, modeLabel, routeBadgeStyle, type PlannerLo
 import { operatorName } from '../../data/transportOperators';
 import { DepartureBadge } from './DepartureBadge';
 import { departureType } from '../../domain/departureType';
-import { JointArrivalBoard } from './JointArrivalBoard';
-import { studentLegFares } from '../../domain/journeyFares';
+import { LegArrivalBoard } from './LegArrivalBoard';
+import { LegStopTimeline } from './LegStopTimeline';
+import { studentLegFares, type FareProfile } from '../../domain/journeyFares';
 import { DEFAULT_WEIGHTS, customWeights, type RouteWeights } from '../../engine/routeWeights';
+import { JourneyNotificationControl } from './JourneyNotificationControl';
 
-export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS }: { route: ScoredRoute; locale: PlannerLocale; weights?: RouteWeights }) {
+export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile = 'adult', selectedFareLabel }: { route: ScoredRoute; locale: PlannerLocale; weights?: RouteWeights; profile?: FareProfile; selectedFareLabel?: string }) {
   const insight = getMonthlyPassInsight(route);
   const studentFares = studentLegFares(route);
   const walkOnly = route.legs.every(leg => leg.mode === 'WALK');
@@ -30,25 +32,30 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS }: { rou
   return <div className="route-details">
     <h4>{copy(locale, '逐段行程', 'Your journey, step by step')}</h4>
     {route.departureTime && route.arrivalTime && <p className="journey-clock-summary">{hongKongTimeLabel(route.departureTime)} → {hongKongTimeLabel(route.arrivalTime)} <small>Hong Kong time</small></p>}
+    {!walkOnly && route.legs[0] && <JourneyNotificationControl leg={route.legs[0]} locale={locale} />}
     <ol className="directions-list">
       {!walkOnly && (route.originWalkMinutes ?? 0) > 0 && <li><span className="step-marker"><PlannerIcon name="walk" size={15} /></span><div><strong>{copy(locale, '步行至上車站', 'Walk to your stop')}</strong><small>{route.legs[0]?.originStop.name} · {route.originWalkMinutes} min</small></div></li>}
       {route.legs.map((leg, index) => {
         const pass = getPassLegFare(leg);
         const passLabel = !pass.available ? copy(locale, '票價待查', 'Fare unavailable')
           : '$' + pass.minimum.toFixed(2) + (pass.maximum !== pass.minimum ? '–$' + pass.maximum.toFixed(2) : '');
+        const selectedPrice = profile === 'unverified' ? copy(locale, '票價未核實', 'Fare unverified') : profile === 'pass' ? passLabel : profile === 'student'
+          ? studentFares[index].available ? (studentFares[index].upperBound ? copy(locale, '最多 ', 'Up to ') : '') + '$' + studentFares[index].maximum.toFixed(2) : copy(locale, '票價待查', 'Fare unavailable')
+          : leg.fareStatus === 'UNAVAILABLE' || leg.fare === undefined ? copy(locale, '票價待查', 'Fare unavailable') : '$' + leg.fare.toFixed(2);
         return <li key={leg.id}>
         <span className="step-marker step-operator-marker" style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
         <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} {leg.mode !== 'WALK' && <DepartureBadge departure={leg.liveDepartures?.[0] ?? { status: leg.serviceStatus ?? 'UNVERIFIED' }} locale={locale} />}</strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>
+          {leg.routeName && <small>{leg.routeName}</small>}
           {leg.departureTime && leg.arrivalTime && <small>{hongKongTimeLabel(leg.departureTime)} → {hongKongTimeLabel(leg.arrivalTime)} HKT</small>}
           {leg.mode !== 'WALK' && leg.fareStatus !== 'UNAVAILABLE' && <small className="leg-adult-fare">{copy(locale, '無月票 ', 'Without pass ')}HK${(leg.fare ?? 0).toFixed(2)}{leg.fareStatus === 'FULL_FARE' ? ' · ' + copy(locale, '全程票價上限', 'full-fare upper bound') : leg.fare === 0 ? ' · ' + copy(locale, '已包括在鐵路票價內', 'included in rail fare') : ''}</small>}
-          {leg.mode !== 'WALK' && <small className="leg-pass-fare">{copy(locale, '使用九巴月票 ', 'With KMB pass ')}{passLabel}{leg.fareStatus === 'FULL_FARE' && pass.maximum > 0 ? ' · ' + copy(locale, '票價上限', 'upper bound') : ''}{pass.operatorDependent ? ' · ' + copy(locale, '視乎實際營辦商', 'depends on the operating company') : ''}</small>}
-          {leg.mode !== 'WALK' && <small>{copy(locale, '學生 ', 'Student ')}{studentFares[index].available ? (studentFares[index].upperBound ? copy(locale, '最多 ', 'Up to ') : '') + '$' + studentFares[index].maximum.toFixed(2) : copy(locale, '票價待查', 'Fare unavailable')}{studentFares[index].adultFallback ? ' · ' + copy(locale, '未核實學生優惠，採成人價', 'adult fare used; student offers unverified') : ''}</small>}
+          {leg.mode !== 'WALK' && <small className="leg-pass-fare">{copy(locale, '所選：', 'Selected: ')}{selectedFareLabel ?? profile} · {selectedPrice}{profile === 'pass' && pass.operatorDependent ? ' · ' + copy(locale, '視乎實際營辦商', 'depends on the operating company') : ''}{profile === 'student' && studentFares[index].adultFallback ? ' · ' + copy(locale, '未核實學生優惠，採成人價', 'adult fare used; student offers unverified') : ''}</small>}
           <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + (leg.liveDepartures?.[0] && departureType(leg.liveDepartures[0]) === 'ADDITIONAL' ? copy(locale, '加班到站', 'Additional arrival') : copy(locale, '即時到站', 'Live arrival')) + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
-          {leg.mode !== 'WALK' && <JointArrivalBoard departures={leg.liveDepartures ?? []}
-            operator={legOperator(leg)} routeNumber={leg.routeNumber} stopName={leg.originStop?.name} locale={locale}
-            scheduledTime={leg.departureTime} scheduledHeadway={leg.publishedHeadwayMinutes}
-            timetableOnly={route.timeMode !== 'now' || index > 0} />}
+          {leg.mode !== 'WALK' && <>
+            {leg.publishedHeadwayMinutes !== undefined && leg.publishedHeadwayMinutes > 0 && <p className="leg-headway">{copy(locale, '公布班距約 ', 'Published headway about ')}{leg.publishedHeadwayMinutes} min</p>}
+            <LegStopTimeline leg={leg} locale={locale} />
+            <LegArrivalBoard key={leg.id} leg={leg} locale={locale} laterConnection={route.timeMode !== 'now' || index > 0} />
+          </>}
           {leg.serviceStatus === 'UNVERIFIED' && <small>{copy(locale, '此路段服務未能核實，請向營辦商確認。', 'Service on this leg is unverified. Confirm with the operator.')}</small>}
           {leg.serviceStatus === 'TIMETABLE' && <small>{copy(locale, '按官方時間表估算，並非即時到站預報。', 'Based on the published timetable, not a live arrival prediction.')}</small>}
           {leg.networkRouteId && <small><a className="departure-timetable-link" href={'/timetables?' + new URLSearchParams({ lang: locale, route: leg.networkRouteId, ...(leg.networkPatternId && leg.originStop ? { pattern: leg.networkPatternId, stop: leg.originStop.id } : {}) })}>{copy(locale, '完整班次時間表', 'Full timetable')}</a></small>}

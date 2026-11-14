@@ -3,10 +3,14 @@ import type { Route, Segment } from '../engine/UpgradedScoringEngine';
 export const corridorChoices = {
   harbour: [['cht', '紅磡海底隧道', 'Cross-Harbour Tunnel'], ['ehc', '東區海底隧道', 'Eastern Harbour Crossing'], ['whc', '西區海底隧道', 'Western Harbour Crossing']],
   shatin: [['lion', '獅子山隧道', 'Lion Rock Tunnel'], ['tate', '大老山隧道', "Tate’s Cairn Tunnel"], ['shingmun', '城門隧道', 'Shing Mun Tunnels'], ['tsingsha', '青沙公路', 'Tsing Sha Highway']],
-  airport: [['lantau', '青嶼幹線', 'Lantau Link'], ['tmclk', '屯門赤鱲角隧道', 'Tuen Mun–Chek Lap Kok Tunnel']],
+  airport: [['lantau', '青嶼幹線', 'Lantau Link'], ['tmclk', '屯門赤鱲角隧道', 'Tuen Mun–Chek Lap Kok Tunnel'], ['northlantau', '北大嶼山公路', 'North Lantau Highway']],
   northwest: [['tailam', '大欖隧道', 'Tai Lam Tunnel'], ['tuenmun', '屯門公路', 'Tuen Mun Road'], ['twisk', '荃錦公路', 'Route Twisk']],
   tko: [['tko', '將軍澳隧道', 'Tseung Kwan O Tunnel'], ['tkolam', '將軍澳－藍田隧道', 'Tseung Kwan O–Lam Tin Tunnel']],
-  south: [['aberdeen', '香港仔隧道', 'Aberdeen Tunnel'], ['gap', '黃泥涌峽道', 'Wong Nai Chung Gap Road']],
+  south: [['aberdeen', '香港仔隧道', 'Aberdeen Tunnel'], ['gap', '黃泥涌峽道', 'Wong Nai Chung Gap Road'], ['pokfulam', '薄扶林道', 'Pok Fu Lam Road'], ['iec', '東區走廊', 'Island Eastern Corridor']],
+  kowloon: [['lungcheung', '龍翔道', 'Lung Cheung Road'], ['chingcheung', '呈祥道', 'Ching Cheung Road'], ['kwuntong', '觀塘繞道', 'Kwun Tong Bypass'], ['kaitak', '啟德隧道', 'Kai Tak Tunnel'], ['taiporoad', '大埔道', 'Tai Po Road']],
+  northeast: [['tolo', '吐露港公路', 'Tolo Highway'], ['fanling', '粉嶺公路', 'Fanling Highway']],
+  saikung: [['clearwater', '清水灣道', 'Clear Water Bay Road']],
+  lantau: [['tungchung', '東涌道', 'Tung Chung Road']],
 } as const;
 export type CorridorGroup = keyof typeof corridorChoices;
 export type RoadLevel = 'normal' | 'prefer' | 'ban';

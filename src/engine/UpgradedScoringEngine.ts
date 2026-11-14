@@ -1,4 +1,4 @@
-import type { LiveDeparture } from '../data/networkTimetable';
+import type { CancellationNotice, LiveDeparture } from '../data/networkTimetable';
 import { DEFAULT_WEIGHTS, type RouteWeights } from './routeWeights';
 
 export type Operator = 'KMB' | 'LWB' | 'MTR' | 'CTB' | string;
@@ -35,6 +35,8 @@ export interface Segment {
   realtimeEta?: RealtimeEta | null;
   /** All upcoming provider predictions at this boarding stop. */
   liveDepartures?: LiveDeparture[];
+  /** Provider-confirmed cancellations are notices, never boardable journeys. */
+  departureNotices?: CancellationNotice[];
   isEtaFresh?: boolean;
   /**
    * The provider serves this route but has no upcoming trip for it, e.g. an

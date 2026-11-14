@@ -2,7 +2,7 @@ import type { ScoredRoute, Segment } from '../engine/UpgradedScoringEngine';
 import snapshot from '../data/studentFares.json';
 import { getMonthlyPassInsight } from './monthlyPass';
 
-export type FareProfile = 'adult' | 'pass' | 'student';
+export type FareProfile = 'adult' | 'pass' | 'student' | 'unverified';
 export type FareEstimate = { minimum: number; maximum: number; available: boolean; upperBound: boolean; adultFallback: boolean };
 const rail = new Map((snapshot.rail as [string, string, number][]).map(([a, b, cents]) => [a + '>' + b, cents / 100]));
 // The route feed can publish multiple fare rows without stop-to-stop keys.
@@ -51,6 +51,7 @@ export function studentLegFares(route: Pick<ScoredRoute, 'legs'>): FareEstimate[
 }
 
 export function journeyFare(route: ScoredRoute, profile: FareProfile): FareEstimate {
+  if (profile === 'unverified') return { minimum: 0, maximum: 0, available: false, upperBound: false, adultFallback: false };
   if (profile === 'pass') {
     const fare = getMonthlyPassInsight(route);
     return { minimum: fare.passFareMin, maximum: fare.passFareMax, available: fare.available,

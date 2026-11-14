@@ -52,13 +52,20 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
     const controller = new AbortController();
     setLoading(true);
     const timer = window.setTimeout(async () => {
+      let hasLocal = false;
       try {
+        const local = await fetch('/api/places?scope=local&q=' + encodeURIComponent(query), { signal: controller.signal });
+        const nearby = local.ok ? await local.json() as { data?: PlaceResult[] } : {};
+        if (!controller.signal.aborted && nearby.data?.length) {
+          hasLocal = true;
+          setResults(nearby.data); setActive(0); setLoading(false);
+        }
         const response = await fetch('/api/places?q=' + encodeURIComponent(query), { signal: controller.signal });
         if (!response.ok) throw new Error('Place lookup failed');
         const payload = await response.json() as { data?: PlaceResult[] };
         if (!controller.signal.aborted) { setResults(payload.data ?? []); setActive(payload.data?.length ? 0 : -1); }
       } catch {
-        if (!controller.signal.aborted) setError(true);
+        if (!controller.signal.aborted && !hasLocal) setError(true);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }

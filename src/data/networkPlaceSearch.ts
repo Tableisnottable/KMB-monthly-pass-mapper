@@ -1,4 +1,4 @@
-import { networkStops } from './transportNetwork';
+import { networkStops } from './networkStops';
 
 function normalize(text: string) {
   return text.normalize('NFKC').toLowerCase().replace(/茘/g, '荔').replace(/[\s(),，（）.\-/]/g, '');

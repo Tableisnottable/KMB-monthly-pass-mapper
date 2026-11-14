@@ -19,3 +19,32 @@ self.addEventListener('fetch', event => {
   event.respondWith(fetch(event.request).catch(async () =>
     (await (await caches.open(OFFLINE_CACHE)).match(OFFLINE_PAGE)) ?? Response.error()));
 });
+
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    let payload = {};
+    try { payload = event.data?.json() ?? {}; } catch { /* Always show a visible fallback for a push. */ }
+    await self.registration.showNotification(payload.title || 'Transit Compass', {
+      body: payload.body || 'Open Transit Compass to check your journey.',
+      icon: '/icons/app-192.png', badge: '/icons/app-192.png',
+      tag: 'transit-compass-boarding', renotify: false, silent: true,
+      data: { url: payload.url === '/en' ? '/en' : '/', id: payload.id, token: payload.token },
+      actions: [{ action: 'stop', title: payload.stopLabel || 'Stop updates' }],
+    });
+  })());
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  event.waitUntil((async () => {
+    if (event.action === 'stop' && data.id && data.token) {
+      const result = await fetch('/api/notifications', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: data.id, token: data.token }) });
+      if (result.ok) for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage({ type: 'boarding-watch-stopped' });
+      return;
+    }
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = windows.find(client => new URL(client.url).origin === self.location.origin);
+    if (existing) { await existing.focus(); return; }
+    await self.clients.openWindow(data.url === '/en' ? '/en' : '/');
+  })());
+});

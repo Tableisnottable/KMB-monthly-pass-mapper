@@ -10,9 +10,10 @@ const thread = new Worker(`
   globalThis.self = globalThis;
   globalThis.location = { origin: 'http://localhost:8787' };
   globalThis.postMessage = value => parentPort.postMessage(value);
-  require(workerData);
-  parentPort.on('message', data => globalThis.onmessage({ data }));
-  parentPort.postMessage({ ready: true });
+  import(require('node:url').pathToFileURL(workerData).href).then(() => {
+    parentPort.on('message', data => globalThis.onmessage({ data }));
+    parentPort.postMessage({ ready: true });
+  });
 `, { eval: true, workerData: resolve('public/__planner/transport.worker.js') });
 let sequence = 0;
 async function request(path, status = 200) {

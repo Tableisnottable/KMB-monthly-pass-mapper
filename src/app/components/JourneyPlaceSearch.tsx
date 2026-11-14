@@ -39,7 +39,7 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
         address: '', lat: coords.latitude, lng: coords.longitude, type: 'location', googleMapsUrl: '' };
       setOrigin(place.name); onSelect('origin', place);
       if (!places.destination) destinationRef.current?.focus();
-    }, () => { setLocating(false); setLocationError(copy(locale, '無法取得位置。你仍可輸入起點或在地圖上選擇。', 'Could not get your location. Type a start or choose it on the map.')); }, { timeout: 10000, maximumAge: 60000 });
+    }, () => { setLocating(false); setLocationError(copy(locale, '無法取得位置。請允許位置權限，或輸入起點／在地圖上選擇。', 'Could not get your location. Allow location access, type a start or choose it on the map.')); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
   }
 
   return <form className="journey-search" onSubmit={event => {
@@ -67,7 +67,7 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
       {searching && <span className="planner-spinner" aria-label={copy(locale, '正在搜尋', 'Searching')} />}
       <button type="submit" className="time-apply" disabled={!places.origin || !places.destination || searching || (time.mode !== 'now' && !time.value)}>{copy(locale, '搜尋', 'Go')}</button>
     </div>
-    <div className="search-place-actions"><button type="button" className="use-location-button" disabled={locating} onClick={useLocation}><PlannerIcon name="locate" size={16} />{locating ? copy(locale, '定位中…', 'Locating…') : copy(locale, '我的位置作起點', 'Start at my location')}</button><span>Hong Kong · UTC+8</span></div>
+    <div className="search-place-actions"><button type="button" className="use-location-button" disabled={locating} aria-busy={locating} onClick={useLocation}><PlannerIcon name="locate" size={18} />{locating ? copy(locale, 'GPS 定位中…', 'Locating…') : copy(locale, 'GPS 定位起點', 'Use GPS as start')}</button><span>Hong Kong · UTC+8</span></div>
     {locationError && <p className="location-error" role="status">{locationError}</p>}
   </form>;
 }

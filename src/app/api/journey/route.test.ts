@@ -57,6 +57,25 @@ describe('Multimodal journey API', () => {
     expect(enrichJourneyArrivals).not.toHaveBeenCalled();
     for (const r of data) expect(Date.parse(r.departureTime)).toBe(Date.parse(time));
   }, 30000);
+  it.each(['depart', 'arrive'])('enforces hard time and transfer maximums during %s searches', async timeMode => {
+    const limits = { transfers: 0, walk: 20, ride: 120, wait: 25, change: null };
+    const { data, meta } = await journey(cheungShaWan, airport, { timeMode, time: '2026-11-14T14:00:00+08:00', limits: JSON.stringify(limits) });
+    expect(data.length).toBeGreaterThan(0); expect(meta.limits).toEqual(limits);
+    for (const route of data) {
+      expect(route.transferCount).toBe(0); expect(route.walkTransferTimeMinutes).toBeLessThanOrEqual(20);
+      expect(route.legs.reduce((sum: number, leg: { journeyTimeMinutes: number }) => sum + leg.journeyTimeMinutes, 0)).toBeLessThanOrEqual(120);
+      expect(route.legs.every((leg: { scheduledWaitMinutes: number }) => leg.scheduledWaitMinutes <= 25)).toBe(true);
+    }
+    const empty = await journey(cheungShaWan, airport, { timeMode, time: '2026-11-14T14:00:00+08:00', limits: '{"ride":0}' });
+    expect(empty.data).toEqual([]);
+  }, 30000);
+  it('rechecks waiting maximums after a live arrival changes', async () => {
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      for (const route of routes) route.legs![0].realtimeEta = { etaMinutes: 60, isLive: true, source: 'DATAGOVHK', dataTime: now.toISOString() };
+    });
+    const { data } = await journey(cheungShaWan, airport, { limits: '{"wait":5}' });
+    expect(data).toEqual([]);
+  }, 30000);
 
   it('searches backwards for arrive-by and returns only journeys meeting the deadline', async () => {
     const time = '2026-11-14T14:00:00+08:00';
@@ -93,7 +112,7 @@ describe('Multimodal journey API', () => {
   }, 20000);
 
   it('enforces company Must/Ban rules and a 15-minute change buffer after live retiming, using custom importance', async () => {
-    const weights = { ...DEFAULT_WEIGHTS, fare: 3 };
+    const weights = { ...DEFAULT_WEIGHTS, fare: .9 };
     const { data, meta } = await journey(cheungShaWan, airport, { operators: 'KMB,LWB', requiredOperators: 'KMB', changeMinutes: '15',
       weights: JSON.stringify(weights), preferences: JSON.stringify({ airport: 'lantau' }) });
     expect(data.length).toBeGreaterThan(0); expect(meta.customWeights).toBe(true); expect(meta.minimumChangeMinutes).toBe(15);
@@ -108,7 +127,7 @@ describe('Multimodal journey API', () => {
   }, 30000);
 
   it('rejects inconsistent Must/Ban choices and invalid change times', async () => {
-    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D']) {
+    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D', 'limits=%7B%22walk%22%3A-1%7D', 'limits=%7B%22transfers%22%3A4%7D', 'changeMinutes=15&limits=%7B%22change%22%3A10%7D']) {
       const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.33882&fromLon=114.15387&toLat=22.31367&toLon=113.93763&' + query));
       expect(response.status).toBe(400);
     }

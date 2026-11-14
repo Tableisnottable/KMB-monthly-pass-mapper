@@ -69,7 +69,8 @@ describe('Official live arrivals', () => {
     expect(route.legs![0].realtimeEta?.etaMinutes).toBe(3);
   });
   it.each(['原定班次 · Scheduled Bus', '加班車 · Scheduled Bus'])('preserves provider scheduled timing without claiming live tracking: %s', async remark => {
-    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][1] === 'KMB' && pattern.s.length > 1);
+    const now = new Date('2026-11-13T09:37:00Z');
+    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][2] === 'B10' && networkStops[pattern.s[0]][0] === '13393');
     const pattern = networkPatterns[index], routeNumber = networkRoutes[pattern.r][2];
     const origin = networkStop(pattern.s[0]), destination = networkStop(pattern.s[1]);
     vi.mocked(getKmbStops).mockResolvedValue([
@@ -90,7 +91,27 @@ describe('Official live arrivals', () => {
     expect(leg.serviceStatus).toBe('TIMETABLE');
     retimeConnections([route], now);
     expect(leg.scheduledWaitMinutes).toBe(6);
-    expect(leg.departureTime).toBe('2026-11-13T04:08:00.000Z');
+    expect(leg.departureTime).toBe('2026-11-13T09:45:00.000Z');
     expect(leg.serviceEnded).toBe(false);
+  });
+  it('retains explicit cancellations without an ETA as notices and excludes them from boardable predictions', async () => {
+    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][2] === 'B10' && networkStops[pattern.s[0]][0] === '13393');
+    const pattern = networkPatterns[index], origin = networkStop(pattern.s[0]), destination = networkStop(pattern.s[1]);
+    vi.mocked(getKmbStops).mockResolvedValue([
+      { stop: 'cancel-origin', name_tc: '', name_en: '', lat: origin.lat!, long: origin.lng! },
+      { stop: 'cancel-destination', name_tc: '', name_en: '', lat: destination.lat!, long: destination.lng! },
+    ]);
+    vi.mocked(getStaticKmbRouteStops).mockImplementation((_route, bound) => bound === 'outbound' ? [{ stop: 'cancel-origin', seq: 1 }, { stop: 'cancel-destination', seq: 2 }] : undefined);
+    vi.mocked(getKmbStopEta).mockResolvedValue([
+      { route: 'B10', dir: 'O', seq: 1, dest_tc: '', dest_en: '', eta: null, rmk_tc: '班次取消', data_timestamp: now.toISOString() },
+      { route: 'B10', dir: 'O', seq: 1, dest_tc: '', dest_en: '', eta: new Date(now.getTime() + 10 * 60000).toISOString(), rmk_tc: '', data_timestamp: now.toISOString() },
+      { route: 'B10', dir: 'O', seq: 9, dest_tc: '', dest_en: '', eta: new Date(now.getTime() + 3 * 60000).toISOString(), rmk_tc: '', data_timestamp: now.toISOString() },
+    ]);
+    const route: Route = { id: 'cancel', legs: [{ operator: 'KMB', mode: 'BUS', routeNumber: 'B10', networkPattern: index, boardingIndex: 0, alightingIndex: 1, originStop: origin, destinationStop: destination }] };
+    await enrichJourneyArrivals([route], now);
+    expect(route.legs![0].departureNotices).toEqual([{ departureType: 'CANCELLED', operator: 'KMB', remark: '班次取消', time: undefined }]);
+    expect(route.legs![0].liveDepartures).toHaveLength(1);
+    expect(route.legs![0].realtimeEta?.etaMinutes).toBe(10);
+    expect(route.legs![0].liveDepartures![0].timetableTime).toBeDefined();
   });
 });

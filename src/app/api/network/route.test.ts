@@ -41,6 +41,52 @@ describe('All-network catalogue', () => {
     expect((await lookup('resource=departures&stop=unknown')).status).toBe(400);
     expect((await lookup('resource=unknown')).status).toBe(400);
   });
+  it('returns exactly the requested native stop interval, rejecting invalid boundaries', async () => {
+    const pattern = networkPatterns.find(pattern => pattern.s.length >= 5)!;
+    const params = new URLSearchParams({ resource: 'pattern-stops', pattern: pattern.id, board: '1', alight: '4', lang: 'en' });
+    const payload = await (await lookup(params.toString())).json();
+    expect(payload.stopCount).toBe(3);
+    expect(payload.data.map((stop: { id: string }) => stop.id)).toEqual(pattern.s.slice(1, 5).map(stop => networkStops[stop][0]));
+    expect(payload.data[0].name).toBe(networkStops[pattern.s[1]][2]);
+    for (const [board, alight] of [['-1', '2'], ['2', '2'], ['1.5', '3'], ['0', String(pattern.s.length)]]) {
+      params.set('board', board); params.set('alight', alight);
+      expect((await lookup(params.toString())).status).toBe(400);
+    }
+    params.delete('board');
+    expect((await lookup(params.toString())).status).toBe(400);
+  });
+  it('restricts leg arrival lookups to the chosen pattern and boarding position', async () => {
+    const pattern = networkPatterns.find(pattern => pattern.s.length >= 4 && pattern.p[1] === 0)!;
+    const params = new URLSearchParams({ resource: 'departures', pattern: pattern.id, board: '1', stop: networkStops[pattern.s[1]][0] });
+    const { data } = await (await lookup(params.toString())).json();
+    expect(data).toHaveLength(1);
+    expect(data[0].patternId).toBe(pattern.id);
+    const candidate = vi.mocked(enrichJourneyArrivals).mock.calls[0][0];
+    expect(candidate).toHaveLength(1);
+    expect(candidate[0].legs?.[0].boardingIndex).toBe(1);
+    params.set('board', '0');
+    expect((await (await lookup(params.toString())).json()).data).toEqual([]);
+  });
+  it('preserves inferred changes and their non-live provider timing in the response', async () => {
+    const pattern = networkPatterns.find(pattern => networkRoutes[pattern.r][1] === 'KMB' && pattern.s.length > 1)!;
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      routes[0].legs![0].liveDepartures = [{ time: new Date(Date.now() + 15 * 60000).toISOString(), minutes: 15,
+        operator: 'KMB', remark: 'Scheduled Bus', scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE', departureType: 'CHANGED', changedReason: 'OBSERVED_SPACING' }];
+    });
+    const params = new URLSearchParams({ resource: 'departures', pattern: pattern.id, board: '0', stop: networkStops[pattern.s[0]][0] });
+    const { data } = await (await lookup(params.toString())).json();
+    expect(data[0]).toMatchObject({ departureType: 'CHANGED', changedReason: 'OBSERVED_SPACING', status: 'TIMETABLE', minutes: 15 });
+  });
+  it('returns explicit cancellations with no invented clock time or countdown', async () => {
+    const pattern = networkPatterns.find(pattern => networkRoutes[pattern.r][1] === 'KMB' && pattern.s.length > 1)!;
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      routes[0].legs![0].departureNotices = [{ departureType: 'CANCELLED', operator: 'KMB', remark: 'Departure cancelled' }];
+    });
+    const params = new URLSearchParams({ resource: 'departures', pattern: pattern.id, board: '0', stop: networkStops[pattern.s[0]][0] });
+    const { data } = await (await lookup(params.toString())).json();
+    const cancelled = data.find((row: { departureType: string }) => row.departureType === 'CANCELLED');
+    expect(cancelled).toMatchObject({ time: null, minutes: null, status: 'UNVERIFIED' });
+  });
   it('publishes source-provided company names and actual timetable coverage', async () => {
     const { data } = await (await lookup('resource=operators')).json();
     expect(data).toHaveLength(17);

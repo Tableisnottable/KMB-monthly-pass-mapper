@@ -17,9 +17,10 @@ export const comparisonTypes: { id: TravelMode; nameTc: string; nameEn: string }
   { id: 'walk', nameTc: '全程步行', nameEn: 'Walk all the way' },
   { id: 'cycle', nameTc: '單車', nameEn: 'Cycle' },
   { id: 'taxi', nameTc: '的士', nameEn: 'Taxi' },
+  { id: 'drive', nameTc: '自行駕駛', nameEn: 'Driving' },
 ];
 export type ComparisonPreferences = Record<TravelMode, boolean>;
-export const defaultComparisons = (): ComparisonPreferences => ({ walk: true, cycle: true, taxi: true });
+export const defaultComparisons = (): ComparisonPreferences => ({ walk: true, cycle: true, taxi: true, drive: true });
 
 function parseSelection<T extends string>(value: string | null, choices: readonly T[]): T[] | undefined {
   if (value === null) return undefined;

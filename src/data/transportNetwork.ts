@@ -1,5 +1,8 @@
-import { stops, routes, patterns, fares, rail_fares, full_fares, calendar, exceptions } from './transport/snapshot';
+import { routes, patterns, fares, rail_fares, full_fares, calendar, exceptions } from './transport/snapshot';
+import { networkStops } from './networkStops';
+export { networkStops } from './networkStops';
 import manifest from './transport/manifest.json';
+import { timetableCorrections } from './timetableCorrections';
 
 // Compact on-disk tuples keep every generated file below the GitHub size cap.
 export type NetworkStop = [id: string, zh: string, en: string, lat: number, lng: number, code: string, mode: string];
@@ -15,9 +18,16 @@ export interface NetworkPattern {
   /** service, first departure, end (exclusive for frequencies), headway, run time */
   w: number[][];
 }
-export const networkStops = stops as NetworkStop[];
 export const networkRoutes = routes as NetworkRoute[];
 export const networkPatterns = patterns as NetworkPattern[];
+for (const correction of timetableCorrections) {
+  for (const pattern of networkPatterns) {
+    const route = networkRoutes[pattern.r];
+    if (route[1] !== correction.operator || route[2] !== correction.route || networkStops[pattern.s[0]][0] !== correction.originStopId) continue;
+    const services = Array.from(new Set(pattern.w.map(window => window[0]))), duration = pattern.w[0]?.[4] ?? pattern.t.at(-1)!;
+    pattern.w = services.flatMap(service => correction.windows.map(([start, end, headway]) => [service, start, end, headway, duration]));
+  }
+}
 export const transportCoverage = manifest;
 
 const calendars = new Map((calendar as (number | string)[][]).map(r => [Number(r[0]), r]));

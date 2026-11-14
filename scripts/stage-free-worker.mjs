@@ -24,8 +24,10 @@ await writeFile(join(assets, '_headers'), `/*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(self)
-/__planner/*
+/__planner/transport.worker.js
   Cache-Control: public, max-age=0, must-revalidate
+/__planner/chunks/*
+  Cache-Control: public, max-age=31536000, immutable
 /sw.js
   Cache-Control: no-cache
   Service-Worker-Allowed: /

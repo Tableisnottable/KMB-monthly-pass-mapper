@@ -98,7 +98,7 @@ async function fetchJson<T>(url: string): Promise<T> {
         'User-Agent': 'KMB-Monthly-Pass-Mapper/1.0',
       },
       signal: controller.signal,
-      next: { revalidate: 60 },
+      cache: 'no-store',
     });
     if (!response.ok) {
       throw new Error(`Transit provider returned HTTP ${response.status}.`);
@@ -123,11 +123,14 @@ export async function getCitybusRoutes() {
   return payload.data;
 }
 
+let kmbStops: { expires: number; data: TransitStopRecord[] } | undefined;
+let kmbStopsLoading: Promise<TransitStopRecord[]> | undefined;
 export async function getKmbStops() {
-  const payload = await fetchJson<{ data: TransitStopRecord[] }>(
-    `${HK_TRANSIT_API.kmb}/stop/`,
-  );
-  return payload.data;
+  if (kmbStops && kmbStops.expires > Date.now()) return kmbStops.data;
+  if (!kmbStopsLoading) kmbStopsLoading = fetchJson<{ data: TransitStopRecord[] }>(`${HK_TRANSIT_API.kmb}/stop/`)
+    .then(payload => { kmbStops = { expires: Date.now() + 3600_000, data: payload.data }; return payload.data; })
+    .finally(() => { kmbStopsLoading = undefined; });
+  return kmbStopsLoading;
 }
 
 export async function getCitybusStops() {
@@ -191,7 +194,7 @@ export async function getKmbStopEta(stopId: string) {
   const promise = fetchJson<{ data: KmbStopEtaRecord[] }>(
     `${HK_TRANSIT_API.kmb}/stop-eta/${encodeURIComponent(stopId)}`,
   ).then((payload) => {
-    kmbStopEtaCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 60 * 1000 });
+    kmbStopEtaCache.set(stopId, { data: payload.data, expiresAt: Date.now() + 20 * 1000 });
     return payload.data;
   }).finally(() => {
     kmbStopEtaInflight.delete(stopId);

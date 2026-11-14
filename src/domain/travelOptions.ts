@@ -1,6 +1,6 @@
 import type { Coordinate, GeometryResult } from '../data/routeGeometry';
 
-export type TravelMode = 'walk' | 'cycle' | 'taxi';
+export type TravelMode = 'walk' | 'cycle' | 'taxi' | 'drive';
 export interface TravelOption {
   mode: TravelMode;
   available: boolean;

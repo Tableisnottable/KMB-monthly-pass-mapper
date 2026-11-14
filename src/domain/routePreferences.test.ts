@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PREFERENCES, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, type RoutePreferences } from './routePreferences';
+import { DEFAULT_PREFERENCES, corridorIds, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, type RoutePreferences } from './routePreferences';
+import intervals from '../data/corridorSegments.json';
 import { networkPatterns, networkRoutes } from '../data/transportNetwork';
 import { operatorAllowed, parseOperatorSelection } from './operatorSelection';
 const leg = (number: string, operator?: string) => {
@@ -40,6 +41,18 @@ describe('Company and road preferences', () => {
   it('does not mistake the EHC approaches for the TKO–Lam Tin Tunnel', () => {
     expect(legCorridors(leg('619'))).not.toContain('tkolam');
     expect(legCorridors(leg('680'))).not.toContain('tkolam');
+  });
+  it('offers 28 unique roads with actual travelled intervals and accepts their settings', () => {
+    expect(corridorIds).toHaveLength(28);
+    expect(new Set(corridorIds).size).toBe(28);
+    for (const id of corridorIds) {
+      const sample = intervals.find(row => row[2] === id)!;
+      expect(sample, id).toBeDefined();
+      const pattern = String(sample[0]), start = Number(sample[1]);
+      const preferences = parseRoutePreferences(JSON.stringify({ roads: { [id]: 'ban' } }));
+      expect(corridorLegAllowed(pattern, start, start + 1, preferences), id).toBe(false);
+      expect(corridorLegAllowed(pattern, start + 1, start + 1, preferences), id).toBe(true);
+    }
   });
   it('bans only the travelled interval, including backwards-search intervals', () => {
     const full = leg('104'), preferences: RoutePreferences = { ...DEFAULT_PREFERENCES, roads: { cht: 'ban' } };

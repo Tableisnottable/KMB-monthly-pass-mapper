@@ -4,6 +4,8 @@
   "minify": true,
   "main": ".free-worker/worker.js",
   "compatibility_date": "2026-11-13",
+  "durable_objects": { "bindings": [{ "name": "JOURNEY_NOTIFICATIONS", "class_name": "JourneyNotifications" }] },
+  "migrations": [{ "tag": "v1-boarding-notifications", "new_sqlite_classes": ["JourneyNotifications"] }],
   "ratelimits": [
     {
       "name": "RATE_LIMITER",

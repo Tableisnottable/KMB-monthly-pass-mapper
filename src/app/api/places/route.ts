@@ -40,6 +40,10 @@ export async function GET(request: NextRequest) {
       ? NextResponse.json({ data: localPlaces.slice(0, 6), meta: { provider: 'HK public transport / Education Bureau catalogue', geocoderUnavailable: true } }, { headers: cacheHeaders })
       : NextResponse.json({ error: 'Place search temporarily unavailable.' }, { status: 502 });
   }
+  if (request.nextUrl.searchParams.get('scope') === 'local') {
+    return NextResponse.json({ data: localPlaces.filter((place, index, all) => all.findIndex(other => other.id === place.id) === index).slice(0, 6),
+      meta: { provider: 'HK public transport / Education Bureau catalogue', localOnly: true } }, { headers: cacheHeaders });
+  }
 
   const url = new URL('https://nominatim.openstreetmap.org/search');
   url.searchParams.set('q', `${query}, Hong Kong`);

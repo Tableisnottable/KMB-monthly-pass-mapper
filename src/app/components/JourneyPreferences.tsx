@@ -3,6 +3,7 @@ import { corridorChoices, roadLevel, type CorridorGroup, type RoutePreferences }
 import { PreferenceToggle } from './PreferenceToggle';
 import { copy, type PlannerLocale } from './plannerUi';
 import { changeMinuteChoices, comparisonTypes, transitTypes, type ComparisonPreferences, type TransportPreferences } from '../../domain/transportSelection';
+import { LIMIT_MAX, type JourneyLimits } from '../../domain/journeyLimits';
 export type CompanyLevel = 'must' | 'normal' | 'ban';
 export type CompanyPreferences = Record<string, CompanyLevel>;
 export const defaultCompanies = (): CompanyPreferences => Object.fromEntries(allOperatorIds.map(id => [id, 'normal']));
@@ -11,28 +12,35 @@ const companyOrder = ['KMB', 'LWB', 'CTB', 'MTR', 'LRT', 'LRTFeeder', 'GMB', 'NL
 const companiesInOrder = [...selectableOperators].sort((a, b) => companyOrder.indexOf(a.id) - companyOrder.indexOf(b.id));
 const groupLabels: Record<CorridorGroup, [string, string]> = {
   harbour: ['過海', 'Cross-harbour'], shatin: ['往返沙田', 'To/from Sha Tin'], airport: ['往返機場', 'To/from airport'],
-  northwest: ['新界西北', 'Northwest New Territories'], tko: ['往返將軍澳', 'To/from Tseung Kwan O'], south: ['港島南', 'South Hong Kong Island'],
+  northwest: ['新界西北', 'Northwest New Territories'], tko: ['往返將軍澳', 'To/from Tseung Kwan O'], south: ['港島主要道路', 'Hong Kong Island roads'],
+  kowloon: ['九龍主要道路', 'Kowloon roads'], northeast: ['新界東北', 'Northeast New Territories'], saikung: ['西貢及清水灣', 'Sai Kung & Clear Water Bay'], lantau: ['大嶼山', 'Lantau Island'],
 };
 
-export function JourneyPreferences({ section, companies, onCompanies, transport, onTransport, comparisons, onComparisons, corridors, onCorridors, changeMinutes, onChangeMinutes, locale }: {
+export function JourneyPreferences({ section, companies, onCompanies, transport, onTransport, comparisons, onComparisons, corridors, onCorridors, changeMinutes, onChangeMinutes, limits, onLimits, locale }: {
   section: SettingsSection; companies: CompanyPreferences; onCompanies: (value: CompanyPreferences) => void;
   transport: TransportPreferences; onTransport: (value: TransportPreferences) => void;
   comparisons: ComparisonPreferences; onComparisons: (value: ComparisonPreferences) => void;
   corridors: RoutePreferences; onCorridors: (value: RoutePreferences) => void;
   changeMinutes: number; onChangeMinutes: (value: number) => void; locale: PlannerLocale;
+  limits: JourneyLimits; onLimits: (value: JourneyLimits) => void;
 }) {
   return <section className="journey-preferences">
     {section === 'changes' && <><h3>{copy(locale, '預留多少轉乘時間？', 'How much time to change?')}</h3>
       <label className="corridor-select"><span>{copy(locale, '最少轉乘時間（0–60 分鐘）', 'Minimum time to change (0–60 minutes)')}</span><select value={changeMinutes} onChange={event => onChangeMinutes(Number(event.target.value))}>
         {changeMinuteChoices.map(minutes => <option value={minutes} key={minutes}>{minutes} {copy(locale, '分鐘', 'minutes')}</option>)}</select></label>
-      <p>{copy(locale, '可選 0–60 分鐘，每次 1 分鐘。0 分鐘不加額外緩衝，仍保留實際轉乘步行；額外緩衝計入候車。較長時間可能排除緊接班次，並改變推薦結果。', 'Choose 0–60 minutes in 1-minute steps. Zero adds no extra buffer; actual transfer walking stays unchanged. Extra buffer counts as waiting. Longer buffers can rule out tight connections and change recommendations.')}</p></>}
+      <p>{copy(locale, '可選 0–60 分鐘，每次 1 分鐘。0 分鐘不加額外緩衝，仍保留實際轉乘步行；額外緩衝計入候車。較長時間可能排除緊接班次，並改變推薦結果。', 'Choose 0–60 minutes in 1-minute steps. Zero adds no extra buffer; actual transfer walking stays unchanged. Extra buffer counts as waiting. Longer buffers can rule out tight connections and change recommendations.')}</p>
+      <h3>{copy(locale, '行程上限（可留空）', 'Journey maximums (optional)')}</h3>
+      {([['transfers', '最多轉乘次數', 'Maximum transfers'], ['change', '每次轉乘最多時間（分鐘）', 'Maximum time per change (minutes)'], ['walk', '全程最多步行時間（分鐘）', 'Maximum total walking (minutes)'], ['wait', '每次上車最多候車時間（分鐘）', 'Maximum waiting per boarding (minutes)'], ['ride', '全程最多乘車時間（分鐘）', 'Maximum total riding (minutes)']] as const).map(([key, zh, en]) => <label className="journey-limit-input" key={key}><span>{copy(locale, zh, en)}</span><input type="number" inputMode="numeric" min="0" max={LIMIT_MAX[key]} step="1" placeholder={copy(locale, '不限', 'No limit')} value={limits[key] ?? ''} onChange={event => { const raw = event.target.value; const value = raw === '' ? null : Number(raw); if (value === null || Number.isInteger(value) && value >= 0 && value <= LIMIT_MAX[key]) onLimits({ ...limits, [key]: value }); }} /></label>)}
+      <p>{copy(locale, '留空不加額外上限；搜尋本身最多三次轉乘及約四小時。轉乘時間包括轉站步行及候車；全程步行包括起點及終點接駁。這些為公共交通的硬性上限，可能找不到行程；不限制獨立步行、單車、的士及駕駛估算。', 'Blank adds no personal cap; the search itself is bounded to three transfers and about four hours. Change time includes transfer walking and waiting; total walking includes access and exit walks. These hard limits apply to public transport and can remove all results. Separate walk, cycle, taxi and driving comparisons are unaffected.')}</p>
+      {limits.change !== null && limits.change < changeMinutes && <p className="weight-warning" role="alert">{copy(locale, '最多轉乘時間不可少於最少轉乘時間。', 'Maximum change time cannot be below the minimum change time.')}</p>}
+    </>}
     {section === 'companies' && <><h3>{copy(locale, '交通方式及公司', 'Transport types & companies')}</h3>
       <details className="transport-settings-group" open><summary>{copy(locale, '公共交通種類', 'Public transport types')}</summary>
         <p>{copy(locale, '× 禁止 · ／ 正常 · ✓ 必須。每種設為必須的交通方式都要出現；公司設定也會同時生效。', '× Ban · ／ Normal · ✓ Must. Every required transport type must appear. Company rules also apply.')}</p>
         {transitTypes.map(type => <PreferenceToggle key={type.id} label={locale === 'en' ? type.nameEn : type.nameTc} locale={locale}
           value={transport[type.id]} positive="must" onChange={level => onTransport({ ...transport, [type.id]: level })} />)}
       </details>
-      <details className="transport-settings-group"><summary>{copy(locale, '步行、單車及的士', 'Walking, cycling & taxi')}</summary>
+      <details className="transport-settings-group"><summary>{copy(locale, '步行、單車、的士及駕駛', 'Walk, cycle, taxi & driving')}</summary>
         <p>{copy(locale, '選擇顯示及計算哪些獨立行程估算。關閉全程步行不會移除公共交通行程所需的接駁步行。', 'Choose which separate journey estimates to calculate and show. Hiding walking comparisons keeps the walking needed to reach and change public transport.')}</p>
         {comparisonTypes.map(type => <label className="comparison-preference" key={type.id}><span>{locale === 'en' ? type.nameEn : type.nameTc}</span>
           <input type="checkbox" checked={comparisons[type.id]} onChange={event => onComparisons({ ...comparisons, [type.id]: event.target.checked })} /></label>)}
@@ -56,6 +64,6 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
       {(Object.keys(corridorChoices) as CorridorGroup[]).map(group => <fieldset className="road-preferences-group" key={group}><legend>{copy(locale, ...groupLabels[group])}</legend>
         {corridorChoices[group].map(([id, zh, en]) => <PreferenceToggle key={id} label={copy(locale, zh, en)} locale={locale} positive="prefer" value={roadLevel(corridors, id)}
           onChange={level => onCorridors({ ...corridors, roads: { ...corridors.roads, [id]: level } })} />)}</fieldset>)}
-      <p>{copy(locale, '只適用於已辨認的公共交通道路路段。偏好為同組其他道路加 15 分；禁止於搜尋時排除該路段。鐵路、渡輪、未辨認道路及獨立步行／單車／的士估算不受影響，並非涵蓋全港所有道路。', 'Applies to identified transit road segments. Prefer adds 15 points to other roads in the same group; Ban excludes the travelled segment during search. Rail, ferries, unclassified roads and separate walk/cycle/taxi estimates are unaffected. This does not cover every Hong Kong road.')}</p></>}
+      <p>{copy(locale, '只適用於已辨認的公共交通道路路段。偏好為同組其他道路加 15 分；禁止於搜尋時排除該路段。鐵路、渡輪、未辨認道路及獨立步行／單車／的士／駕駛估算不受影響，並非涵蓋全港所有道路。', 'Applies to identified transit road segments. Prefer adds 15 points to other roads in the same group; Ban excludes the travelled segment during search. Rail, ferries, unclassified roads and separate walk/cycle/taxi/driving estimates are unaffected. This does not cover every Hong Kong road.')}</p></>}
   </section>;
 }
