@@ -5,6 +5,8 @@ export type PlannerLocale = 'zh' | 'en';
 export type JourneyField = 'origin' | 'destination';
 export type JourneyLocations = Record<JourneyField, import('./PlaceAutocomplete').PlaceResult | null>;
 export const copy = (locale: PlannerLocale, zh: string, en: string) => locale === 'en' ? en : zh;
+export const totalWalkMinutes = (route: ScoredRoute) => Math.ceil(route.walkTransferTimeMinutes
+  + route.legs.filter(leg => leg.mode === 'WALK').reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), 0));
 
 export function journeyMinutes(route: ScoredRoute): number {
   if (route.departureTime && route.arrivalTime) return Math.max(0, Math.ceil((new Date(route.arrivalTime).getTime() - new Date(route.departureTime).getTime()) / 60000));

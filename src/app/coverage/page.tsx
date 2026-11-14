@@ -33,7 +33,9 @@ export default function CoveragePage() {
         <li>普通成人票價；港鐵、機場快綫及輕鐵使用成人八達通。同一付費區鐵路轉綫只計一次起訖票價，不自動扣除未核實優惠。Normal adult fares, with adult Octopus on MTR, Airport Express and Light Rail. Connected paid-area rail changes share an OD fare; unverified interchange discounts are excluded.</li>
         <li>已匯入 {alignments.roadAlignments.toLocaleString()} 條運輸署道路線形，鐵路、電車、纜車及渡輪使用 OpenStreetMap 實際線形，步行使用路網規劃。缺少路徑時隱藏該段連線。Imported TD road alignments and OpenStreetMap tracks/water routes replace stop-to-stop chords. Walking uses street paths. Missing paths are hidden; accessibility and temporary closures are not verified.</li>
         <li>指定日期不使用現在的即時 ETA；鐵路時間表仍屬估算，請確認營運時間。Selected-date trips never use current live ETAs. Rail schedules remain estimated; confirm operating hours.</li>
-        <li>紅色小巴、的士、昂坪360及未有納入固定路線資料的私人服務暫不支援。Red minibuses, taxis, Ngong Ping 360 and private services absent from the imported feeds are not included.</li>
+          <li>另提供路網步行、單車及的士時間估算；的士車費按咪錶，未提供數字估價或即時交通預測。Separate street-network walking, cycling and taxi time estimates are available. Taxi fares are metered; numeric taxi fares and live traffic predictions are not supplied.</li>
+          <li>學生比較採用已匯入港鐵、輕鐵及港鐵巴士學生票價；未核實的學生優惠採成人價並標示。Student comparisons use imported MTR, Light Rail and MTR Bus tariffs; adult-fare fallbacks for unverified student discounts are labelled.</li>
+          <li>紅色小巴、昂坪360及未有納入固定路線資料的私人服務暫不支援。Red minibuses, Ngong Ping 360 and private services absent from the imported fixed-route feeds are not included.</li>
       </ul>
       <h2 className="mt-6 text-xl font-bold">官方來源 Official sources</h2>
       <ul className="mt-3 space-y-2 text-sm">{Object.entries(coverage.sources).map(([name, url]) => <li key={name}><a className="text-cm-greenDark underline" href={url}>{name}</a></li>)}

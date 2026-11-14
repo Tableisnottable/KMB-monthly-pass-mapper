@@ -177,12 +177,13 @@ button {
 .route-option:focus-visible { outline: 2px solid var(--green-dark); outline-offset: -3px; }
 .route-option-top { display: flex; align-items: center; gap: 10px; min-height: 28px; }
 .route-option-top > .route-duration { margin-left: auto; flex-shrink: 0; }
-.fare-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin: 10px 0; text-align: left; }
-.fare-comparison > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.fare-comparison > span + span { border-left: 1px solid #dce5d9; padding-left: 12px; }
+.fare-comparison { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 10px 0; text-align: left; }
+.fare-comparison > span { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-width: 0; padding: 4px 7px; border-radius: 4px; }
+.fare-comparison > span + span { border-top: 1px solid #e9eee6; }
 .fare-comparison > span > span { font-size: 11px; line-height: 16px; color: #647165; font-weight: 400; }
 .fare-comparison strong { font-size: 14px; line-height: 20px; color: #485349; font-weight: 800; overflow-wrap: anywhere; }
-.fare-comparison > span + span strong { color: #277f22; }
+.fare-comparison > .fare-selected { background: #e6f3e0; box-shadow: inset 3px 0 #277f22; }
+.fare-comparison > .fare-selected strong { color: #277f22; }
 .fare-comparison > small { grid-column: 1 / -1; font-size: 10px; line-height: 15px; color: #766333; font-weight: 400; }
 .trip-fare-comparison { margin: 0 12px 12px; padding: 4px 16px; border: 1px solid #ddd; border-radius: 6px; background: #fff; }
 .directions-list .leg-pass-fare { color: #277f22; }
@@ -389,3 +390,64 @@ button {
 .install-card .install-status { margin-top: 18px; padding: 12px; border-radius: 6px; background: #edf6e9; }
 .install-card .install-note { margin-top: 24px; font-size: 13px; color: #657167; }
 @media (max-width: 450px) { .install-page { padding: 18px 14px 32px; } .install-card { padding: 22px; } }
+/* Journey choices and accessible phone controls. */
+.fare-profile-control { margin: 0 12px 12px; padding: 12px; background: #fff; border: 1px solid #dce5d9; border-radius: 6px; min-width: 0; }
+.fare-profile-control legend { float: left; width: 100%; margin-bottom: 8px; font-size: 14px; font-weight: 800; color: #344036; }
+.fare-profile-control > div { clear: both; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.fare-profile-control button { min-height: 44px; font-size: 12px; padding: 6px; border: 1px solid #cbd7c7; border-radius: 4px; color: #465241; }
+.fare-profile-control button[aria-pressed=true] { background: #277f22; color: #fff; border-color: #277f22; font-weight: 800; }
+.fare-profile-control p { clear: both; font-size: 11px; line-height: 1.5; margin-top: 8px; color: #647165; }
+.search-step-hint { margin-bottom: 10px; color: #277f22; font-size: 13px; font-weight: 700; }
+.place-input { min-height: 52px; height: auto; }
+.place-input input { padding-right: 45px; min-height: 50px; }
+.field-clear { top: 4px; right: 3px; width: 44px; height: 44px; }
+.search-fields { padding-right: 0; }
+.swap-button { position: static; width: auto; align-self: flex-end; height: 38px; min-width: 70px; margin-top: 0; border-radius: 5px; background: #edf4e9; color: #277f22; }
+.swap-button::after { content: '⇅'; margin-left: 4px; }
+.swap-button:hover { background: #dfeeda; }
+.search-place-actions { display: flex; margin-top: 6px; }
+.use-location-button { display: flex; align-items: center; gap: 7px; min-height: 44px; font-size: 13px; color: #277f22; text-align: left; }
+.location-error { font-size: 12px; line-height: 1.5; color: #9a4d24; margin-top: 6px; }
+.place-results { max-height: min(350px, 45dvh); }
+.place-results > button { min-height: 60px; padding: 12px; }
+.place-results strong { font-weight: 700; line-height: 1.4; }
+.place-results small { color: #667263; }
+.departure-options { height: auto; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.departure-options button { min-height: 44px; padding: 6px 9px; }
+.departure-options button[aria-pressed=true] { background: #e8f4e2; border-radius: 4px; }
+.journey-preferences { margin: 12px; padding: 13px; border-radius: 6px; background: #fff; color: #344036; min-width: 0; }
+.journey-preferences summary { cursor: pointer; min-height: 24px; font-size: 14px; font-weight: 800; }
+.journey-preferences h3 { font-weight: 800; font-size: 14px; margin-top: 18px; }
+.journey-preferences p { margin: 8px 0; font-size: 11px; line-height: 1.6; color: #667263; }
+.company-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.company-shortcuts button { border: 1px solid #c9d7c4; color: #277f22; border-radius: 4px; min-height: 44px; padding: 6px 9px; font-size: 12px; }
+.company-preferences > label, .corridor-select { display: grid; grid-template-columns: minmax(0, 1fr) minmax(85px, 40%); gap: 8px; align-items: center; padding: 6px 0; font-size: 12px; }
+.company-preferences select, .corridor-select select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #c8d4c3; border-radius: 4px; background: #fff; color: #344036; padding: 5px; font: inherit; }
+.corridor-select { grid-template-columns: minmax(0, 1fr); margin-top: 8px; }
+.quick-modes { height: auto; min-height: 104px; margin-top: 15px; }
+.quick-modes button { padding: 10px 8px; grid-template-rows: 42px auto; gap: 5px; }
+.quick-modes button > span { font-size: 21px; }
+.quick-modes button > svg { color: #277f22; }
+.quick-modes button > strong { color: #3b4836; font-size: 13px; }
+.quick-modes button > small { font-size: 10px; color: #71806b; text-align: right; }
+.quick-modes button:disabled > svg, .quick-modes button:disabled > strong { color: #99a395; }
+.quick-mode-note { margin-top: 7px; color: #ffffffe0; font-size: 10px; line-height: 1.5; }
+.journey-walk-time { display: flex; gap: 5px; align-items: center; font-size: 12px; color: #5d6b59; margin: 6px 0; font-weight: 600; }
+.route-corridor-label { display: block; margin-top: 6px; font-size: 11px; line-height: 1.5; color: #376e89; }
+.menu-dialog { overflow-y: auto; }
+.route-weight-settings h3 { font-size: 16px; font-weight: 800; margin: 15px 0; }
+.route-weight-settings .weight-warning, .weight-warning { padding: 10px; background: #fff4d9; color: #78531e; border-left: 3px solid #d59824; border-radius: 3px; }
+.weight-slider { display: block; margin: 17px 0; }
+.weight-slider > span { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #344036; }
+.weight-slider output { font-variant-numeric: tabular-nums; font-weight: 700; }
+.weight-slider input { width: 100%; height: 34px; accent-color: #277f22; }
+.weight-slider small { font-size: 10px; color: #71806b; }
+.weight-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.weight-actions button { min-height: 44px; padding: 8px 11px; border-radius: 4px; font-size: 12px; border: 1px solid #277f22; color: #277f22; }
+.weight-actions button:first-child { color: #fff; background: #277f22; }
+.install-platform-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.install-platform-links a { padding: 10px 14px; border: 1px solid #a8c49f; border-radius: 6px; color: #277f22; font-weight: 700; }
+.trip-address { display: block; color: #ffffffe0; font-size: 12px; font-weight: 400; line-height: 1.5; margin-top: 4px; }
+.endpoint-coordinate { font-size: 10px; color: #647165; }
+.selected-place-description { display: block; color: #687263; font-size: 11px; line-height: 1.5; padding: 5px 6px 2px; white-space: normal; overflow-wrap: anywhere; }
+.selected-place-description .endpoint-coordinate { display: block; }

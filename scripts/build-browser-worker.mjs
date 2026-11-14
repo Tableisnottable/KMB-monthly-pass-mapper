@@ -13,7 +13,7 @@ await build({
   absWorkingDir: root, entryPoints: ['src/browser/transport.worker.ts'],
   outfile: 'public/__planner/transport.worker.js', bundle: true, minify: true,
   platform: 'browser', format: 'iife', target: ['es2020'],
-  define: { 'process.env.OSRM_FOOT_URL': 'undefined', 'process.env.OSRM_CAR_URL': 'undefined',
+  define: { 'process.env.OSRM_FOOT_URL': 'undefined', 'process.env.OSRM_CAR_URL': 'undefined', 'process.env.OSRM_BIKE_URL': 'undefined',
     'process.env.NODE_ENV': '"production"' },
   plugins: [{ name: 'web-platform-adapters', setup(builder) {
     builder.onResolve({ filter: /^next\/server$/ }, () => ({ path: resolve(root, 'src/browser/platform.ts') }));

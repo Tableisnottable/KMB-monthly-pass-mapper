@@ -6,6 +6,9 @@ import { haversineKm } from '../../../engine/journeyHelpers';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { transportCoverage, weightingDate } from '../../../data/transportNetwork';
 import { getRateLimiter } from '../../../lib/cloudflare';
+import { parseOperatorSelection } from '../../../domain/operatorSelection';
+import { parseRouteWeights, customWeights } from '../../../engine/routeWeights';
+import { parseRoutePreferences } from '../../../domain/routePreferences';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,18 +29,26 @@ export async function GET(request: NextRequest) {
   const locale = params.get('lang') === 'en' ? 'en' : 'zh';
   const now = new Date(), started = Date.now();
   let selection;
-  try { selection = parseJourneyTime(params.get('timeMode'), params.get('time'), now); }
+  let operators: string[] | undefined, requiredOperators: string[] | undefined;
+  let weights, preferences;
+  const minimumChangeMinutes = Number(params.get('changeMinutes') ?? 3);
+  try { selection = parseJourneyTime(params.get('timeMode'), params.get('time'), now);
+    operators = parseOperatorSelection(params.get('operators')); requiredOperators = parseOperatorSelection(params.get('requiredOperators'));
+    if (requiredOperators?.some(id => operators !== undefined && !operators.includes(id))) throw new Error('A required company cannot also be banned.');
+    if (!Number.isInteger(minimumChangeMinutes) || minimumChangeMinutes < 3 || minimumChangeMinutes > 30) throw new Error('Choose a minimum change time between 3 and 30 minutes.');
+    weights = parseRouteWeights(params.get('weights')); preferences = parseRoutePreferences(params.get('preferences')); }
   catch (err) { return NextResponse.json({ error: (err as Error).message }, { status: 400 }); }
   const { mode, date } = selection;
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive');
-  const candidates: Route[] = selectJourneyAlternatives(result.routes, 64);
+  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', false, { operators, weights, minimumChangeMinutes });
+  const candidates: Route[] = selectJourneyAlternatives(result.routes.filter(route => !requiredOperators?.length
+    || requiredOperators.every(id => route.legs.some(leg => (leg.networkOperator ?? leg.operator).split('+').includes(id)))), 64, preferences);
   // A current prediction says nothing about a trip on a selected future date.
-  if (mode === 'now') { await enrichJourneyArrivals(candidates, now); retimeConnections(candidates, now); }
+  if (mode === 'now') { await enrichJourneyArrivals(candidates, now); retimeConnections(candidates, now, minimumChangeMinutes); }
   else for (const route of candidates) setJourneyTimes(route, date, mode);
   let scored: ScoredRoute[] = selectJourneyAlternatives(scoreRoutes(candidates.filter(r => !r.legs?.some(l => l.serviceEnded)
-    && (mode !== 'arrive' || new Date(r.arrivalTime!).getTime() <= date.getTime() + 1)), weightingDate(date)));
+    && (mode !== 'arrive' || new Date(r.arrivalTime!).getTime() <= date.getTime() + 1)), weightingDate(date), weights), 40, preferences);
   const walkMinutes = Math.ceil(haversineKm(fromLat, fromLon, toLat, toLon) * 1.2 / (5 / 60));
-  if (walkMinutes <= 45) {
+  if (walkMinutes <= 45 && !requiredOperators?.length) {
     const walk: Route = { id: 'walk-only', transferCount: 0, walkTransferTimeMinutes: 0,
       legs: [{ id: 'walk', mode: 'WALK', operator: 'WALK', routeNumber: '',
         originStop: { id: 'origin', name: locale === 'en' ? 'Start' : '起點', lat: fromLat, lng: fromLon },
@@ -46,7 +57,7 @@ export async function GET(request: NextRequest) {
     const departure = mode === 'arrive' ? new Date(date.getTime() - walkMinutes * 60_000) : date;
     walk.departureTime = departure.toISOString(); walk.arrivalTime = new Date(departure.getTime() + walkMinutes * 60_000).toISOString(); walk.timeMode = mode;
     walk.legs![0].departureTime = walk.departureTime; walk.legs![0].arrivalTime = walk.arrivalTime;
-    scored = [...scored, scoreRoutes([walk], weightingDate(date))[0]].sort((a, b) => a.finalScore - b.finalScore);
+    scored = [...scored, scoreRoutes([walk], weightingDate(date), weights)[0]].sort((a, b) => a.finalScore - b.finalScore);
   }
   return NextResponse.json({ data: scored, meta: {
     source: 'Transport Department GTFS; MTR topology/fares; official KMB, Citybus and MTR arrivals',
@@ -54,6 +65,7 @@ export async function GET(request: NextRequest) {
     timeMode: mode, requestedTime: date.toISOString(), timeZone: 'Asia/Hong_Kong', farePassenger: 'NORMAL_ADULT',
     fareBasis: 'Adult Octopus where published; normal adult fares otherwise. No assumed interchange or pass discount.',
     weightingVersion: 2,
+    customWeights: customWeights(weights), weights, preferences, selectedOperators: operators ?? null, requiredOperators: requiredOperators ?? [], minimumChangeMinutes,
     importedOn: transportCoverage.importedOn, coverage: transportCoverage.counts,
     candidates: result.candidates, durationMs: Date.now() - started,
     originUncovered: !result.originStops.length, destinationUncovered: !result.destinationStops.length,

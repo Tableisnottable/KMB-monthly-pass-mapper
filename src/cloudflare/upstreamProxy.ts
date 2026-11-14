@@ -3,8 +3,8 @@ const paths: Record<string, RegExp> = {
   'rt.data.gov.hk': /^\/(?:v2\/transport\/citybus\/(?:route|stop|route-stop|eta|stop-eta)(?:\/|$)|v1\/transport\/mtr\/(?:getSchedule\.php|lrt\/getSchedule)$)/,
   'data.etagmb.gov.hk': /^\/(?:route-stop|eta\/route-stop)\//,
   'resource.data.one.gov.hk': /^\/td\/en\/specialtrafficnews\.xml$/,
-  'nominatim.openstreetmap.org': /^\/search$/,
-  'routing.openstreetmap.de': /^\/routed-(?:foot|car)\/route\/v1\/(?:foot|driving)\//,
+  'nominatim.openstreetmap.org': /^\/(?:search|reverse)$/,
+  'routing.openstreetmap.de': /^\/(?:routed-foot\/route\/v1\/foot|routed-car\/route\/v1\/driving|routed-bike\/route\/v1\/cycling)\//,
 };
 export function safeProviderUrl(value: string | null): URL | undefined {
   if (!value || value.length > 4096) return;
@@ -13,6 +13,13 @@ export function safeProviderUrl(value: string | null): URL | undefined {
     if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash
       || !paths[url.hostname]?.test(url.pathname)) return;
     if (url.hostname === 'nominatim.openstreetmap.org') {
+      if (url.pathname === '/reverse') {
+        const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
+        if (!url.searchParams.get('lat') || !url.searchParams.get('lon') || !Number.isFinite(lat) || !Number.isFinite(lon)
+          || lat < 22.1 || lat > 22.6 || lon < 113.8 || lon > 114.5) return;
+        url.searchParams.set('format', 'jsonv2'); url.searchParams.set('zoom', '18');
+        return url;
+      }
       if (!url.searchParams.get('q') || url.searchParams.get('q')!.length > 180) return;
       // Bound by coordinates: some HK records are indexed under China's code,
       // so forcing countrycodes=hk would silently remove valid local places.

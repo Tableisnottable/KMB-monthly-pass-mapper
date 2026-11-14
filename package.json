@@ -17,7 +17,9 @@
     "test:browser": "node scripts/build-browser-worker.mjs && node scripts/test-browser-worker.mjs",
     "data:citybus": "node scripts/fetch-citybus-data.mjs",
     "data:transport": "python scripts/import-transport.py",
-    "data:residents": "python scripts/import-residents.py"
+    "data:residents": "python scripts/import-residents.py",
+    "data:student-fares": "python scripts/import-student-fares.py",
+    "data:corridors": "python scripts/import-corridors.py"
   },
   "keywords": [],
   "author": "",

@@ -10,8 +10,9 @@ describe('Visible fare comparison', () => {
   ]);
   it('shows labelled without-pass and with-pass prices in English', () => {
     const html = renderToStaticMarkup(createElement(FareComparison, { routes: routes('LWB', 'A31'), locale: 'en' }));
-    expect(html).toContain('Without pass'); expect(html).toContain('With KMB pass');
+    expect(html).toContain('Normal adult (without pass)'); expect(html).toContain('With KMB pass'); expect(html).toContain('Student');
     expect(html).toContain('$20.60'); expect(html).toContain('$5.60');
+    expect(html).toContain('Student*'); expect(html).toContain('without a verified student discount');
   });
   it('shows both labels and an explicit zero payable fare in Chinese', () => {
     const html = renderToStaticMarkup(createElement(FareComparison, { routes: routes('KMB', '44'), locale: 'zh' }));

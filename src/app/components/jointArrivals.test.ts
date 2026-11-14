@@ -53,4 +53,10 @@ describe('Joint operator arrival displays', () => {
     ], operator: 'KMB+CTB', locale: 'en' }));
     expect(unknown).toContain('Operator not supplied');
   });
+  it('shows a scheduled estimate on ordinary routes without labelling it live', () => {
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [], operator: 'KMB', routeNumber: '44', locale: 'en',
+      scheduledTime: '2026-11-14T02:00:00Z', scheduledHeadway: 12, timetableOnly: true }));
+    expect(html).toContain('10:00'); expect(html).toContain('Boarding estimate'); expect(html).toContain('not live');
+    expect(html).toContain('12'); expect(html).not.toContain('Live arrivals');
+  });
 });

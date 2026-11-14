@@ -77,11 +77,11 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
           {row.remark && <small>{row.remark}</small>}
           <a className="departure-timetable-link" href={'/timetables?' + new URLSearchParams({ lang: locale, route: row.routeId, pattern: row.patternId, stop: row.stopId })}>{copy(locale, '完整班次時間表', 'Full timetable')}</a></span>
         <strong>{row.status === 'NO_UPCOMING' ? '—' : row.minutes === null ? '—' : row.minutes + ' min'}{row.time && <small>{hongKongTimeLabel(row.time)} HKT</small>}</strong>
-        {group.jointOperator && <JointArrivalBoard operator={group.jointOperator} routeNumber={row.number}
+        <JointArrivalBoard operator={group.jointOperator ?? row.networkOperator ?? row.operator} routeNumber={row.number}
           stopName={locale === 'en' ? selected.nameEn : selected.nameTc} locale={locale}
           departures={group.rows.flatMap(item => item.status === 'LIVE' && item.time !== null && item.minutes !== null
             ? [{ time: item.time, minutes: item.minutes, operator: item.operator, remark: item.remark,
-              scheduleMatch: item.scheduleMatch, addedReason: item.addedReason }] : [])} />}
+                scheduleMatch: item.scheduleMatch, addedReason: item.addedReason }] : [])} scheduledTime={row.status === 'TIMETABLE' ? row.time ?? undefined : undefined} />
       </div>;
       })}</div>
       {!loading && <button type="button" className="all-results-button" onClick={() => void choose(selected)}>{copy(locale, '更新班次', 'Refresh departures')}</button>}

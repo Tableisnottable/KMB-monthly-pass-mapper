@@ -1,6 +1,8 @@
 import type { ScoredRoute, Segment, TransitLeg } from '../../engine/UpgradedScoringEngine';
 import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, type PlannerLocale } from './plannerUi';
 import { getMonthlyPassInsight } from '../../domain/monthlyPass';
+import { fareSortValue, journeyFare, type FareProfile } from '../../domain/journeyFares';
+import { DEFAULT_PREFERENCES, preferencePenalty, type RoutePreferences } from '../../domain/routePreferences';
 
 export interface JourneyGroup { id: string; routes: ScoredRoute[] }
 export type JourneySort = 'recommended' | 'fastest' | 'cheapest' | 'transfers' | 'walking';
@@ -8,20 +10,20 @@ export type JourneySort = 'recommended' | 'fastest' | 'cheapest' | 'transfers' |
 const serviceKey = (leg: Segment) => JSON.stringify([legOperator(leg), leg.mode, leg.routeNumber, leg.routeName,
   leg.mode === 'MINIBUS' ? leg.networkPattern : undefined]);
 
-function sortValue(route: ScoredRoute, sort: JourneySort): number {
+function sortValue(route: ScoredRoute, sort: JourneySort, profile: FareProfile, preferences: RoutePreferences): number {
   switch (sort) {
     case 'fastest': return journeyMinutes(route);
-    case 'cheapest': return route.legs.some(leg => leg.fareStatus === 'UNAVAILABLE') ? Infinity : route.discountedFare;
+    case 'cheapest': return fareSortValue(route, profile);
     case 'transfers': return route.transferCount;
     case 'walking': return route.walkTransferTimeMinutes;
-    default: return route.finalScore;
+    default: return route.finalScore + preferencePenalty(route, preferences);
   }
 }
 
 /** Combine direct stop pairs or feeders joining the same onward services. */
-export function groupJourneysByStops(routes: ScoredRoute[], sort: JourneySort = 'recommended'): JourneyGroup[] {
+export function groupJourneysByStops(routes: ScoredRoute[], sort: JourneySort = 'recommended', profile: FareProfile = 'adult', preferences: RoutePreferences = DEFAULT_PREFERENCES): JourneyGroup[] {
   const groups = new Map<string, JourneyGroup>();
-  [...routes].sort((a, b) => sortValue(a, sort) - sortValue(b, sort) || a.finalScore - b.finalScore).forEach((route, index) => {
+  [...routes].sort((a, b) => sortValue(a, sort, profile, preferences) - sortValue(b, sort, profile, preferences) || a.finalScore - b.finalScore).forEach((route, index) => {
     const first = route.legs[0], last = route.legs.at(-1);
     const originId = first?.originStop?.id, destinationId = last?.destinationStop?.id;
     const canCombine = originId && destinationId
@@ -60,6 +62,14 @@ export function groupPassFareLabel(group: JourneyGroup, locale: PlannerLocale): 
   if (max > 0 && group.routes.some(route => route.legs.some(leg => leg.fareStatus === 'FULL_FARE'))) {
     return copy(locale, '最多 ', 'Up to ') + '$' + max.toFixed(2);
   }
+  return min === max ? '$' + min.toFixed(2) : '$' + min.toFixed(2) + '–$' + max.toFixed(2);
+}
+
+export function groupStudentFareLabel(group: JourneyGroup, locale: PlannerLocale): string {
+  const fares = group.routes.map(route => journeyFare(route, 'student'));
+  if (fares.some(fare => !fare.available)) return copy(locale, '票價待查', 'Fare unavailable');
+  const min = Math.min(...fares.map(fare => fare.minimum)), max = Math.max(...fares.map(fare => fare.maximum));
+  if (fares.some(fare => fare.upperBound)) return copy(locale, '最多 ', 'Up to ') + '$' + max.toFixed(2);
   return min === max ? '$' + min.toFixed(2) : '$' + min.toFixed(2) + '–$' + max.toFixed(2);
 }
 

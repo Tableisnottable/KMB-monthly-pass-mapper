@@ -25,11 +25,11 @@ The checked-in [transport manifest](src/data/transport/manifest.json) records a 
 
 The main page and `/en` share a Citymapper-style web workspace: a green search/results sidebar, an edge-to-edge interactive map, compact journey rows, and a full journey detail view. Start and End stay empty until the user chooses places, and planning starts automatically once both are selected. Locations can also be picked on the map. Mobile uses Show Map / Back to journeys controls. The interface retains the independent Transit Compass identity, original artwork, system fonts and OpenStreetMap tiles; it does not use Citymapper's proprietary assets, map service or backend.
 
-The planner supports Now, Leave at and Arrive by, with editable dates/times explicitly in Hong Kong (UTC+8). Arrive-by uses a backwards timetable search and reports the actual suggested departure and arrival. Scheduled trips never use current live ETAs. Switching cities, cycling and taxi routing remain disabled. The menu contains the existing station-arrival lookup, traffic/update links and weighting explanation. Journey details retain the score breakdown and monthly-pass estimate.
+The planner supports Now, Leave at and Arrive by, with editable dates/times explicitly in Hong Kong (UTC+8). Arrive-by uses a backwards timetable search and reports the actual suggested departure and arrival. Scheduled trips never use current live ETAs. Walking, cycling and taxi tiles show separate street-profile route-time estimates, with unavailable paths kept explicit. Taxi prices remain metered, not fabricated estimates. Switching cities remains disabled. The menu contains station-arrival lookup, traffic/update links and adjustable importance sliders. Journey details retain the score breakdown and monthly-pass estimate.
 
 Enhanced weighting version 2 uses ride time + actual wait × time multiplier + walking × 1.35 + 8 per transfer + normal adult fare × 0.45 + 4 per unverified service leg, retaining the operator adjustments. A separate broad direct/one-transfer scan preserves cheaper feeders alongside bounded deeper searches. The results board offers up to 40 diverse alternatives; Show all expands beyond the first 12. `/api/journey` searches the imported public-transport graph with up to three transfers. The 2026-11-13 snapshot contains 2,487 routes/variants and 9,626 stops: KMB, Long Win, Citybus and joint services, New Lantao Bus, MTR Bus, Discovery Bay and Ma Wan buses, published cross-boundary coaches, green minibuses, ferries, Hong Kong Tramways, Peak Tram, MTR and Light Rail. These are the networks in the official feeds, not a claim that every private service or live feed exists.
 
-Direct journeys with the same physical boarding and alighting stops appear in one expandable card. Feeder alternatives joining the same onward services and final stop are also combined, with different boarding/transfer stops explicitly indicated. Transport modes, leg counts and service availability remain separate. The card shows the minimum–maximum adult fare and duration across its choices; equal fares display once. Expanding preserves each complete journey's exact fares, times, transfer stops, score and selectable map path. Missing fares remain explicit and full-fare estimates remain upper bounds. Route numbers are combined by leg only when every displayed combination exists among the actual results.
+Direct journeys with the same physical boarding and alighting stops appear in one expandable card. Feeder alternatives joining the same onward services and final stop are also combined, with different boarding/transfer stops explicitly indicated. Transport modes, leg counts and service availability remain separate. The card shows minimum–maximum normal adult, KMB pass and student fares, journey duration and total walking time across its choices; equal values display once. Expanding preserves each complete journey's exact fares, times, transfer stops, score and selectable map path. Missing fares remain explicit and full-fare estimates remain upper bounds. Route numbers are combined by leg only when every displayed combination exists among the actual results.
 
 Combined cards use a blue tint and a label; the selected map journey has a green highlight and remains identified when returning from its details. Opening an unselected combined card previews its first choice on the map; reopening the selected group preserves its current individual choice. Results can be sorted by weighted recommendation, fastest, cheapest, fewest transfers or least walking. Sorting applies to cards and the choices inside them without changing any score, and unknown fares are placed last for cheapest sorting. Harbour 1xx/3xx/6xx badges mix red route numbers with company-coloured icons; 9xx/X9xx use green route numbers. Joint harbour icons include both company colours, and maps follow the route colour. Known local and mixed-tunnel exceptions retain company colours. Other bus badges use company display colours. N/NA night-bus routes use black badges and map lines with white text and icons, including joint night routes. Other joint services show both companies: the number follows the first company and the icon follows the second. Their maps use the first company colour. See `docs/route-colours.md`. Catalogue operator identity is retained separately from the existing weighting operator.
 
@@ -181,10 +181,10 @@ Waiting uses a reachable fresh live arrival minus access walking, or the actual 
 
 ### Normal adult fares
 
-`calculateFare` sums the published adult leg fares. Paid-area MTR/Light Rail changes are combined into one published OD fare before scoring. The planner uses adult Octopus rail fares and normal adult fares for other modes; it does not invent interchange offers or concessions. `discountedFare` retains its existing API field name but is the undiscounted normal adult total; `bbiDiscountApplied` is zero. Full-fare fallbacks are marked as upper bounds. Ranking and the cheapest sort continue to use these without-pass adult fares.
+`calculateFare` sums the published adult leg fares. Paid-area MTR/Light Rail changes are combined into one published OD fare before scoring. The planner uses adult Octopus rail fares and normal adult fares for other modes; it does not invent interchange offers or concessions. `discountedFare` retains its existing API field name but is the undiscounted normal adult total; `bbiDiscountApplied` is zero. Full-fare fallbacks are marked as upper bounds. The default recommendation and fare-importance slider use these adult fares. Cheapest sorting uses the adult / KMB pass / student profile selected at the top; selecting a profile does not hide the other prices.
 
-Journey cards, combined groups and selected journeys show **Without pass** and
-**With KMB pass** separately. Combined cards calculate the minimum and maximum
+Journey cards, combined groups and selected journeys show **Normal adult**,
+**With KMB pass** and **Student** separately. Combined cards calculate the minimum and maximum
 for each comparison from their actual member journeys. The pass calculation
 uses KMB's terms effective 2025-11-14, verified on 2026-11-14; see
 [KMB_PASS_RULES.md](src/domain/KMB_PASS_RULES.md) for the source and assumptions. It distinguishes
@@ -192,6 +192,42 @@ included rides, LWB A/NA and KMB HK1 discounts, P960/P968 charges, excluded rout
 and joint-service operating companies. A joint timetable without a known company
 shows a conditional range. Unknown fares remain unknown. The HK$834 pass purchase
 price is separate, and a valid pass with enough daily rides is assumed.
+
+### Journey preferences and fare profiles
+
+- **Companies, tunnels & changes** includes Must / Normal / Ban per operator.
+  Every Must company must appear; Normal is optional. Banned operators are
+  excluded during graph expansion. Joint services require all companies to be
+  allowed, and do not guarantee which company operates the actual vehicle.
+  KMB-only excludes Long Win and KMB/Citybus joint services.
+- Harbour, Sha Tin and airport road preferences use travelled intervals from
+  imported TD alignments. Recommended sorting adds 15 points to other known
+  corridors in the same group. It retains alternatives and leaves rail, ferry
+  and unclassified geometry unchanged. Run `npm run data:corridors` after an
+  alignment/network refresh.
+- **Minimum time to change** offers 3, 5, 10, 15, 20 or 30 minutes. The engine
+  keeps physical transfer walking and adds the remaining buffer to waiting,
+  including live retiming and arrive-by search. Press Go/Plan after changing
+  preferences. Searches remain bounded; restrictions can produce no result.
+- **Menu → Route weighting** provides importance sliders, advanced waiting
+  multipliers/company adjustments, an explicit warning, Apply & recalculate
+  and Reset to defaults. Actual estimates do not change when weights change.
+  Preferences and custom importance apply to the current session.
+- Student fares use the official MTR Student Octopus OD, Light Rail student
+  and MTR Bus student CSVs. Connected paid-area rail changes share one OD fare.
+  Airport Express remains adult-priced. Other services without a verified
+  student tariff show an adult-fare fallback (*), not an assumed half fare.
+  Ambiguous MTR Bus route-level fares use a marked upper bound. Import with
+  `npm run data:student-fares` and review current student eligibility/conditions.
+- Walking/cycling/taxi times use separate OSRM foot/bike/car profiles and their
+  routed durations. They do not include live traffic or taxi waiting. Cycling
+  assumes an owned bicycle; ferry/hire charges and accessibility guarantees are
+  excluded. Missing paths remain unavailable.
+- Start/End inputs offer clear buttons, swap, automatic destination focus and
+  five recent selections stored on the device. GPS requires a user action and
+  is not added to recents. Map picks resolve to a street/landmark with a nearby
+  stop fallback; exact coordinates remain secondary. Endpoint coordinates are
+  sent to the restricted public geocoder/router proxies for these lookups.
 
 ## Data sources and API behaviour / 資料來源及 API 行為
 
@@ -325,7 +361,12 @@ The main `JourneyMap` uses Leaflet/OpenStreetMap and does not use this setting. 
 
 不要提交 credentials、API keys 或 private endpoints / Do not commit credentials, API keys, or private endpoints.
 
-### Install on Android / 在 Android 安裝
+### Install on iOS and Android / 在 iOS 及 Android 安裝
+
+On iPhone or iPad, open `/install` in Safari, tap **Share → Add to Home Screen**,
+enable **Open as Web App** if offered, then tap **Add**. The page includes
+bilingual instructions for both platforms. Website and installed PWA share updates.
+
 
 Open `/install` in Chrome on an Android phone or tablet (or `/install?lang=zh`
 for Chinese). There is no device-brand restriction.
@@ -372,11 +413,11 @@ npx wrangler login
 npx wrangler deploy --config wrangler.jsonc
 ```
 
-Joint-operated bus services show a compact dark arrivals board in station results
+All transit services show a compact dark arrivals/boarding board in station results
 and journey details: each live prediction has its Hong Kong clock time, minutes
-remaining and actual company. Both companies are interleaved chronologically,
+remaining and actual company. Joint services interleave both companies chronologically,
 without combining opposite directions or different boarding stops. Missing live
-data stays explicitly unavailable; published headways are not fabricated arrivals.
+data stays explicitly unavailable; scheduled boarding estimates and published headways are labelled separately from live arrivals.
 
 `wrangler.jsonc` 定義 worker entry point、static asset binding 及 optional `RATE_LIMITER` binding / `wrangler.jsonc` defines the worker entry point, static asset binding, and optional `RATE_LIMITER` binding.
 
@@ -456,6 +497,6 @@ python scripts/import-alignments.py --cache C:/path/outside/repository/cache
 
 Install `osmium` in that cache's `python-libs` directory first. The importer downloads CSDI line features and the Geofabrik Hong Kong PBF into the external cache. Only compact derived chunks smaller than 890 KB are committed. Track data is ODbL 1.0; see `src/data/alignments/NOTICE.md`. Raw downloads, dependencies, logs and builds stay out of Git.
 
-`/api/journey` accepts `timeMode=now|depart|arrive` and an explicit-offset ISO timestamp in `time` for scheduled modes. `/api/journey-geometry` loads physical paths for the selected result. The default public OSRM service is cached and serialized; production can set `OSRM_FOOT_URL` and `OSRM_CAR_URL` to private services. Road fallback follows roads through stops and may differ from the operator's exact alignment. Missing paths are reported and suppressed. Public service availability and per-process rate limiting are not a production SLA.
+`/api/journey` accepts `timeMode=now|depart|arrive` and an explicit-offset ISO timestamp in `time` for scheduled modes. `/api/journey-geometry` loads physical paths for the selected result. The default public OSRM service is cached and serialized; production can set `OSRM_FOOT_URL`, `OSRM_BIKE_URL` and `OSRM_CAR_URL` to private services. Road fallback follows roads through stops and may differ from the operator's exact alignment. Missing paths are reported and suppressed. Public service availability and per-process rate limiting are not a production SLA.
 
 The `OSRM_FOOT_URL` and `OSRM_CAR_URL` overrides apply to the Next.js server handlers. The current browser-worker build substitutes those variables with `undefined` and uses the configured public-provider proxy; adding a Cloudflare secret alone does not change its routing endpoints.

@@ -1,0 +1,22 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { routeOnStreets, type Coordinate, type StreetProfile } from '../../../data/routeGeometry';
+import { travelOption, type TravelMode } from '../../../domain/travelOptions';
+import { getRateLimiter } from '../../../lib/cloudflare';
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const raw = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(k => request.nextUrl.searchParams.get(k));
+  const values = raw.map(Number);
+  if (raw.some(v => !v?.trim()) || values.some(v => !Number.isFinite(v)) || values[0] < 22.1 || values[0] > 22.6
+    || values[2] < 22.1 || values[2] > 22.6 || values[1] < 113.8 || values[1] > 114.5 || values[3] < 113.8 || values[3] > 114.5) {
+    return NextResponse.json({ error: 'Valid Hong Kong endpoints are required.' }, { status: 400 });
+  }
+  const limiter = await getRateLimiter();
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (limiter && !(await limiter.limit({ key: 'travel-options:' + ip })).success) return NextResponse.json({ error: 'Please try again shortly.' }, { status: 429 });
+  const points: Coordinate[] = [[values[0], values[1]], [values[2], values[3]]];
+  const modes: [TravelMode, StreetProfile][] = [['walk', 'foot'], ['cycle', 'bike'], ['taxi', 'car']];
+  const data = await Promise.all(modes.map(async ([mode, profile]) => travelOption(mode, await routeOnStreets(points, profile))));
+  return NextResponse.json({ data, attribution: '© OpenStreetMap contributors; routing by FOSSGIS / OSRM. Estimated travel times, not live traffic.' },
+    { headers: { 'Cache-Control': 'public, max-age=3600' } });
+}

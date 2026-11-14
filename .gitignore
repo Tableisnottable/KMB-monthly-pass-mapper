@@ -14,3 +14,4 @@ devserver.log
 tsconfig.tsbuildinfo
 
 server-*.log
+__pycache__/

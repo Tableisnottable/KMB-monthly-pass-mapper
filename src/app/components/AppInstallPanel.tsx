@@ -18,7 +18,7 @@ export function AppInstallPanel() {
   useEffect(() => {
     setEnglish(new URLSearchParams(window.location.search).get('lang') !== 'zh');
     const standalone = window.matchMedia('(display-mode: standalone)');
-    const updateDisplay = () => setInstalled(standalone.matches);
+    const updateDisplay = () => setInstalled(standalone.matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     const ready = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPrompt); };
     const complete = () => { setInstalled(true); setPrompt(null); };
     updateDisplay();
@@ -50,13 +50,21 @@ export function AppInstallPanel() {
     <section className="install-card">
       <img src="/icons/app-192.png" width="80" height="80" alt="" />
       <p className="install-eyebrow">TRANSIT COMPASS HK</p>
-      <h1>{text('在 Android 安裝 App', 'Install on Android')}</h1>
+      <h1>{text('在 iPhone、iPad 或 Android 安裝', 'Install on iPhone, iPad or Android')}</h1>
       <p>{text('將交通規劃器加入主畫面，以獨立 App 視窗開啟。使用相同的路線權重、普通成人車費、班次及地圖。', 'Add the planner to your home screen and open it in its own app window. Use the same route scoring, adult fares, timetables and maps.')}</p>
       {installed ? <p className="install-status" role="status">{text('已在 App 視窗開啟。', 'You are using the installed app.')}</p>
         : prompt && <button className="install-primary" type="button" disabled={busy} onClick={() => void install()}>{busy ? text('正在開啟安裝…', 'Opening installer…') : text('安裝 App', 'Install app')}</button>}
       {message && <p className="install-status" role="status">{message}</p>}
       {!installed && <>
-        <h2>{text('使用 Android Chrome 安裝', 'Install with Chrome on Android')}</h2>
+        <nav className="install-platform-links" aria-label={text('選擇裝置', 'Choose your device')}><a href="#install-ios">iPhone / iPad</a><a href="#install-android">Android</a></nav>
+        <h2 id="install-ios">{text('iPhone / iPad：使用 Safari', 'iPhone / iPad: use Safari')}</h2>
+        <ol>
+          <li>{text('在 Safari 開啟此頁面，避免使用通訊 App 內置瀏覽器。', 'Open this page in Safari, rather than inside a messaging app.')}</li>
+          <li>{text('點選「分享」按鈕（部分版本需先打開「更多」選單），再選「加入主畫面」。', 'Tap Share (open the More menu first if needed), then Add to Home Screen.')}</li>
+          <li>{text('如有「以網頁 App 開啟」選項，請開啟，再按「加入」。從主畫面開啟 Transit Compass。', 'Turn on Open as Web App if that option appears, then tap Add. Open Transit Compass from your home screen.')}</li>
+        </ol>
+        <p className="install-note">{text('iOS / iPadOS 使用分享選單安裝，不會顯示 Android 的自動安裝提示。', 'iOS and iPadOS use the Share menu; the Android-style install prompt is not required.')}</p>
+        <h2 id="install-android">{text('Android：使用 Chrome', 'Android: use Chrome')}</h2>
         <ol>
           <li>{text('在 Android 手機或平板的 Chrome 開啟此頁面。', 'Open this page in Chrome on your Android phone or tablet.')}</li>
           <li>{text('點選右上角 ⋮ 選單，再選「安裝及建立捷徑」→「安裝」。部分版本會顯示「加入主畫面」或「安裝應用程式」。', 'Tap the ⋮ menu, then Install and create shortcut → Install. Some versions show Add to home screen or Install app.')}</li>
@@ -65,7 +73,7 @@ export function AppInstallPanel() {
         <p className="install-note">{text('其他 Android 瀏覽器可在選單尋找「安裝應用程式」或「加入主畫面」。安裝功能及 App／捷徑形式視乎瀏覽器；請直接使用瀏覽器開啟，避免使用通訊 App 內置瀏覽器。', 'In other Android browsers, look in the menu for Install app or Add to home screen. Availability and whether it opens as an app or shortcut depend on the browser. Open this page directly in your browser, rather than inside a messaging app.')}</p>
       </>}
       <a className="install-primary" href={english ? '/en' : '/'}>{text('開啟交通規劃器', 'Open the planner')}</a>
-      <p className="install-note">{text('免費安裝的網頁 App，毋須 Play 商店。仍需網絡載入資料、地圖及即時到站；並非完整離線 App。首次搜尋可能較慢。', 'Free installable web app; no Play Store needed. An internet connection is still needed for data, maps and live arrivals. Full offline routing is not included. The first search may take longer.')}</p>
+      <p className="install-note">{text('免費安裝的網頁 App，毋須 App Store 或 Play 商店。網站及 App 使用相同版本；更新後重新開啟即可。仍需網絡載入資料、地圖及即時到站；並非完整離線 App。首次搜尋可能較慢。', 'Free installable web app; no App Store or Play Store needed. The website and app share updates; reopen after deployment to use them. An internet connection is still needed for data, maps and live arrivals. Full offline routing is not included. The first search may take longer.')}</p>
     </section>
   </main>;
 }

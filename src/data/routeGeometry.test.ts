@@ -33,6 +33,14 @@ describe('Physical route geometry', () => {
     const result = await routeOnStreets([[22.337,114.15],[22.338,114.152]], true);
     expect(result).toEqual({ paths: [], source: 'UNAVAILABLE' });
   });
+  it('retains real cycling duration and distance from the bike router', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'Ok', waypoints: [{ distance: 0 }, { distance: 0 }], routes: [{ distance: 180, duration: 61,
+      geometry: { coordinates: [[114.17, 22.4], [114.171, 22.401]] } }] }));
+    vi.stubGlobal('fetch', fetcher);
+    const result = await routeOnStreets([[22.4, 114.17], [22.401, 114.171]], 'bike');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('/routed-bike/route/v1/cycling/');
+    expect(result).toMatchObject({ source: 'OSM_BIKE', durationSeconds: 61, distanceMetres: 180 });
+  });
   it('keeps every alignment chunk below the requested 1 MB limit', () => {
     for (const files of Object.values(manifest.files)) for (const file of files) {
       const path = resolve('src/data/alignments', file);

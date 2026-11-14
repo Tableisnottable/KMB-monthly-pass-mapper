@@ -6,12 +6,16 @@ import { GET as places } from '../app/api/places/route';
 import { GET as transit } from '../app/api/transit/route';
 import { GET as updates } from '../app/api/updates/route';
 import { GET as traffic } from '../app/api/traffic/route';
+import { GET as travelOptions } from '../app/api/travel-options/route';
+import { GET as placeLabel } from '../app/api/place-label/route';
 
 // Reuse the actual application handlers and scoring engine. Only the execution
 // environment changes: expensive graph searches never run on the free Worker.
 const handlers: Record<string, (request: import('next/server').NextRequest) => Promise<Response>> = {
   '/api/journey': journey, '/api/journey-geometry': geometry, '/api/network': network,
   '/api/places': places, '/api/transit': transit, '/api/updates': updates, '/api/traffic': traffic,
+  '/api/travel-options': travelOptions,
+  '/api/place-label': placeLabel,
 };
 const worker = self as unknown as {
   location: Location; fetch: typeof fetch;

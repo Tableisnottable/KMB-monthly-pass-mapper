@@ -4,6 +4,7 @@ import { scoreRoutes } from '../../../engine/UpgradedScoringEngine';
 import { networkPatterns, networkRoutes, weightingDate } from '../../../data/transportNetwork';
 import { GET } from './route';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
+import { DEFAULT_WEIGHTS } from '../../../engine/routeWeights';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
 vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
@@ -58,13 +59,14 @@ describe('Multimodal journey API', () => {
 
   it('searches backwards for arrive-by and returns only journeys meeting the deadline', async () => {
     const time = '2026-11-14T14:00:00+08:00';
-    const { data, meta } = await journey(cheungShaWan, airport, { timeMode: 'arrive', time });
+    const { data, meta } = await journey(cheungShaWan, airport, { timeMode: 'arrive', time, changeMinutes: '15' });
     expect(data.length).toBeGreaterThan(0); expect(meta.timeMode).toBe('arrive');
+    expect(data.some((r: { legs: unknown[] }) => r.legs.length > 1)).toBe(true);
     expect(enrichJourneyArrivals).not.toHaveBeenCalled();
     for (const r of data) {
       expect(Date.parse(r.arrivalTime)).toBeLessThanOrEqual(Date.parse(time));
       expect(Date.parse(r.departureTime)).toBeLessThan(Date.parse(r.arrivalTime));
-      for (let i = 1; i < r.legs.length; i++) expect(Date.parse(r.legs[i].departureTime)).toBeGreaterThanOrEqual(Date.parse(r.legs[i - 1].arrivalTime) + (r.legs[i].accessWalkMinutes ?? 3) * 60000 - 1);
+      for (let i = 1; i < r.legs.length; i++) expect(Date.parse(r.legs[i].departureTime)).toBeGreaterThanOrEqual(Date.parse(r.legs[i - 1].arrivalTime) + Math.max(15, r.legs[i].accessWalkMinutes ?? 3) * 60000 - 1);
     }
   }, 30000);
 
@@ -88,4 +90,26 @@ describe('Multimodal journey API', () => {
     const { data } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 });
     expect(data.some((r: { legs: { mode: string }[] }) => r.legs.every(l => l.mode === 'WALK'))).toBe(true);
   }, 20000);
+
+  it('enforces company Must/Ban rules and a 15-minute change buffer after live retiming, using custom importance', async () => {
+    const weights = { ...DEFAULT_WEIGHTS, fare: 3 };
+    const { data, meta } = await journey(cheungShaWan, airport, { operators: 'KMB,LWB', requiredOperators: 'KMB', changeMinutes: '15',
+      weights: JSON.stringify(weights), preferences: JSON.stringify({ airport: 'lantau' }) });
+    expect(data.length).toBeGreaterThan(0); expect(meta.customWeights).toBe(true); expect(meta.minimumChangeMinutes).toBe(15);
+    for (const route of data) {
+      expect(route.legs.some((l: { operator: string }) => l.operator === 'KMB')).toBe(true);
+      expect(route.legs.every((l: { networkOperator: string }) => ['KMB', 'LWB'].includes(l.networkOperator))).toBe(true);
+      expect(route.finalScore).toBe(scoreRoutes([route], weightingDate(now), weights)[0].finalScore);
+      for (let i = 1; i < route.legs.length; i++) {
+        expect(Date.parse(route.legs[i].departureTime) - Date.parse(route.legs[i - 1].arrivalTime)).toBeGreaterThanOrEqual(15 * 60000 - 1);
+      }
+    }
+  }, 30000);
+
+  it('rejects inconsistent Must/Ban choices and invalid change times', async () => {
+    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=2', 'weights=%7B%22fare%22%3A-1%7D']) {
+      const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.33882&fromLon=114.15387&toLat=22.31367&toLon=113.93763&' + query));
+      expect(response.status).toBe(400);
+    }
+  });
 });

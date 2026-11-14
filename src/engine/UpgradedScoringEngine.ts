@@ -1,4 +1,5 @@
 import type { LiveDeparture } from '../data/networkTimetable';
+import { DEFAULT_WEIGHTS, type RouteWeights } from './routeWeights';
 
 export type Operator = 'KMB' | 'LWB' | 'MTR' | 'CTB' | string;
 export type RouteMode = 'BUS' | 'SUBWAY' | 'WALK' | 'FERRY' | string;
@@ -155,30 +156,31 @@ function fare(leg: Segment): number {
 }
 
 export class UpgradedScoringEngine {
-  public static getOperatorAdjustment(operator: string): number {
-    return operatorAdjustments[operator] ?? 0;
+  public static getOperatorAdjustment(operator: string, weights: RouteWeights = DEFAULT_WEIGHTS): number {
+    const key = ({ KMB: 'kmb', LWB: 'lwb', MTR: 'mtr', CTB: 'ctb' } as const)[operator as 'KMB' | 'LWB' | 'MTR' | 'CTB'];
+    return key ? weights[key] : operatorAdjustments[operator] ?? 0;
   }
 
-  public static getTimeMultiplier(date: Date = new Date()): number {
+  public static getTimeMultiplier(date: Date = new Date(), weights: RouteWeights = DEFAULT_WEIGHTS): number {
     const hours = date.getHours();
     const minutes = date.getMinutes();
     const timeInMin = hours * 60 + minutes;
 
-    if (timeInMin >= 1380 || timeInMin < 350) return 1.8;
+    if (timeInMin >= 1380 || timeInMin < 350) return weights.waitNight * weights.wait;
     if ((timeInMin >= 420 && timeInMin <= 570) || (timeInMin >= 1020 && timeInMin <= 1170)) {
-      return 1;
+      return weights.waitPeak * weights.wait;
     }
-    return 1.3;
+    return weights.waitOffPeak * weights.wait;
   }
 
-  public static calculateSegmentScore(segment: Segment, date: Date = new Date()): number {
+  public static calculateSegmentScore(segment: Segment, date: Date = new Date(), weights: RouteWeights = DEFAULT_WEIGHTS): number {
     // All walking is charged once in the route-level walking component.
     if (segment.mode === 'WALK') return 0;
-    const multiplier = this.getTimeMultiplier(date);
+    const multiplier = this.getTimeMultiplier(date, weights);
     // No upcoming trip: the wait is unbounded, so push the leg far down the
     // ranking rather than assuming an average half-headway wait.
     if (segment.serviceEnded) {
-      return journeyTime(segment) + SERVICE_ENDED_WAIT_PENALTY * multiplier + this.getOperatorAdjustment(segment.operator);
+      return journeyTime(segment) * weights.ride + SERVICE_ENDED_WAIT_PENALTY * multiplier + this.getOperatorAdjustment(segment.operator, weights);
     }
     const liveEta = segment.realtimeEta?.isLive
       ? segment.realtimeEta.etaMinutes
@@ -189,18 +191,18 @@ export class UpgradedScoringEngine {
       ? Math.max(0, liveEta - (segment.accessWalkMinutes ?? 0))
       : segment.scheduledWaitMinutes ?? (segment.scheduledIntervalMinutes ?? 12) * 0.5;
     const wait = segment.mode === 'WALK' ? 0 : waitMinutes * multiplier;
-    return journeyTime(segment) + wait + this.getOperatorAdjustment(segment.operator);
+    return journeyTime(segment) * weights.ride + wait + this.getOperatorAdjustment(segment.operator, weights);
   }
 
-  public static calculateRouteScore(route: Route, date: Date = new Date()): ScoreResult {
+  public static calculateRouteScore(route: Route, date: Date = new Date(), weights: RouteWeights = DEFAULT_WEIGHTS): ScoreResult {
     const legs = normalizeLegs(route);
-    const legSubtotal = legs.reduce((total, leg) => total + this.calculateSegmentScore(leg, date), 0);
-    const transferPenalty = (route.transferCount ?? Math.max(0, legs.length - 1)) * 8;
+    const legSubtotal = legs.reduce((total, leg) => total + this.calculateSegmentScore(leg, date, weights), 0);
+    const transferPenalty = (route.transferCount ?? Math.max(0, legs.length - 1)) * weights.transfer;
     const walkTransferTime = round(((route.walkTransferTimeMinutes ?? 0)
-      + legs.filter(leg => leg.mode === 'WALK').reduce((sum, leg) => sum + journeyTime(leg), 0)) * WALK_MULTIPLIER);
+      + legs.filter(leg => leg.mode === 'WALK').reduce((sum, leg) => sum + journeyTime(leg), 0)) * weights.walk);
     const longDistanceSurcharge = route.longDistanceTransferSurcharge ?? 0;
-    const fareCost = round(this.calculateFare(legs).discountedFare * FARE_MINUTES_PER_DOLLAR);
-    const reliabilityPenalty = legs.reduce((sum, leg) => sum + (leg.serviceStatus === 'UNVERIFIED' ? 4 : 0), 0);
+    const fareCost = round(this.calculateFare(legs).discountedFare * weights.fare);
+    const reliabilityPenalty = legs.reduce((sum, leg) => sum + (leg.serviceStatus === 'UNVERIFIED' ? weights.unverified : 0), 0);
 
     return {
       finalScore: round(legSubtotal + walkTransferTime + longDistanceSurcharge + transferPenalty + fareCost + reliabilityPenalty),
@@ -224,17 +226,17 @@ export class UpgradedScoringEngine {
   }
 }
 
-export function scoreRoutes(routes: Route[], date: Date = new Date()): ScoredRoute[] {
+export function scoreRoutes(routes: Route[], date: Date = new Date(), weights: RouteWeights = DEFAULT_WEIGHTS): ScoredRoute[] {
   return routes
     .map((route) => {
       const legs = normalizeLegs(route);
-      const score = UpgradedScoringEngine.calculateRouteScore({ ...route, legs }, date);
+      const score = UpgradedScoringEngine.calculateRouteScore({ ...route, legs }, date, weights);
       const fareResult = UpgradedScoringEngine.calculateFare(legs);
       const breakdown: ScoreBreakdown = {
         legSubtotal: score.legSubtotal,
-        journeyTime: round(legs.reduce((total, leg) => total + (leg.mode === 'WALK' ? 0 : journeyTime(leg)), 0)),
-        scheduledWait: round(score.legSubtotal - legs.reduce((total, leg) => total + (leg.mode === 'WALK' ? 0 : journeyTime(leg) + UpgradedScoringEngine.getOperatorAdjustment(leg.operator)), 0)),
-        operatorAdjustment: round(legs.reduce((total, leg) => total + UpgradedScoringEngine.getOperatorAdjustment(leg.operator), 0)),
+        journeyTime: round(legs.reduce((total, leg) => total + (leg.mode === 'WALK' ? 0 : journeyTime(leg) * weights.ride), 0)),
+        scheduledWait: round(score.legSubtotal - legs.reduce((total, leg) => total + (leg.mode === 'WALK' ? 0 : journeyTime(leg) * weights.ride + UpgradedScoringEngine.getOperatorAdjustment(leg.operator, weights)), 0)),
+        operatorAdjustment: round(legs.reduce((total, leg) => total + UpgradedScoringEngine.getOperatorAdjustment(leg.operator, weights), 0)),
         walkTransferTime: score.walkTransferTime,
         transferPenalty: score.transferPenalty,
         longDistanceSurcharge: score.longDistanceSurcharge,

@@ -9,6 +9,8 @@ describe('Free-hosting public provider proxy', () => {
     'https://data.etagmb.gov.hk/eta/route-stop/1/1/1',
     'https://resource.data.one.gov.hk/td/en/specialtrafficnews.xml',
     'https://routing.openstreetmap.de/routed-foot/route/v1/foot/114.1,22.3;114.2,22.4?overview=full',
+    'https://routing.openstreetmap.de/routed-bike/route/v1/cycling/114.1,22.3;114.2,22.4?overview=full',
+    'https://nominatim.openstreetmap.org/reverse?lat=22.3&lon=114.1',
   ])('allows the published data endpoint %s', value => expect(safeProviderUrl(value)).toBeDefined());
   it.each([
     'http://data.etabus.gov.hk/v1/transport/kmb/stop/', 'https://127.0.0.1/',

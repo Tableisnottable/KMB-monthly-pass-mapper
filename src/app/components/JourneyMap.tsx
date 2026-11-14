@@ -8,10 +8,11 @@ import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import type { PlaceResult } from './PlaceAutocomplete';
 import { copy, legOperator, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { PlannerIcon } from './PlannerIcon';
+import type { TravelOption } from '../../domain/travelOptions';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
 
-export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRoute; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale }) {
+export function JourneyMap({ route, travel, places, onPick, locale }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale }) {
   const container = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const journeyBounds = useRef<Leaflet.LatLngBounds | null>(null);
@@ -94,6 +95,15 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
       }
     }
     fit();
+    if (travel) {
+      const color = travel.mode === 'taxi' ? '#b77d00' : travel.mode === 'cycle' ? '#197daf' : '#72827d';
+      for (const path of travel.paths) {
+        L.polyline(path, { color: '#fff', weight: 8, interactive: false }).addTo(routeLayer);
+        L.polyline(path, { color, weight: 4, dashArray: travel.mode === 'walk' ? '5 7' : undefined, interactive: false }).addTo(routeLayer);
+        points.push(...path);
+      }
+      fit(); return;
+    }
     if (!route || !origin || !destination) return;
     const controller = new AbortController();
     setGeometryStatus('loading');
@@ -122,7 +132,7 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
     }).catch(() => { if (!controller.signal.aborted) setGeometryStatus('error'); })
       .finally(() => window.clearTimeout(timeout));
     return () => { controller.abort(); window.clearTimeout(timeout); };
-  }, [ready, route, origin, destination, locale]);
+  }, [ready, route, travel, origin, destination, locale]);
 
   function locate() {
     if (!navigator.geolocation) { setMessage(copy(locale, '瀏覽器不支援定位。', 'Location is unavailable in this browser.')); return; }
@@ -145,7 +155,8 @@ export function JourneyMap({ route, places, onPick, locale }: { route?: ScoredRo
       <button className="map-tool" aria-label={copy(locale, '返回香港全境', 'Reset Hong Kong map')} onClick={() => state.current?.map.setView([22.303, 114.164], 14)}><PlannerIcon name="compass" size={20} /></button></div>
     {!ready && !message && <div className="map-loading"><span className="planner-spinner" />{copy(locale, '正在載入地圖…', 'Loading the map…')}</div>}
     {(message || tileError) && <div className="map-message" role="status">{tileError ? copy(locale, '底圖暫時無法載入，路線仍可在左側查看。', 'Map tiles are unavailable. Your route details are still available.') : message}<button onClick={() => { setMessage(''); setTileError(false); }} aria-label={copy(locale, '關閉提示', 'Dismiss message')}><PlannerIcon name="close" size={14} /></button></div>}
-    {route && <div className="map-caption" role="status"><PlannerIcon name="info" size={12} /><span>{geometryStatus === 'loading'
+    {travel && <div className="map-caption" role="status"><PlannerIcon name="info" size={12} /><span>{copy(locale, 'OpenStreetMap 路徑及時間估算 · 非即時交通', 'OpenStreetMap route and time estimates · not live traffic')}</span></div>}
+    {!travel && route && <div className="map-caption" role="status"><PlannerIcon name="info" size={12} /><span>{geometryStatus === 'loading'
       ? copy(locale, '正在載入實際路徑…', 'Loading roads and tracks…')
       : geometryStatus === 'ready' ? estimatedRoad
         ? copy(locale, '部分道路路徑由 OpenStreetMap 估算', 'Some road paths are estimated using OpenStreetMap')

@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   applicationName: 'Transit Compass HK',
   manifest: '/manifest.webmanifest',
   icons: { icon: '/icons/app-192.png', apple: '/icons/app-192.png' },
+  appleWebApp: { capable: true, title: 'Transit Compass', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = { themeColor: '#2e9127', width: 'device-width', initialScale: 1 };

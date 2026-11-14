@@ -5,7 +5,11 @@ import { hongKongClock, isServiceActive, networkPatterns, networkRoutes, network
   networkStop, networkStopIndex, normalAdultFare, railFare, weightingDate, type NetworkPattern } from '../data/transportNetwork';
 
 type Point = { lat: number; lng: number };
-type Label = { stop: number; elapsed: number; cost: number; legs: Segment[]; walk: number; pendingWalk: number; originWalk: number; used: number[] };
+import { DEFAULT_WEIGHTS, type RouteWeights } from './routeWeights';
+import { operatorAllowed } from '../domain/operatorSelection';
+import { DEFAULT_PREFERENCES, preferencePenalty, routeCorridors, type RoutePreferences } from '../domain/routePreferences';
+export interface JourneySearchOptions { operators?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number }
+type Label = { stop: number; elapsed: number; cost: number; legs: Segment[]; walk: number; pendingWalk: number; originWalk: number; used: number[]; readyDelay: number };
 type Window = { start: number; end: number; headway: number; duration: number };
 const WALK_SPEED = 5 / 60, MAX_ROUNDS = 4, MAX_WAIT = 90, MAX_JOURNEY = 240;
 const grid = new Map<string, number[]>();
@@ -106,7 +110,9 @@ function addLabel(map: Map<number, Label[]>, value: Label, limit = 4) {
 }
 
 type JourneySearchResult = { routes: ScoredRoute[]; originStops: { index: number; walk: number }[]; destinationStops: { index: number; walk: number }[]; candidates: number };
-export function findMultimodalJourneys(from: Point, to: Point, date = new Date(), locale: 'zh' | 'en' = 'zh', reverse = false, simpleOnly = false): JourneySearchResult {
+export function findMultimodalJourneys(from: Point, to: Point, date = new Date(), locale: 'zh' | 'en' = 'zh', reverse = false, simpleOnly = false, options: JourneySearchOptions = {}): JourneySearchResult {
+  const weights = options.weights ?? DEFAULT_WEIGHTS;
+  const minimumChange = options.minimumChangeMinutes ?? 3;
   const scoreDate = weightingDate(date), originStops = nearbyNetworkStops(from, 1.1), destinationStops = nearbyNetworkStops(to, 1.1);
   if (!originStops.length || !destinationStops.length) return { routes: [], originStops, destinationStops, candidates: 0 };
   const endings = new Map((reverse ? originStops : destinationStops).map(s => [s.index, s.walk]));
@@ -114,7 +120,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
   const finishing = new Set(networkPatterns.map((p, i) => p.s.some((s, j) => endings.has(s) && (reverse ? p.p : p.a)[j] === 0) ? i : -1));
   let frontier = new Map<number, Label[]>();
   for (const { index, walk } of reverse ? destinationStops : originStops) addLabel(frontier, {
-    stop: index, elapsed: walk, cost: walk * WALK_MULTIPLIER, legs: [], walk, pendingWalk: walk, originWalk: walk, used: [],
+    stop: index, elapsed: walk, cost: walk * weights.walk, legs: [], walk, pendingWalk: walk, originWalk: walk, used: [], readyDelay: 0,
   });
   const windows = networkPatterns.map(p => patternWindows(p, date)), results: Route[] = [];
   const fareCache = new Map<string, ReturnType<typeof normalAdultFare>>();
@@ -125,6 +131,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
       if (!windows[patternIndex].length) return;
       if (simpleOnly && round === 1 && !finishing.has(patternIndex)) return;
       const route = networkRoutes[pattern.r], rail = route[5] === 'SUBWAY' || route[5] === 'LIGHT_RAIL';
+      if (!operatorAllowed(route[1], options.operators)) return;
       const operator = route[1] === 'KMB+CTB' ? 'KMB' : route[1] === 'LWB+CTB' ? 'LWB' : route[1];
       const boardings: { label: Label; position: number; wait: number; duration: number; interval: number; publishedHeadway?: number }[] = [];
       for (let step = 0; step < pattern.s.length; step++) {
@@ -135,8 +142,8 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
           const scale = pattern.t[pattern.t.length - 1] > 0 ? duration / pattern.t[pattern.t.length - 1] : 1;
           const ride = Math.max(1, Math.round((pattern.t[end] - pattern.t[start]) * scale)), elapsed = label.elapsed + wait + ride;
           if (elapsed > MAX_JOURNEY) continue;
-          const waitCost = (reverse ? (label.legs.length ? wait : 0) : wait) * UpgradedScoringEngine.getTimeMultiplier(scoreDate);
-          if (label.cost + ride + waitCost + (round ? 8 : 0) > bestCompleteCost * 1.9 + 35) continue;
+          const waitCost = (reverse ? (label.legs.length ? wait : 0) : wait) * UpgradedScoringEngine.getTimeMultiplier(scoreDate, weights);
+          if (label.cost + ride * weights.ride + waitCost + (round ? weights.transfer : 0) > bestCompleteCost * 1.9 + 35) continue;
           const fareKey = `${pattern.r}:${pattern.s[start]}:${pattern.s[end]}`;
           if (!fareCache.has(fareKey)) fareCache.set(fareKey, normalAdultFare(pattern.r, pattern.s[start], pattern.s[end]));
           const adult = fareCache.get(fareKey)!;
@@ -150,14 +157,14 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
           };
           const rest = reverse ? label.legs.map((l, i) => i === 0 ? { ...l, scheduledWaitMinutes: wait, accessWalkMinutes: label.pendingWalk } : l) : label.legs;
           const legs = reverse ? [leg, ...rest] : [...rest, leg];
-          const cost = label.cost + ride + waitCost + UpgradedScoringEngine.getOperatorAdjustment(operator)
-            + adult.fare * FARE_MINUTES_PER_DOLLAR + (rail ? 4 : 0) + (round ? 8 : 0);
+          const cost = label.cost + ride * weights.ride + waitCost + UpgradedScoringEngine.getOperatorAdjustment(operator, weights)
+            + adult.fare * weights.fare + (rail ? weights.unverified : 0) + (round ? weights.transfer : 0);
           if (cost > bestCompleteCost * 1.9 + 30) continue;
           addLabel(arrivals, { stop: index, cost, elapsed, legs, walk: label.walk, pendingWalk: 0,
-            originWalk: label.originWalk, used: reverse ? [pattern.r, ...label.used] : [...label.used, pattern.r] }, simpleOnly && round === 0 ? 48 : 4);
+            originWalk: label.originWalk, used: reverse ? [pattern.r, ...label.used] : [...label.used, pattern.r], readyDelay: 0 }, simpleOnly && round === 0 ? 48 : 4);
           const endWalk = endings.get(index);
           if (endWalk !== undefined) {
-            bestCompleteCost = Math.min(bestCompleteCost, cost + endWalk * WALK_MULTIPLIER);
+            bestCompleteCost = Math.min(bestCompleteCost, cost + endWalk * weights.walk);
             const complete = legs.map(l => ({ ...l }));
             if (reverse) complete[0].accessWalkMinutes = endWalk;
             results.push({ id: 'multi:' + complete.map(l => l.id).join('|'), legs: complete,
@@ -168,8 +175,8 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
         if ((reverse ? pattern.a : pattern.p)[position] !== 0 || step === pattern.s.length - 1) continue;
         for (const label of frontier.get(index) ?? []) {
           if (label.used.includes(pattern.r)) continue;
-          const departure = departureAt(pattern, windows[patternIndex], position, reverse ? -label.elapsed : label.elapsed, reverse);
-          if (departure) boardings.push({ label, position, wait: departure.wait, duration: departure.duration,
+          const departure = departureAt(pattern, windows[patternIndex], position, reverse ? -label.elapsed - label.readyDelay : label.elapsed + label.readyDelay, reverse);
+          if (departure) boardings.push({ label, position, wait: departure.wait + label.readyDelay, duration: departure.duration,
             interval: departure.headway, publishedHeadway: departure.publishedHeadway });
         }
         if (boardings.length > (simpleOnly ? 100 : 12)) {
@@ -183,16 +190,16 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
     if (round === rounds - 1) break;
     frontier = new Map();
     for (const [stop, labels] of Array.from(arrivals)) for (const label of labels) {
-      addLabel(frontier, { ...label, elapsed: label.elapsed + 3, cost: label.cost + 3 * WALK_MULTIPLIER, walk: label.walk + 3, pendingWalk: 3 }, simpleOnly ? 48 : 4);
+      addLabel(frontier, { ...label, elapsed: label.elapsed + 3, cost: label.cost + 3 * weights.walk, walk: label.walk + 3, pendingWalk: 3, readyDelay: Math.max(0, minimumChange - 3) }, simpleOnly ? 48 : 4);
       for (const t of transfers(stop)) addLabel(frontier, { ...label, stop: t.index, elapsed: label.elapsed + t.walk,
-        cost: label.cost + t.walk * WALK_MULTIPLIER, walk: label.walk + t.walk, pendingWalk: t.walk }, simpleOnly ? 48 : 4);
+        cost: label.cost + t.walk * weights.walk, walk: label.walk + t.walk, pendingWalk: t.walk, readyDelay: Math.max(0, minimumChange - t.walk) }, simpleOnly ? 48 : 4);
     }
   }
   for (const result of results) combineRailFares(result);
-  const simple = simpleOnly ? null : findMultimodalJourneys(from, to, date, locale, reverse, true);
+  const simple = simpleOnly ? null : findMultimodalJourneys(from, to, date, locale, reverse, true, options);
   // A sparse direct service can score below a large number of interchange
   // permutations. Retain it so users can still compare the simpler journey.
-  const selected = dedupeJourneys([...scoreRoutes(results, scoreDate), ...(simple?.routes ?? [])])
+  const selected = dedupeJourneys([...scoreRoutes(results, scoreDate, weights), ...(simple?.routes ?? [])])
     .filter((route, index) => index < 1000 || route.transferCount === 0);
   for (const result of selected) setJourneyTimes(result, date, reverse ? 'arrive' : 'depart');
   return { routes: selected, originStops, destinationStops, candidates: results.length + (simple?.candidates ?? 0) };
@@ -223,9 +230,10 @@ export function dedupeJourneys(routes: ScoredRoute[]): ScoredRoute[] {
     if (seen.has(key)) return false; seen.add(key); return true;
   });
 }
-export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40) {
+export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40, preferences: RoutePreferences = DEFAULT_PREFERENCES) {
   if (limit <= 0) return [];
-  const ranked = dedupeJourneys(routes);
+  const rank = (route: ScoredRoute) => route.finalScore + preferencePenalty(route, preferences);
+  const ranked = dedupeJourneys(routes).sort((a, b) => rank(a) - rank(b));
   const durations = new Map(ranked.map(r => [r, r.legs.reduce((sum, l) => sum + (l.journeyTimeMinutes ?? 0) + (l.scheduledWaitMinutes ?? 0), r.walkTransferTimeMinutes)]));
   const duration = (r: ScoredRoute) => durations.get(r)!;
   const family = (leg: Segment) => leg.networkPattern === undefined || leg.mode !== 'MINIBUS'
@@ -246,6 +254,8 @@ export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40) {
       if (!chosen.has(r)) { chosen.add(r); added++; }
     }
   };
+  const preferred = Object.values(preferences).filter(Boolean);
+  if (preferred.length) add(ranked.filter(route => routeCorridors(route).some(id => preferred.includes(id))), Math.min(6, limit));
   add(direct, Math.min(8, Math.max(1, Math.floor(limit / 3))));
   // Choose a useful cheaper feeder for each onward service instead of filling
   // the board with many ways to catch the same final bus.
@@ -269,7 +279,7 @@ export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40) {
     .sort((a, b) => a.discountedFare - b.discountedFare).slice(0, 1)]);
   add(feederComparisons, Math.max(0, limit - chosen.size - 1));
   add(efficient, limit); add(useful, limit);
-  return Array.from(chosen).sort((a, b) => a.finalScore - b.finalScore);
+  return Array.from(chosen).sort((a, b) => rank(a) - rank(b));
 }
 export function setJourneyTimes(route: Route, anchor: Date, mode: 'now' | 'depart' | 'arrive') {
   const legs = route.legs ?? [];
@@ -291,19 +301,21 @@ export function setJourneyTimes(route: Route, anchor: Date, mode: 'now' | 'depar
   route.timeMode = mode;
 }
 /** Recheck connections after a fresh initial ETA. */
-export function retimeConnections(routes: Route[], now: Date) {
+export function retimeConnections(routes: Route[], now: Date, minimumChangeMinutes = 3) {
   for (const route of routes) {
     let elapsed = 0;
     for (const [index, leg] of (route.legs ?? []).map((l, i) => [i, l] as const)) {
-      elapsed += leg.accessWalkMinutes ?? (index === 0 ? route.originWalkMinutes ?? 0 : 3);
+      const accessWalk = leg.accessWalkMinutes ?? (index === 0 ? route.originWalkMinutes ?? 0 : 3);
+      elapsed += accessWalk;
       if (index === 0 && leg.realtimeEta?.isLive) {
         if (leg.realtimeEta.etaMinutes < elapsed) { leg.serviceEnded = true; continue; }
         leg.scheduledWaitMinutes = leg.realtimeEta.etaMinutes - elapsed; leg.scheduledDepartureMinutes = leg.realtimeEta.etaMinutes;
       } else if (leg.networkPattern !== undefined) {
-        const pattern = networkPatterns[leg.networkPattern], departure = departureAt(pattern, patternWindows(pattern, now), leg.boardingIndex!, elapsed, false);
+        const buffer = index === 0 ? 0 : Math.max(0, minimumChangeMinutes - accessWalk);
+        const pattern = networkPatterns[leg.networkPattern], departure = departureAt(pattern, patternWindows(pattern, now), leg.boardingIndex!, elapsed + buffer, false);
         if (!departure) { leg.serviceEnded = true; continue; }
-        leg.scheduledWaitMinutes = departure.wait; leg.scheduledIntervalMinutes = departure.headway;
-        leg.publishedHeadwayMinutes = departure.publishedHeadway; leg.scheduledDepartureMinutes = elapsed + departure.wait;
+        leg.scheduledWaitMinutes = departure.wait + buffer; leg.scheduledIntervalMinutes = departure.headway;
+        leg.publishedHeadwayMinutes = departure.publishedHeadway; leg.scheduledDepartureMinutes = elapsed + buffer + departure.wait;
         const scale = pattern.t[pattern.t.length - 1] > 0 ? departure.duration / pattern.t[pattern.t.length - 1] : 1;
         leg.journeyTimeMinutes = Math.max(1, Math.round((pattern.t[leg.alightingIndex!] - pattern.t[leg.boardingIndex!]) * scale));
       }
