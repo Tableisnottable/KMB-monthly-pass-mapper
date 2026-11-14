@@ -9,6 +9,7 @@ import type { PlaceResult } from './PlaceAutocomplete';
 import { copy, legOperator, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { PlannerIcon } from './PlannerIcon';
 import type { TravelOption } from '../../domain/travelOptions';
+import { routeLineStyles } from './routeColours';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
 
@@ -123,7 +124,10 @@ export function JourneyMap({ route, travel, places, onPick, locale }: { route?: 
         for (const path of piece.paths) {
           if (path.length < 2 || path.some(p => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) continue;
           L.polyline(path, { color: '#fff', weight: piece.walk ? 6 : 9, opacity: .9, interactive: false }).addTo(routeLayer);
-          L.polyline(path, { color, weight: piece.walk ? 3 : 5, dashArray: piece.walk ? '5 7' : undefined, lineCap: 'round', interactive: false }).addTo(routeLayer);
+          if (piece.walk) L.polyline(path, { color, weight: 3, dashArray: '5 7', lineCap: 'round', interactive: false }).addTo(routeLayer);
+          else for (const style of routeLineStyles(leg ? legOperator(leg) : '', leg?.routeNumber)) {
+            L.polyline(path, { ...style, interactive: false }).addTo(routeLayer);
+          }
           points.push(...path);
         }
       }

@@ -6,7 +6,8 @@ import { PlannerIcon } from './PlannerIcon';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { copy, legOperator, modeIcon, modeLabel, routeBadgeStyle, type PlannerLocale } from './plannerUi';
 import { operatorName } from '../../data/transportOperators';
-import { AddedDeparture } from './AddedDeparture';
+import { DepartureBadge } from './DepartureBadge';
+import { departureType } from '../../domain/departureType';
 import { JointArrivalBoard } from './JointArrivalBoard';
 import { studentLegFares } from '../../domain/journeyFares';
 import { DEFAULT_WEIGHTS, customWeights, type RouteWeights } from '../../engine/routeWeights';
@@ -37,13 +38,13 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS }: { rou
           : '$' + pass.minimum.toFixed(2) + (pass.maximum !== pass.minimum ? '–$' + pass.maximum.toFixed(2) : '');
         return <li key={leg.id}>
         <span className="step-marker step-operator-marker" style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
-        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} <AddedDeparture departure={leg.liveDepartures?.[0]} locale={locale} /></strong>
+        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} {leg.mode !== 'WALK' && <DepartureBadge departure={leg.liveDepartures?.[0] ?? { status: leg.serviceStatus ?? 'UNVERIFIED' }} locale={locale} />}</strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>
           {leg.departureTime && leg.arrivalTime && <small>{hongKongTimeLabel(leg.departureTime)} → {hongKongTimeLabel(leg.arrivalTime)} HKT</small>}
           {leg.mode !== 'WALK' && leg.fareStatus !== 'UNAVAILABLE' && <small className="leg-adult-fare">{copy(locale, '無月票 ', 'Without pass ')}HK${(leg.fare ?? 0).toFixed(2)}{leg.fareStatus === 'FULL_FARE' ? ' · ' + copy(locale, '全程票價上限', 'full-fare upper bound') : leg.fare === 0 ? ' · ' + copy(locale, '已包括在鐵路票價內', 'included in rail fare') : ''}</small>}
           {leg.mode !== 'WALK' && <small className="leg-pass-fare">{copy(locale, '使用九巴月票 ', 'With KMB pass ')}{passLabel}{leg.fareStatus === 'FULL_FARE' && pass.maximum > 0 ? ' · ' + copy(locale, '票價上限', 'upper bound') : ''}{pass.operatorDependent ? ' · ' + copy(locale, '視乎實際營辦商', 'depends on the operating company') : ''}</small>}
           {leg.mode !== 'WALK' && <small>{copy(locale, '學生 ', 'Student ')}{studentFares[index].available ? (studentFares[index].upperBound ? copy(locale, '最多 ', 'Up to ') : '') + '$' + studentFares[index].maximum.toFixed(2) : copy(locale, '票價待查', 'Fare unavailable')}{studentFares[index].adultFallback ? ' · ' + copy(locale, '未核實學生優惠，採成人價', 'adult fare used; student offers unverified') : ''}</small>}
-          <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + copy(locale, '即時到站', 'Live arrival') + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
+          <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + (leg.liveDepartures?.[0] && departureType(leg.liveDepartures[0]) === 'ADDITIONAL' ? copy(locale, '加班到站', 'Additional arrival') : copy(locale, '即時到站', 'Live arrival')) + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
           {leg.mode !== 'WALK' && <JointArrivalBoard departures={leg.liveDepartures ?? []}
             operator={legOperator(leg)} routeNumber={leg.routeNumber} stopName={leg.originStop?.name} locale={locale}
             scheduledTime={leg.departureTime} scheduledHeadway={leg.publishedHeadwayMinutes}

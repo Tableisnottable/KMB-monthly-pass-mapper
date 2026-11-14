@@ -109,4 +109,24 @@ describe('All-network catalogue', () => {
     expect(live[0].company.id).toBe('CTB');
     expect(live[1].company.id).toBe('KMB');
   });
+  it('distinguishes live, provider-scheduled and additional feed departures', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T04:00:00Z'));
+    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][1] === 'KMB+CTB' && pattern.s.length > 1);
+    const pattern = networkPatterns[index];
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      for (const route of routes) {
+        const leg = route.legs![0];
+        if (networkPatterns[leg.networkPattern!].r !== pattern.r) continue;
+        leg.liveDepartures = ['', '原定班次 · Scheduled Bus', '加班車', '加班車 · Scheduled Bus'].map((remark, i) => ({
+          operator: i % 2 ? 'KMB' : 'CTB', minutes: 3 + i * 5, remark,
+          time: new Date(Date.now() + (3 + i * 5) * 60000).toISOString(), scheduleMatch: 'MATCHED',
+        }));
+      }
+    });
+    const { data } = await (await lookup('resource=departures&stop=' + encodeURIComponent(networkStops[pattern.s[0]][0]))).json();
+    const rows = data.filter((row: { routeId: string }) => row.routeId === networkRoutes[pattern.r][0]);
+    expect(rows.map((row: { departureType: string; status: string }) => [row.departureType, row.status])).toEqual([
+      ['LIVE', 'LIVE'], ['SCHEDULED', 'TIMETABLE'], ['ADDITIONAL', 'LIVE'], ['ADDITIONAL', 'TIMETABLE'],
+    ]);
+  });
 });

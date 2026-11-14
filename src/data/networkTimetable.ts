@@ -1,8 +1,11 @@
 import { hongKongClock, networkPatterns, networkRoutes, networkStops, serviceCalendarStatus } from './transportNetwork';
+import { providerMarksAdditional, providerMarksScheduled, type DepartureType } from '../domain/departureType';
 
 export type ScheduleMatch = 'MATCHED' | 'ADDED' | 'UNVERIFIED';
 export type AddedReason = 'PROVIDER' | 'NOT_IN_TIMETABLE';
 export interface LiveDeparture {
+  /** Rows from arrival feeds can be live, provider-scheduled, or additional. */
+  departureType?: DepartureType;
   time: string;
   minutes: number;
   remark?: string;
@@ -74,7 +77,7 @@ networkPatterns.forEach((pattern, index) => routePatterns.set(pattern.r, [...(ro
 /** Compare with compatible variants and adjacent service days, allowing ETA drift. */
 export function matchDepartureToTimetable(patternIndex: number, boarding: number, alighting: number, time: string, remark = ''):
   Pick<LiveDeparture, 'scheduleMatch' | 'addedReason'> {
-  if (/(?:\bextra\b|\badditional\b|加班|加開|加开|特別加)/i.test(remark)) return { scheduleMatch: 'ADDED', addedReason: 'PROVIDER' };
+  if (providerMarksAdditional(remark)) return { scheduleMatch: 'ADDED', addedReason: 'PROVIDER' };
   const pattern = networkPatterns[patternIndex], timestamp = Date.parse(time);
   if (!pattern || !Number.isFinite(timestamp)) return { scheduleMatch: 'UNVERIFIED' };
   const day = parseServiceDate(hongKongServiceDate(new Date(timestamp)));
@@ -96,7 +99,7 @@ export function matchDepartureToTimetable(patternIndex: number, boarding: number
       }
     }
   }
-  return covered ? { scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' } : { scheduleMatch: 'UNVERIFIED' };
+  return covered && !providerMarksScheduled(remark) ? { scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' } : { scheduleMatch: 'UNVERIFIED' };
 }
 
 export function routeTimetable(routeId: string, serviceDate: string, patternId?: string, stopId?: string) {

@@ -11,7 +11,7 @@ import { copy, fareLabel, hasEndedService, journeyMinutes, totalWalkMinutes, leg
 import { combinedLegChoices, groupDurationLabel, groupPassFareLabel, groupStudentFareLabel, groupJourneysByStops, type JourneyGroup, type JourneySort } from './journeyGroups';
 import { FareComparison } from './FareComparison';
 import { KMB_PASS_RULES } from '../../domain/monthlyPass';
-import { AddedDeparture } from './AddedDeparture';
+import { DepartureBadge } from './DepartureBadge';
 import { operatorName } from '../../data/transportOperators';
 import type { FareProfile } from '../../domain/journeyFares';
 import { fareProfileLabel } from './FareProfileControl';
@@ -61,9 +61,9 @@ function JourneyRow({ route, locale, onSelect, selected = false }: { route: Scor
     {route.departureTime && route.arrivalTime && <span className="route-clock-line">{hongKongTimeLabel(route.departureTime)} → {hongKongTimeLabel(route.arrivalTime)} <small>HKT</small></span>}
     <span className="route-service-line">{ended ? <span className="service-ended">{copy(locale, '暫無班次', 'No upcoming service')}</span>
       : isWalk ? copy(locale, '全程步行', 'Walk all the way')
-        : live ? <><PlannerIcon name="signal" size={13} /><span>{copy(locale, '約 ', 'in ')}{first.realtimeEta?.etaMinutes} {copy(locale, '分鐘到站', 'min from')} {first.originStop?.name}</span><AddedDeparture departure={first.liveDepartures?.[0]} locale={locale} /></>
+        : live ? <><PlannerIcon name="signal" size={13} /><span>{copy(locale, '約 ', 'in ')}{first.realtimeEta?.etaMinutes} {copy(locale, '分鐘到站', 'min from')} {first.originStop?.name}</span><DepartureBadge departure={first.liveDepartures?.[0] ?? { status: 'LIVE' }} locale={locale} /></>
           : first?.serviceStatus === 'UNVERIFIED' ? <span>{copy(locale, '班次未能核實 · 時間估算', 'Service unverified · estimated times')}</span>
-            : first?.departureTime ? <span>{copy(locale, '時間表 · 上車 ', 'Timetable · board at ')}{hongKongTimeLabel(first.departureTime)}</span>
+            : first?.departureTime ? <span><DepartureBadge departure={first.liveDepartures?.[0] ?? { status: 'TIMETABLE' }} locale={locale} /> {copy(locale, '上車 ', 'Board at ')}{hongKongTimeLabel(first.departureTime)}</span>
               : <span>{copy(locale, '班距約 ', 'Every ')}{first?.scheduledIntervalMinutes ?? 12} min</span>}</span>
   </button>;
 }

@@ -230,6 +230,13 @@ button {
 .step-marker { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; color: #999; }
 .step-operator-marker { border: 1px solid #0003; border-radius: 4px; }
 .added-departure { display: inline-block; color: #8b4600; background: #fff0cf; border: 1px solid #e8bc71; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-weight: 700; line-height: 1.5; white-space: nowrap; }
+.departure-type { display: inline-block; border: 1px solid; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-weight: 700; line-height: 1.5; vertical-align: middle; white-space: normal; }
+.departure-live { color: #186839; background: #dcf5e6; border-color: #76bf92; }
+.departure-scheduled { color: #194e88; background: #e2edff; border-color: #93b3e0; }
+.departure-additional { color: #834500; background: #fff0cf; border-color: #e8bc71; }
+.departure-legend { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0 3px; }
+.arrival-company { display: inline-block; border-radius: 3px; padding: 1px 5px; font-weight: 700; line-height: 1.5; }
+.joint-arrival-board td .departure-type { display: table; margin-top: 4px; }
 .departure-timetable-link { color: var(--green); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 .station-departures > div > strong small { display: block; font-size: 11px; font-weight: 400; margin-top: 3px; white-space: nowrap; }
 .joint-arrival-board { grid-column: 1 / -1; width: 100%; min-width: 0; margin-top: 12px; padding: 12px 14px; border: 1px solid #30343a; border-radius: 5px; background: #090b0d; color: #fff; font-size: 13px; line-height: 1.7; }
@@ -345,6 +352,13 @@ button {
 .station-data-note a, .route-estimate-note a { text-decoration: underline; }
 .route-option-price { max-width: 90px; font-size: 12px; }
 .arrivals-dialog { width: min(700px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; border-radius: 7px; }
+@media (max-width: 450px) {
+  .arrivals-dialog { width: calc(100% - 16px); padding: 16px; }
+  .arrivals-dialog .station-lookup { padding: 8px; }
+  .joint-arrival-board td:first-child { width: 48px; }
+  .joint-arrival-board td:nth-child(2) { width: 58px; }
+  .joint-arrival-board td:nth-child(3) { width: 10px; }
+}
 @media (max-width: 1050px) and (min-width: 701px) { .planner-workspace { grid-template-columns: 420px minmax(0, 1fr); } }
 @media (max-width: 700px) {
   .app-header { padding: 6px; gap: 6px; }

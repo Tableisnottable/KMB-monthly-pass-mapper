@@ -8,6 +8,7 @@ import { operatorInfo, transportOperators } from '../../../data/transportOperato
 import { hongKongServiceDate, nextPublishedDeparture, routeTimetable } from '../../../data/networkTimetable';
 import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
 import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
+import { departureType, providerMarksScheduled } from '../../../domain/departureType';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
@@ -95,7 +96,8 @@ export async function GET(request: NextRequest) {
       status: leg.serviceEnded ? 'NO_UPCOMING' : leg.serviceStatus };
     return leg.liveDepartures?.length ? leg.liveDepartures.map((departure, index) => ({ ...base, ...departure,
       company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
-      id: `${r.id}:live:${index}`, status: 'LIVE' })) : [{ ...base, id: r.id,
+      id: `${r.id}:live:${index}`, departureType: departureType(departure), status: departureType(departure) === 'SCHEDULED' || providerMarksScheduled(departure.remark) ? 'TIMETABLE' : 'LIVE' })) : [{ ...base, id: r.id,
+      departureType: base.status === 'TIMETABLE' ? 'SCHEDULED' : undefined,
       time: leg.departureTime ?? (base.minutes === null ? null : new Date(now.getTime() + base.minutes * 60000).toISOString()), scheduleMatch: 'UNVERIFIED' }];
   }).sort((a,b) => (a.minutes ?? Infinity) - (b.minutes ?? Infinity)), meta: { fetchedAt: now.toISOString(), stop: networkStop(stopIndex, locale) } },
   { headers: { 'Cache-Control': 'no-store' } });

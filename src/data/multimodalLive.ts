@@ -5,6 +5,7 @@ import { networkPatterns, networkRoutes, networkStops } from './transportNetwork
 import { haversineKm } from '../engine/journeyHelpers';
 import type { Segment, Route } from '../engine/UpgradedScoringEngine';
 import { matchDepartureToTimetable } from './networkTimetable';
+import { departureType, providerMarksScheduled } from '../domain/departureType';
 
 type Train = { dest: string; time: string; valid?: string };
 type RailResponse = { status: number; curr_time?: string; sys_time?: string;
@@ -47,11 +48,15 @@ function attach(leg: Segment, predictions: { time: string; remark?: string; oper
   }).map(prediction => ({ ...prediction, minutes: Math.max(0, Math.ceil((Date.parse(prediction.time) - now.getTime()) / 60000)),
     ...matchDepartureToTimetable(leg.networkPattern!, leg.boardingIndex ?? 0,
       leg.alightingIndex ?? networkPatterns[leg.networkPattern!].s.length - 1, prediction.time, prediction.remark) }))
+    .map(departure => ({ ...departure, departureType: departureType(departure)! }))
     .sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
   if (!departures.length) return;
   leg.liveDepartures = departures;
-  leg.realtimeEta = { etaMinutes: departures[0].minutes, dataTime: now.toISOString(), isLive: true, source: 'DATAGOVHK' };
-  leg.serviceStatus = 'LIVE'; leg.serviceEnded = false;
+  const scheduled = departures[0].departureType === 'SCHEDULED' || providerMarksScheduled(departures[0].remark);
+  leg.realtimeEta = { etaMinutes: departures[0].minutes, dataTime: now.toISOString(), isLive: !scheduled, source: scheduled ? 'SCHEDULED' : 'DATAGOVHK' };
+  leg.scheduledWaitMinutes = Math.max(0, departures[0].minutes - (leg.accessWalkMinutes ?? earliest));
+  leg.scheduledDepartureMinutes = departures[0].minutes;
+  leg.serviceStatus = scheduled ? 'TIMETABLE' : 'LIVE'; leg.serviceEnded = false;
 }
 
 function matchBusStops(leg: Segment, stops: TransitStopRecord[], citybus: boolean) {

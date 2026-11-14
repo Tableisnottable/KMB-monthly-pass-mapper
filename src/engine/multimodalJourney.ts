@@ -309,7 +309,7 @@ export function retimeConnections(routes: Route[], now: Date, minimumChangeMinut
     for (const [index, leg] of (route.legs ?? []).map((l, i) => [i, l] as const)) {
       const accessWalk = leg.accessWalkMinutes ?? (index === 0 ? route.originWalkMinutes ?? 0 : 3);
       elapsed += accessWalk;
-      if (index === 0 && leg.realtimeEta?.isLive) {
+      if (index === 0 && leg.realtimeEta && (leg.realtimeEta.isLive || leg.realtimeEta.source === 'SCHEDULED')) {
         if (leg.realtimeEta.etaMinutes < elapsed) { leg.serviceEnded = true; continue; }
         leg.scheduledWaitMinutes = leg.realtimeEta.etaMinutes - elapsed; leg.scheduledDepartureMinutes = leg.realtimeEta.etaMinutes;
       } else if (leg.networkPattern !== undefined) {

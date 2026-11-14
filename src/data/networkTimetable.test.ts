@@ -71,6 +71,10 @@ describe('Added live departures', () => {
   it('shows out-of-window live services as added, with the comparison reason', () => {
     expect(match('16:00:00')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
   });
+  it('does not infer additional buses from provider-scheduled times outside imported windows', () => {
+    expect(match('16:00:00', '原定班次 · Scheduled Bus')).toEqual({ scheduleMatch: 'UNVERIFIED' });
+    expect(match('10:37:00', 'Scheduled Bus')).toEqual({ scheduleMatch: 'MATCHED' });
+  });
   it('retains provider-confirmed additional services even within a normal service window', () => {
     expect(match('10:37:00', 'Additional departure')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'PROVIDER' });
     expect(match('10:37:00', '加班車').addedReason).toBe('PROVIDER');

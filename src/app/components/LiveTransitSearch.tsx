@@ -7,13 +7,13 @@ import { PlannerIcon } from './PlannerIcon';
 import { copy, modeIcon, modeLabel, routeBadgeStyle, routeSignColours, type PlannerLocale } from './plannerUi';
 import { operatorName } from '../../data/transportOperators';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
-import { AddedDeparture } from './AddedDeparture';
+import { DepartureBadge } from './DepartureBadge';
 import type { LiveDeparture } from '../../data/networkTimetable';
 import { JointArrivalBoard } from './JointArrivalBoard';
 import { groupStationDepartures } from './jointArrivals';
 
 interface Stop { id: string; nameTc: string; nameEn: string; mode: string }
-interface Departure extends Pick<LiveDeparture, 'scheduleMatch' | 'addedReason'> { id: string; operator: string; networkOperator?: string; number: string; mode: string; destination: string;
+interface Departure extends Pick<LiveDeparture, 'scheduleMatch' | 'addedReason' | 'departureType'> { id: string; operator: string; networkOperator?: string; number: string; mode: string; destination: string;
   minutes: number | null; time: string | null; routeId: string; patternId: string; stopId: string; remark?: string;
   status: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED' | 'NO_UPCOMING' }
 
@@ -72,16 +72,15 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
         const row = group.first, displayOperator = group.jointOperator ?? row.operator;
         return <div key={group.id}>
         <span className="route-badge route-stop-plate" title={operatorName(displayOperator, locale) + (routeSignColours(displayOperator, row.number).verified ? '' : ' · ' + copy(locale, '公司顏色未核實', 'Company colour not verified'))} style={routeBadgeStyle(displayOperator, row.number)}><span className="route-badge-icon"><PlannerIcon name={modeIcon(row.mode)} size={18} /></span><strong>{row.number || modeLabel(row.mode, locale)}</strong></span>
-        <span>{row.destination}<small>{operatorName(displayOperator, locale)} · {row.status === 'LIVE' ? copy(locale, '即時', 'Live')
-          : row.status === 'TIMETABLE' ? copy(locale, '時間表', 'Timetable') : row.status === 'NO_UPCOMING' ? copy(locale, '暫無已公布班次', 'No upcoming published service') : copy(locale, '服務未能核實', 'Service unverified')} <AddedDeparture departure={row} locale={locale} /></small>
+        <span>{row.destination}<small>{operatorName(displayOperator, locale)} · {row.status === 'NO_UPCOMING' ? copy(locale, '暫無已公布班次', 'No upcoming published service') : row.status === 'UNVERIFIED' ? copy(locale, '服務未能核實', 'Service unverified') : <DepartureBadge departure={row} locale={locale} />}</small>
           {row.remark && <small>{row.remark}</small>}
           <a className="departure-timetable-link" href={'/timetables?' + new URLSearchParams({ lang: locale, route: row.routeId, pattern: row.patternId, stop: row.stopId })}>{copy(locale, '完整班次時間表', 'Full timetable')}</a></span>
         <strong>{row.status === 'NO_UPCOMING' ? '—' : row.minutes === null ? '—' : row.minutes + ' min'}{row.time && <small>{hongKongTimeLabel(row.time)} HKT</small>}</strong>
         <JointArrivalBoard operator={group.jointOperator ?? row.networkOperator ?? row.operator} routeNumber={row.number}
           stopName={locale === 'en' ? selected.nameEn : selected.nameTc} locale={locale}
-          departures={group.rows.flatMap(item => item.status === 'LIVE' && item.time !== null && item.minutes !== null
+          departures={group.rows.flatMap(item => (item.status === 'LIVE' || item.status === 'TIMETABLE') && item.time !== null && item.minutes !== null
             ? [{ time: item.time, minutes: item.minutes, operator: item.operator, remark: item.remark,
-                scheduleMatch: item.scheduleMatch, addedReason: item.addedReason }] : [])} scheduledTime={row.status === 'TIMETABLE' ? row.time ?? undefined : undefined} />
+                scheduleMatch: item.scheduleMatch, addedReason: item.addedReason, departureType: item.departureType ?? (item.status === 'TIMETABLE' ? 'SCHEDULED' : undefined) }] : [])} scheduledTime={row.status === 'TIMETABLE' ? row.time ?? undefined : undefined} />
       </div>;
       })}</div>
       {!loading && <button type="button" className="all-results-button" onClick={() => void choose(selected)}>{copy(locale, '更新班次', 'Refresh departures')}</button>}
@@ -89,6 +88,6 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
     {loading && <p role="status">{copy(locale, '正在載入…', 'Loading…')}</p>}
     {message && <p role="status">{message}</p>}
     <p className="station-data-note">{copy(locale, '時間表不代表即時到站，未能核實的服務請向營辦商查詢。', 'Timetables are not live predictions. Confirm unverified services with the operator.')} <a href="/coverage">{copy(locale, '資料涵蓋範圍', 'Coverage')}</a></p>
-    <p className="station-data-note">{copy(locale, '（新增）表示營辦商標示為加班，或即時班次未列於已匯入時間表時段；亦可能是延誤或資料更新。', '(Added) means a provider-marked extra trip or a live departure outside imported timetable windows; delays and timetable changes are also possible.')} <a href={'/timetables?lang=' + locale}>{copy(locale, '所有營辦商及時間表', 'All companies and timetables')}</a></p>
+    <p className="station-data-note">{copy(locale, '即時＝營辦商到站預測；時間表班次＝原定班次或按時間表估算；加班＝營辦商標示加班或即時班次未列於匯入時間表時段（亦可能是延誤或資料更新）。', 'Live = operator arrival prediction. Scheduled = provider-marked scheduled bus or timetable estimate. Additional = provider-marked extra or a live departure outside imported timetable windows (also possibly a delay or data update).')} <a href={'/timetables?lang=' + locale}>{copy(locale, '所有營辦商及時間表', 'All companies and timetables')}</a></p>
   </div>;
 }
