@@ -494,9 +494,19 @@ button {
 .journey-preferences p { margin: 8px 0; font-size: 11px; line-height: 1.6; color: #667263; }
 .company-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .company-shortcuts button { border: 1px solid #c9d7c4; color: #277f22; border-radius: 4px; min-height: 44px; padding: 6px 9px; font-size: 12px; }
-.company-preferences > label, .corridor-select { display: grid; grid-template-columns: minmax(0, 1fr) minmax(85px, 40%); gap: 8px; align-items: center; padding: 6px 0; font-size: 12px; }
-.company-preferences select, .corridor-select select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #c8d4c3; border-radius: 4px; background: #fff; color: #344036; padding: 5px; font: inherit; }
-.corridor-select { grid-template-columns: minmax(0, 1fr); margin-top: 8px; }
+.company-preferences > label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(85px, 40%); gap: 8px; align-items: center; padding: 6px 0; font-size: 12px; }
+.company-preferences select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #c8d4c3; border-radius: 4px; background: #fff; color: #344036; padding: 5px; font: inherit; }
+.change-time-control { margin: 10px 0 14px; padding: 14px; border: 1px solid #e0e8dc; border-radius: 8px; background: #f8faf7; }
+.change-time-value { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #536154; font-size: 13px; font-weight: 700; }
+.change-time-number { display: flex; align-items: baseline; gap: 6px; color: #647263; font-size: 12px; }
+.change-time-number input { width: 78px; min-height: 48px; border: 1px solid #cbd8c7; border-radius: 6px; background: #fff; color: #246b2d; font-size: 23px; font-weight: 800; text-align: center; }
+.change-time-number input:focus-visible { outline: 2px solid #347eaa; outline-offset: 2px; }
+.change-time-slider { display: block; width: 100%; height: 36px; margin: 8px 0 4px; accent-color: #287e2d; cursor: pointer; }
+.change-time-slider:focus-visible { outline: 2px solid #347eaa; outline-offset: 2px; border-radius: 4px; }
+.change-time-shortcuts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)) auto; align-items: center; gap: 5px; color: #748073; font-size: 11px; }
+.change-time-shortcuts button { min-width: 0; min-height: 38px; border: 1px solid #d8e1d4; border-radius: 5px; background: #fff; color: #506052; font-size: 12px; font-weight: 700; }
+.change-time-shortcuts button[aria-pressed=true] { border-color: #287e2d; background: #e8f4e5; color: #216b29; }
+.change-time-shortcuts button:focus-visible { outline: 2px solid #347eaa; outline-offset: 1px; }
 .quick-modes { height: auto; min-height: 104px; margin-top: 15px; }
 .quick-modes[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 .quick-modes[data-count="4"] button { border-bottom: 1px solid #eee; }

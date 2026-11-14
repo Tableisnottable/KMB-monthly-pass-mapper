@@ -2,12 +2,13 @@ import { allOperatorIds, selectableOperators } from '../../domain/operatorSelect
 import { corridorChoices, roadLevel, type CorridorGroup, type RoutePreferences } from '../../domain/routePreferences';
 import { PreferenceToggle } from './PreferenceToggle';
 import { copy, type PlannerLocale } from './plannerUi';
-import { changeMinuteChoices, comparisonTypes, transitTypes, type ComparisonPreferences, type TransportPreferences } from '../../domain/transportSelection';
+import { comparisonTypes, transitTypes, type ComparisonPreferences, type TransportPreferences } from '../../domain/transportSelection';
 import { LIMIT_MAX, type JourneyLimits } from '../../domain/journeyLimits';
 export type CompanyLevel = 'must' | 'normal' | 'ban';
 export type CompanyPreferences = Record<string, CompanyLevel>;
 export const defaultCompanies = (): CompanyPreferences => Object.fromEntries(allOperatorIds.map(id => [id, 'normal']));
 export type SettingsSection = 'companies' | 'roads' | 'changes' | 'importance';
+const changeTimeShortcuts = [0, 5, 10, 15, 30, 60];
 const companyOrder = ['KMB', 'LWB', 'CTB', 'MTR', 'LRT', 'LRTFeeder', 'GMB', 'NLB', 'TRAM', 'FERRY', 'PTRAM', 'DB', 'PI', 'XB'];
 const companiesInOrder = [...selectableOperators].sort((a, b) => companyOrder.indexOf(a.id) - companyOrder.indexOf(b.id));
 const groupLabels: Record<CorridorGroup, [string, string]> = {
@@ -26,8 +27,21 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
 }) {
   return <section className="journey-preferences">
     {section === 'changes' && <><h3>{copy(locale, '預留多少轉乘時間？', 'How much time to change?')}</h3>
-      <label className="corridor-select"><span>{copy(locale, '最少轉乘時間（0–60 分鐘）', 'Minimum time to change (0–60 minutes)')}</span><select value={changeMinutes} onChange={event => onChangeMinutes(Number(event.target.value))}>
-        {changeMinuteChoices.map(minutes => <option value={minutes} key={minutes}>{minutes} {copy(locale, '分鐘', 'minutes')}</option>)}</select></label>
+      <div className="change-time-control">
+        <div className="change-time-value"><label htmlFor="minimum-change-time">{copy(locale, '最少轉乘時間', 'Minimum change time')}</label>
+          <div className="change-time-number"><input id="minimum-change-time" type="number" inputMode="numeric" min="0" max="60" step="1" value={changeMinutes}
+            aria-label={copy(locale, '最少轉乘時間（分鐘）', 'Minimum change time in minutes')}
+            onChange={event => { const value = event.currentTarget.valueAsNumber; if (Number.isFinite(value)) onChangeMinutes(Math.min(60, Math.max(0, Math.round(value)))); }} />
+            <span>{copy(locale, '分鐘', 'min')}</span></div></div>
+        <input className="change-time-slider" type="range" min="0" max="60" step="1" value={changeMinutes}
+          aria-label={copy(locale, '最少轉乘時間滑桿', 'Minimum change time slider')}
+          onChange={event => onChangeMinutes(Number(event.currentTarget.value))} />
+        <div className="change-time-shortcuts" aria-label={copy(locale, '快速選擇轉乘時間', 'Quick change time choices')}>
+          {changeTimeShortcuts.map(minutes => <button type="button" key={minutes} aria-pressed={changeMinutes === minutes}
+            aria-label={`${minutes} ${copy(locale, '分鐘', 'minutes')}`} onClick={() => onChangeMinutes(minutes)}>{minutes}</button>)}
+          <span>{copy(locale, '分鐘', 'min')}</span>
+        </div>
+      </div>
       <p>{copy(locale, '可選 0–60 分鐘，每次 1 分鐘。0 分鐘不加額外緩衝，仍保留實際轉乘步行；額外緩衝計入候車。較長時間可能排除緊接班次，並改變推薦結果。', 'Choose 0–60 minutes in 1-minute steps. Zero adds no extra buffer; actual transfer walking stays unchanged. Extra buffer counts as waiting. Longer buffers can rule out tight connections and change recommendations.')}</p>
       <h3>{copy(locale, '行程上限（可留空）', 'Journey maximums (optional)')}</h3>
       {([['transfers', '最多轉乘次數', 'Maximum transfers'], ['change', '每次轉乘最多時間（分鐘）', 'Maximum time per change (minutes)'], ['walk', '全程最多步行時間（分鐘）', 'Maximum total walking (minutes)'], ['wait', '每次上車最多候車時間（分鐘）', 'Maximum waiting per boarding (minutes)'], ['ride', '全程最多乘車時間（分鐘）', 'Maximum total riding (minutes)']] as const).map(([key, zh, en]) => <label className="journey-limit-input" key={key}><span>{copy(locale, zh, en)}</span><input type="number" inputMode="numeric" min="0" max={LIMIT_MAX[key]} step="1" placeholder={copy(locale, '不限', 'No limit')} value={limits[key] ?? ''} onChange={event => { const raw = event.target.value; const value = raw === '' ? null : Number(raw); if (value === null || Number.isInteger(value) && value >= 0 && value <= LIMIT_MAX[key]) onLimits({ ...limits, [key]: value }); }} /></label>)}
