@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { routeOnStreets } from '../../../data/routeGeometry';
@@ -6,6 +6,7 @@ vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => nu
 vi.mock('../../../data/routeGeometry', () => ({ routeOnStreets: vi.fn(async (_points, profile) => profile === 'bike'
   ? { paths: [], source: 'UNAVAILABLE' } : { paths: [[[22.3, 114.1], [22.31, 114.11]]], source: 'OSM_ROAD', distanceMetres: 2000, durationSeconds: 601 }) }));
 describe('Walking, cycling and taxi API', () => {
+  beforeEach(() => vi.clearAllMocks());
   it('uses a distinct real routing profile for each mode and preserves no-route results', async () => {
     const response = await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11'));
     const { data } = await response.json();
@@ -14,5 +15,15 @@ describe('Walking, cycling and taxi API', () => {
   });
   it('rejects missing and out-of-area coordinates', async () => {
     expect((await GET(new NextRequest('http://localhost/api/travel-options?fromLat=0'))).status).toBe(400);
+  });
+  it('only calculates enabled estimates, and supports switching all of them off', async () => {
+    const url = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=';
+    const response = await GET(new NextRequest(url + 'taxi'));
+    expect((await response.json()).data.map((option: { mode: string }) => option.mode)).toEqual(['taxi']);
+    expect(vi.mocked(routeOnStreets).mock.calls.map(call => call[1])).toEqual(['car']);
+    vi.clearAllMocks();
+    expect((await (await GET(new NextRequest(url))).json()).data).toEqual([]);
+    expect(routeOnStreets).not.toHaveBeenCalled();
+    expect((await GET(new NextRequest(url + 'SUBWAY'))).status).toBe(400);
   });
 });

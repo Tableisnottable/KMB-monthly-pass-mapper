@@ -7,8 +7,9 @@ import { hongKongClock, isServiceActive, networkPatterns, networkRoutes, network
 type Point = { lat: number; lng: number };
 import { DEFAULT_WEIGHTS, type RouteWeights } from './routeWeights';
 import { operatorAllowed } from '../domain/operatorSelection';
+import { transitTypeAllowed } from '../domain/transportSelection';
 import { DEFAULT_PREFERENCES, preferencePenalty, preferredRoads, routeCorridors, corridorLegAllowed, routeRoadsAllowed, type RoutePreferences } from '../domain/routePreferences';
-export interface JourneySearchOptions { operators?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences }
+export interface JourneySearchOptions { operators?: string[]; modes?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences }
 type Label = { stop: number; elapsed: number; cost: number; legs: Segment[]; walk: number; pendingWalk: number; originWalk: number; used: number[]; readyDelay: number };
 type Window = { start: number; end: number; headway: number; duration: number };
 const WALK_SPEED = 5 / 60, MAX_ROUNDS = 4, MAX_WAIT = 90, MAX_JOURNEY = 240;
@@ -131,7 +132,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
       if (!windows[patternIndex].length) return;
       if (simpleOnly && round === 1 && !finishing.has(patternIndex)) return;
       const route = networkRoutes[pattern.r], rail = route[5] === 'SUBWAY' || route[5] === 'LIGHT_RAIL';
-      if (!operatorAllowed(route[1], options.operators)) return;
+      if (!operatorAllowed(route[1], options.operators) || !transitTypeAllowed(route[5], options.modes)) return;
       const operator = route[1] === 'KMB+CTB' ? 'KMB' : route[1] === 'LWB+CTB' ? 'LWB' : route[1];
       const boardings: { label: Label; position: number; wait: number; duration: number; interval: number; publishedHeadway?: number }[] = [];
       for (let step = 0; step < pattern.s.length; step++) {

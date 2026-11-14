@@ -108,10 +108,30 @@ describe('Multimodal journey API', () => {
   }, 30000);
 
   it('rejects inconsistent Must/Ban choices and invalid change times', async () => {
-    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=2', 'weights=%7B%22fare%22%3A-1%7D']) {
+    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D']) {
       const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.33882&fromLon=114.15387&toLat=22.31367&toLon=113.93763&' + query));
       expect(response.status).toBe(400);
     }
+  });
+  it.each([0, 31, 60])('accepts a %i-minute transfer minimum and keeps physical walking time', async minutes => {
+    const { data, meta } = await journey(cheungShaWan, airport, { timeMode: 'depart', time: '2026-11-14T10:00:00+08:00',
+      changeMinutes: String(minutes), operators: 'KMB,LWB', requiredOperators: 'KMB', modes: 'BUS', requiredModes: 'BUS' });
+    expect(data.length).toBeGreaterThan(0); expect(meta.minimumChangeMinutes).toBe(minutes);
+    expect(data.some((route: { legs: unknown[] }) => route.legs.length > 1)).toBe(true);
+    for (const route of data) for (let i = 1; i < route.legs.length; i++) {
+      const gap = Date.parse(route.legs[i].departureTime) - Date.parse(route.legs[i - 1].arrivalTime);
+      expect(gap).toBeGreaterThanOrEqual(Math.max(minutes, route.legs[i].accessWalkMinutes ?? 3) * 60000 - 1);
+    }
+  }, 30000);
+  it.each(['depart', 'arrive'])('filters transit types during %s searches and enforces required types', async timeMode => {
+    const { data, meta } = await journey(cheungShaWan, airport, { timeMode, time: '2026-11-14T14:00:00+08:00',
+      modes: 'SUBWAY', requiredModes: 'SUBWAY', changeMinutes: '60' });
+    expect(data.length).toBeGreaterThan(0); expect(meta.selectedModes).toEqual(['SUBWAY']); expect(meta.requiredModes).toEqual(['SUBWAY']);
+    for (const route of data) expect(route.legs.every((leg: { mode: string }) => leg.mode === 'SUBWAY')).toBe(true);
+  }, 30000);
+  it('allows all transit types to be banned and the walking comparison switched off', async () => {
+    const { data } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 }, { modes: '', walkComparison: 'false' });
+    expect(data).toEqual([]);
   });
   it.each(['depart', 'arrive'])('excludes banned road intervals during %s graph search while retaining alternatives', async mode => {
     const { data } = await journey(cheungShaWan, airport, { timeMode: mode, time: '2026-11-14T14:00:00+08:00', preferences: '{"roads":{"lantau":"ban"}}' });

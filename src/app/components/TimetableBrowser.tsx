@@ -14,10 +14,10 @@ interface RouteResult { id: string; operator: string; number: string; nameTc: st
 type Timetable = ReturnType<typeof routeTimetable> & { company?: Company; residentDocument?: typeof residentsRoutes[number]; meta: { importedOn: string; source: string } };
 type ResidentsData = { resident: typeof residentsRoutes[number]; meta: typeof residentsDirectoryMeta };
 
-export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPattern = '', initialStop = '' }:
-  { locale?: PlannerLocale; initialRoute?: string; initialPattern?: string; initialStop?: string }) {
+export function TimetableBrowser({ locale = 'zh', initialRoute = '', initialPattern = '', initialStop = '', initialCompany = '' }:
+  { locale?: PlannerLocale; initialRoute?: string; initialPattern?: string; initialStop?: string; initialCompany?: string }) {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [company, setCompany] = useState('');
+  const [company, setCompany] = useState(initialCompany);
   const [query, setQuery] = useState('');
   const [routes, setRoutes] = useState<RouteResult[]>([]);
   const [routeId, setRouteId] = useState(initialRoute);

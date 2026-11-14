@@ -15,15 +15,17 @@ export const travelModeLabel = (mode: TravelMode, locale: PlannerLocale) => mode
   : mode === 'cycle' ? copy(locale, '單車', 'Cycle') : copy(locale, '的士', 'Taxi');
 const icon = (mode: TravelMode) => mode === 'taxi' ? 'car' : mode;
 
-export function useTravelOptions(places: JourneyLocations) {
+export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] = ['walk', 'cycle', 'taxi']) {
   const [state, setState] = useState<{ key: string; options: TravelOption[]; loading: boolean }>({ key: '', options: [], loading: false });
-  const key = places.origin && places.destination ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') : '';
+  const key = places.origin && places.destination && modes.length ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') + '|' + modes.join(',') : '';
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     setState({ key, options: [], loading: true });
-    const values = key.split(',');
+    const [coordinates, selectedModes] = key.split('|');
+    const values = coordinates.split(',');
     const params = new URLSearchParams(Object.fromEntries(['fromLat', 'fromLon', 'toLat', 'toLon'].map((name, i) => [name, values[i]])));
+    params.set('modes', selectedModes);
     transportFetch('/api/travel-options?' + params, { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Travel options unavailable');
       const payload = await response.json() as { data: TravelOption[] };
@@ -34,11 +36,11 @@ export function useTravelOptions(places: JourneyLocations) {
   return state.key === key ? state : { key, options: [], loading: Boolean(key) };
 }
 
-export function QuickTravelOptions({ options, loading, onChoose, locale }: {
-  options: TravelOption[]; loading: boolean; onChoose: (option: TravelOption) => void; locale: PlannerLocale;
+export function QuickTravelOptions({ options, loading, onChoose, locale, modes = ['walk', 'cycle', 'taxi'] }: {
+  options: TravelOption[]; loading: boolean; onChoose: (option: TravelOption) => void; locale: PlannerLocale; modes?: TravelMode[];
 }) {
-  return <div className="quick-modes" aria-label={copy(locale, '步行、單車及的士時間估算', 'Walking, cycling and taxi time estimates')}>
-    {(['walk', 'cycle', 'taxi'] as const).map(mode => {
+  return <div className="quick-modes" style={{ gridTemplateColumns: `repeat(${modes.length}, minmax(0, 1fr))` }} aria-label={copy(locale, '步行、單車及的士時間估算', 'Walking, cycling and taxi time estimates')}>
+    {modes.map(mode => {
       const option = options.find(o => o.mode === mode);
       return <button key={mode} type="button" disabled={!option?.available} onClick={() => { if (option?.available) onChoose(option); }}
         aria-label={travelModeLabel(mode, locale) + (option?.available ? ', ' + option.minutes + ' ' + copy(locale, '分鐘（估算）', 'minutes (estimated)') : ', ' + (loading ? copy(locale, '正在計算', 'calculating') : copy(locale, '未有可用路徑', 'route unavailable')))}>

@@ -22,6 +22,7 @@ import type { RouteWeights } from '../../engine/routeWeights';
 import { corridorChoices, routeCorridors, type RoutePreferences } from '../../domain/routePreferences';
 import { STUDENT_FARE_SOURCE } from '../../domain/journeyFares';
 import { JourneyEndpoints } from './JourneyEndpoints';
+import { comparisonTypes, type ComparisonPreferences } from '../../domain/transportSelection';
 const FareProfileContext = createContext<FareProfile>('adult');
 
 function WalkTime({ routes, locale }: { routes: ScoredRoute[]; locale: PlannerLocale }) {
@@ -110,7 +111,7 @@ function JourneySortControl({ value, onChange, locale }: { value: JourneySort; o
   </label>;
 }
 
-export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places, onMapPick, fareProfile, preferences, time, weights, locale = 'zh' }: {
+export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places, onMapPick, fareProfile, preferences, time, weights, comparisons, locale = 'zh' }: {
   routes: ScoredRoute[];
   searchPanel: ReactNode;
   emptyHint?: string;
@@ -122,13 +123,15 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
   preferences: RoutePreferences;
   time: JourneyTimeSelection;
   weights: RouteWeights;
+  comparisons: ComparisonPreferences;
 }) {
   const [selectedId, setSelectedId] = useState('');
   const [showDetails, setShowDetails] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
   const [sort, setSort] = useState<JourneySort>('recommended');
-  const travel = useTravelOptions(endpoints ?? { origin: null, destination: null });
+  const comparisonModes = comparisonTypes.filter(type => comparisons[type.id]).map(type => type.id);
+  const travel = useTravelOptions(endpoints ?? { origin: null, destination: null }, comparisonModes);
   const [travelMode, setTravelMode] = useState<TravelMode | null>(null);
   const selectedTravel = travel.options.find(option => option.mode === travelMode && option.available);
   const sidebar = useRef<HTMLDivElement>(null);
@@ -161,7 +164,7 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
       </section> : <>
         <button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
         <section className="results-pane" id="routes" aria-label={copy(locale, '行程選擇', 'Journey options')}>
-          {endpoints && <><QuickTravelOptions options={travel.options} loading={travel.loading} locale={locale} onChoose={option => { setTravelMode(option.mode); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }} />
+          {endpoints && comparisonModes.length > 0 && <><QuickTravelOptions options={travel.options} modes={comparisonModes} loading={travel.loading} locale={locale} onChoose={option => { setTravelMode(option.mode); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }} />
             <p className="quick-mode-note">{copy(locale, '按道路／路徑估算，非即時交通；「—」表示未有可用路徑。', 'Road/path estimates, not live traffic. “—” means no route is available.')}</p></>}
           {routes.length > 0 ? <>
             {recommendedGroups.length > 0 && <div className="route-group"><div className="route-group-heading"><h2>{copy(locale, '建議', 'Suggested')}</h2><JourneySortControl value={sort} onChange={setSort} locale={locale} /></div><div className="route-list">{(showAllRoutes ? recommendedGroups : recommendedGroups.slice(0, 12)).map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} onPreview={preview} selectedId={selected?.id} searchOrigin={mapPlaces.origin?.name} />)}</div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { routeOnStreets, type Coordinate, type StreetProfile } from '../../../data/routeGeometry';
 import { travelOption, type TravelMode } from '../../../domain/travelOptions';
 import { getRateLimiter } from '../../../lib/cloudflare';
+import { parseComparisonSelection } from '../../../domain/transportSelection';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -11,12 +12,16 @@ export async function GET(request: NextRequest) {
     || values[2] < 22.1 || values[2] > 22.6 || values[1] < 113.8 || values[1] > 114.5 || values[3] < 113.8 || values[3] > 114.5) {
     return NextResponse.json({ error: 'Valid Hong Kong endpoints are required.' }, { status: 400 });
   }
+  let selected;
+  try { selected = parseComparisonSelection(request.nextUrl.searchParams.get('modes')); }
+  catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
   const limiter = await getRateLimiter();
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   if (limiter && !(await limiter.limit({ key: 'travel-options:' + ip })).success) return NextResponse.json({ error: 'Please try again shortly.' }, { status: 429 });
   const points: Coordinate[] = [[values[0], values[1]], [values[2], values[3]]];
   const modes: [TravelMode, StreetProfile][] = [['walk', 'foot'], ['cycle', 'bike'], ['taxi', 'car']];
-  const data = await Promise.all(modes.map(async ([mode, profile]) => travelOption(mode, await routeOnStreets(points, profile))));
+  const data = await Promise.all(modes.filter(([mode]) => selected === undefined || selected.includes(mode))
+    .map(async ([mode, profile]) => travelOption(mode, await routeOnStreets(points, profile))));
   return NextResponse.json({ data, attribution: '© OpenStreetMap contributors; routing by FOSSGIS / OSRM. Estimated travel times, not live traffic.' },
     { headers: { 'Cache-Control': 'public, max-age=3600' } });
 }

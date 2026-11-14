@@ -54,5 +54,19 @@ try {
     for (let i = 1; i < route.legs.length; i++) assert(Date.parse(route.legs[i].departureTime) - Date.parse(route.legs[i - 1].arrivalTime) >= 15 * 60000 - 1);
     assert(Date.parse(route.arrivalTime) <= Date.parse(params.get('time')));
   }
-  console.log(`Browser bundle passed: catalogue, ${result.data.length} adult-priced departures, airport alternatives, ${reverse.data.length} arrive-by journeys, Must/Ban and 15-minute changes; new travel/label handlers registered.`);
+  params.set('modes', 'BUS'); params.set('requiredModes', 'BUS');
+  for (const minutes of [0, 60]) {
+    params.set('changeMinutes', String(minutes));
+    const boundary = await request('/api/journey?' + params);
+    assert.equal(boundary.meta.minimumChangeMinutes, minutes); assert(boundary.data.length > 0);
+    for (const route of boundary.data) {
+      assert(route.legs.every(leg => leg.mode === 'BUS'));
+      for (let i = 1; i < route.legs.length; i++) assert(Date.parse(route.legs[i].departureTime) - Date.parse(route.legs[i - 1].arrivalTime)
+        >= Math.max(minutes, route.legs[i].accessWalkMinutes ?? 3) * 60000 - 1);
+    }
+  }
+  params.set('changeMinutes', '61'); await request('/api/journey?' + params, 400);
+  const empty = await request('/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=');
+  assert.deepEqual(empty.data, []);
+  console.log(`Browser bundle passed: catalogue, ${result.data.length} adult-priced departures, airport alternatives, ${reverse.data.length} arrive-by journeys, Must/Ban for companies and types, 0/15/60-minute changes and disabled comparisons.`);
 } finally { await thread.terminate(); }
