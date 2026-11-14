@@ -1,9 +1,9 @@
 import { allOperatorIds, selectableOperators } from '../../domain/operatorSelection';
-import { corridorChoices, roadLevel, type CorridorGroup, type RoutePreferences } from '../../domain/routePreferences';
+import { corridorChoices, strategicRouteDetails, visibleCorridorGroups, roadLevel, type CorridorGroup, type RoutePreferences } from '../../domain/routePreferences';
 import { PreferenceToggle } from './PreferenceToggle';
 import { copy, type PlannerLocale } from './plannerUi';
 import { comparisonTypes, transitTypes, type ComparisonPreferences, type TransportPreferences } from '../../domain/transportSelection';
-import { LIMIT_MAX, type JourneyLimits } from '../../domain/journeyLimits';
+import { type JourneyLimits } from '../../domain/journeyLimits';
 export type CompanyLevel = 'must' | 'normal' | 'ban';
 export type CompanyPreferences = Record<string, CompanyLevel>;
 export const defaultCompanies = (): CompanyPreferences => Object.fromEntries(allOperatorIds.map(id => [id, 'normal']));
@@ -44,8 +44,18 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
       </div>
       <p>{copy(locale, '可選 0–60 分鐘，每次 1 分鐘。0 分鐘不加額外緩衝，仍保留實際轉乘步行；額外緩衝計入候車。較長時間可能排除緊接班次，並改變推薦結果。', 'Choose 0–60 minutes in 1-minute steps. Zero adds no extra buffer; actual transfer walking stays unchanged. Extra buffer counts as waiting. Longer buffers can rule out tight connections and change recommendations.')}</p>
       <h3>{copy(locale, '行程上限（可留空）', 'Journey maximums (optional)')}</h3>
-      {([['transfers', '最多轉乘次數', 'Maximum transfers'], ['change', '每次轉乘最多時間（分鐘）', 'Maximum time per change (minutes)'], ['walk', '全程最多步行時間（分鐘）', 'Maximum total walking (minutes)'], ['wait', '每次上車最多候車時間（分鐘）', 'Maximum waiting per boarding (minutes)'], ['ride', '全程最多乘車時間（分鐘）', 'Maximum total riding (minutes)']] as const).map(([key, zh, en]) => <label className="journey-limit-input" key={key}><span>{copy(locale, zh, en)}</span><input type="number" inputMode="numeric" min="0" max={LIMIT_MAX[key]} step="1" placeholder={copy(locale, '不限', 'No limit')} value={limits[key] ?? ''} onChange={event => { const raw = event.target.value; const value = raw === '' ? null : Number(raw); if (value === null || Number.isInteger(value) && value >= 0 && value <= LIMIT_MAX[key]) onLimits({ ...limits, [key]: value }); }} /></label>)}
-      <p>{copy(locale, '留空不加額外上限；搜尋本身最多三次轉乘及約四小時。轉乘時間包括轉站步行及候車；全程步行包括起點及終點接駁。這些為公共交通的硬性上限，可能找不到行程；不限制獨立步行、單車、的士及駕駛估算。', 'Blank adds no personal cap; the search itself is bounded to three transfers and about four hours. Change time includes transfer walking and waiting; total walking includes access and exit walks. These hard limits apply to public transport and can remove all results. Separate walk, cycle, taxi and driving comparisons are unaffected.')}</p>
+      {([['transfers', '最多轉乘次數', 'Maximum transfers'], ['change', '每次轉乘最多時間（分鐘）', 'Maximum time per change (minutes)'], ['walk', '全程最多步行時間（分鐘）', 'Maximum total walking (minutes)'], ['wait', '每次上車最多候車時間（分鐘）', 'Maximum waiting per boarding (minutes)'], ['ride', '全程最多乘車時間（分鐘）', 'Maximum total riding (minutes)']] as const).map(([key, zh, en]) => (
+        <label className="journey-limit-input" key={key}>
+          <span>{copy(locale, zh, en)}</span>
+          <input type="number" inputMode="numeric" min="0" step="1" placeholder={copy(locale, '不限', 'No limit')}
+            value={limits[key] ?? ''} onChange={event => {
+              const raw = event.target.value;
+              const value = raw === '' ? null : Number(raw);
+              if (value === null || Number.isSafeInteger(value) && value >= 0) onLimits({ ...limits, [key]: value });
+            }} />
+        </label>
+      ))}
+      <p>{copy(locale, '全部留空即不限。轉乘時間包括轉站步行及候車；全程步行包括起點及終點接駁。', 'Leave a field blank for no limit. Change time includes transfer walking and waiting; total walking includes access and exit walks.')}</p>
       {limits.change !== null && limits.change < changeMinutes && <p className="weight-warning" role="alert">{copy(locale, '最多轉乘時間不可少於最少轉乘時間。', 'Maximum change time cannot be below the minimum change time.')}</p>}
     </>}
     {section === 'companies' && <><h3>{copy(locale, '交通方式及公司', 'Transport types & companies')}</h3>
@@ -75,8 +85,14 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
       </details></>}
     {section === 'roads' && <><h3>{copy(locale, '選擇道路', 'Choose road corridors')}</h3>
       <p>{copy(locale, '× 禁止 · ／ 正常 · ✓ 必須。同一組有多條必須道路時，行程經過其中一條即可；不同組別的必須道路則都要經過。', '× Ban · ／ Normal · ✓ Must. If several roads in one group are Must, a route may use any one of them. Must roads in separate groups are all required.')}</p>
-      {(Object.keys(corridorChoices) as CorridorGroup[]).map(group => <fieldset className="road-preferences-group" key={group}><legend>{copy(locale, ...groupLabels[group])}</legend>
-        {corridorChoices[group].map(([id, zh, en]) => <PreferenceToggle key={id} label={copy(locale, zh, en)} locale={locale} positive="must" value={roadLevel(corridors, id)}
+      {visibleCorridorGroups.map(group => <fieldset className="road-preferences-group" key={group}><legend>{copy(locale, ...groupLabels[group])}</legend>
+        {group === 'strategic' ? <div className="strategic-route-grid">{strategicRouteDetails.map((route, index) => <article className="strategic-route-item" key={route.id}>
+          <div className="strategic-route-title"><span className="strategic-route-number" style={{ backgroundColor: route.color }}>{index + 1}</span>
+            <strong>{copy(locale, route.ends[0], route.ends[1])}</strong></div>
+          <p>{(locale === 'en' ? route.pathEn : route.path).join(' · ')}</p>
+          <PreferenceToggle label={copy(locale, route.ends[0], route.ends[1])} locale={locale} positive="must" value={roadLevel(corridors, route.id)}
+            onChange={level => onCorridors({ ...corridors, roads: { ...corridors.roads, [route.id]: level } })} />
+        </article>)}</div> : corridorChoices[group].map(([id, zh, en]) => <PreferenceToggle key={id} label={copy(locale, zh, en)} locale={locale} positive="must" value={roadLevel(corridors, id)}
           onChange={level => onCorridors({ ...corridors, roads: { ...corridors.roads, [id]: level } })} />)}</fieldset>)}
       <p>{copy(locale, '必須及禁止道路規則會套用於公共交通及步行、單車、的士和駕駛估算；偏好道路會影響可選路徑排序。道路比對依賴已收錄的路線幾何，資料未涵蓋全港，未匹配到的道路不能可靠判斷；單車及步行通行限制亦請以現場標誌為準。', 'Must and Ban apply to public-transport journeys and walk, cycle, taxi and driving estimates; Prefer ranks matching alternatives. Matching depends on mapped corridor geometry and coverage is incomplete, so unmapped roads cannot be checked reliably. Follow access signs for walking and cycling.')}</p></>}
   </section>;

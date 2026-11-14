@@ -67,7 +67,15 @@ try {
     }
   }
   params.set('changeMinutes', '61'); await request('/api/journey?' + params, 400);
+  const borderParams = new URLSearchParams({ fromLat: '22.534', fromLon: '114.057', toLat: '22.244', toLon: '114.156',
+    timeMode: 'depart', time: '2026-11-15T12:00:00+08:00' });
+  const border = await request('/api/journey?' + borderParams);
+  assert(border.data.length > 0, 'Missing Futian-to-Ap-Lei-Chau cross-border journeys');
+  assert.equal(border.meta.originUncovered, false); assert.equal(border.meta.destinationUncovered, false);
+  assert.equal(border.meta.maxTransfers, null);
+  const borderComparison = await request('/api/travel-options?' + borderParams + '&modes=');
+  assert.deepEqual(borderComparison.data, []);
   const empty = await request('/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=');
   assert.deepEqual(empty.data, []);
-  console.log(`Browser bundle passed: catalogue, ${result.data.length} adult-priced departures, airport alternatives, ${reverse.data.length} arrive-by journeys, Must/Ban for companies and types, 0/15/60-minute changes and disabled comparisons.`);
+  console.log(`Browser bundle passed: catalogue, ${result.data.length} adult-priced departures, airport alternatives, ${reverse.data.length} arrive-by journeys, ${border.data.length} cross-border journeys, Must/Ban for companies and types, 0/15/60-minute changes and disabled comparisons.`);
 } finally { await thread.terminate(); }

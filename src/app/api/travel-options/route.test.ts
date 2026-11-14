@@ -14,8 +14,12 @@ describe('Walking, cycling, taxi and driving API', () => {
     expect(data.map((o: { available: boolean }) => o.available)).toEqual([true, false, true, true]); expect(data[0].minutes).toBe(11);
     expect(data.map((o: { mode: string }) => o.mode)).toEqual(['walk', 'cycle', 'taxi', 'drive']);
   });
-  it('rejects missing and out-of-area coordinates', async () => {
+  it('accepts cross-border Hong Kong–Shenzhen endpoints and rejects coordinates outside the routing area', async () => {
     expect((await GET(new NextRequest('http://localhost/api/travel-options?fromLat=0'))).status).toBe(400);
+    const crossBorder = 'http://localhost/api/travel-options?fromLat=22.534&fromLon=114.057&toLat=22.244&toLon=114.156&modes=drive';
+    expect((await GET(new NextRequest(crossBorder))).status).toBe(200);
+    const outside = 'http://localhost/api/travel-options?fromLat=23&fromLon=114&toLat=22.244&toLon=114.156';
+    expect((await GET(new NextRequest(outside))).status).toBe(400);
   });
   it('only calculates enabled estimates, and supports switching all of them off', async () => {
     const url = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=';

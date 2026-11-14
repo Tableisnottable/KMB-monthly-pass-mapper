@@ -192,6 +192,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     : meta?.tooCloseToRide ? copy(locale, '兩個地點很接近，步行即可到達。', 'These places are close enough to walk between.')
       : allClosed ? copy(locale, '行程有已收班的路段，請留意服務狀態。', 'These options contain ended services. Check service status before travelling.')
         : searched && routes.length === 0 ? copy(locale, '未找到符合設定的公共交通路線。請放寬篩選或更改時間。', 'No transit route matches these settings. Try changing the filters or time.') : null;
+  const noTransitRoutes = searched && routes.length === 0 && !uncovered && !meta?.tooCloseToRide;
   const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的公共交通路線', 'No supported transit journey found')
     : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
 
@@ -217,7 +218,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       <button type="button" className="filter-reset" disabled={!settingsChanged} onClick={() => applySettings(defaultSettings())}>{copy(locale, '重設', 'Reset')}</button>
     </div>
     {error && <p className="planner-notice notice-error" role="alert">{error}</p>}
-    {notice && <p className="planner-notice notice-warning" role="status">{notice}</p>}
+    {notice && <p className="planner-notice notice-warning" role="status"><span>{notice}</span>{noTransitRoutes && settingsChanged && <button type="button" className="notice-action" onClick={() => applySettings(defaultSettings())}>{copy(locale, '不限篩選重搜', 'Try all routes')}</button>}</p>}
     {dataUpdateAvailable && <p className="planner-notice notice-warning" role="status">{copy(locale, '有新交通、票價或時間表資料。', 'Updated transport, fare or timetable data is available.')} <button type="button" onClick={() => window.location.reload()}>{copy(locale, '重新載入以使用新資料', 'Reload to use updated data')}</button></p>}
     {journeyRefresh.failed && <p className="planner-notice notice-warning" role="status">{copy(locale, '行程自動更新失敗；保留的時間可能已過時，將自動重試。', 'Journey refresh failed. Retained times may be stale; retrying automatically.')}</p>}
   </section>;

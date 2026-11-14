@@ -22,6 +22,11 @@ function ensureAlignments() {
   return alignmentLoading;
 }
 const distance = (a: Coordinate, b: Coordinate) => haversineKm(a[0], a[1], b[0], b[1]);
+const MAX_WALKING_GAP_KM = 0.2;
+export function hasWalkableGeometry(path: Coordinate[]): boolean {
+  return path.length >= 2 && path.every((point, index) => point.every(Number.isFinite)
+    && (index === 0 || distance(path[index - 1], point) <= MAX_WALKING_GAP_KM));
+}
 
 export function decodePolyline(value: string): Coordinate[] {
   let i = 0, lat = 0, lng = 0; const points: Coordinate[] = [];
@@ -199,13 +204,14 @@ export async function routeOnStreets(points: Coordinate[], mode: boolean | Stree
         // concurrent users in this process. Production can use a private backend.
         const delay = Math.max(0, nextPublicRequest - Date.now()); nextPublicRequest = Date.now() + delay + 1100;
         if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-        const response = await fetch(`${base}/${chunk.map(([lat, lng]) => `${lng},${lat}`).join(';')}?overview=full&geometries=geojson&steps=false${preferences ? '&alternatives=3' : ''}`, { signal: AbortSignal.timeout(12000) });
+        const response = await fetch(`${base}/${chunk.map(([lat, lng]) => `${lng},${lat}`).join(';')}?overview=full&geometries=geojson&steps=false${walking || preferences ? '&alternatives=3' : ''}`, { signal: AbortSignal.timeout(12000) });
         if (!response.ok) return missing();
         const data = await response.json() as { code?: string; waypoints?: { distance: number }[]; routes?: { geometry: { coordinates: number[][] }; distance: number; duration?: number }[] };
         if (data.code !== 'Ok' || !data.routes?.length || data.waypoints?.some(p => !Number.isFinite(p.distance) || p.distance > (walking ? 150 : 100))) return missing();
         const maxDistance = Math.max(1200, chunk.reduce((n, p, i) => n + (i ? distance(chunk[i - 1], p) * 1000 : 0), 0) * (walking ? 5 : 8));
         const candidates = data.routes.map(route => ({ route, path: route.geometry.coordinates.map(p => [p[1], p[0]] as Coordinate) }))
           .filter(({ route, path }) => path.length >= 2 && !path.some(p => p.some(v => !Number.isFinite(v)))
+            && (!walking || hasWalkableGeometry(path))
             && Number.isFinite(route.distance) && route.distance >= 0 && route.distance <= maxDistance);
         const valid = preferences ? (await Promise.all(candidates.map(async candidate => {
           const evaluation = await evaluateStreetPathWithData([candidate.path], preferences);

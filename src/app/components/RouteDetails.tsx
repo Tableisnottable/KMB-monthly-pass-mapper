@@ -52,7 +52,6 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile
           {leg.mode !== 'WALK' && <small className="leg-pass-fare">{copy(locale, '所選：', 'Selected: ')}{selectedFareLabel ?? profile} · {selectedPrice}{profile === 'pass' && pass.operatorDependent ? ' · ' + copy(locale, '視乎實際營辦商', 'depends on the operating company') : ''}{profile === 'student' && studentFares[index].adultFallback ? ' · ' + copy(locale, '未核實學生優惠，採成人價', 'adult fare used; student offers unverified') : ''}</small>}
           <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + (leg.liveDepartures?.[0] && departureType(leg.liveDepartures[0]) === 'ADDITIONAL' ? copy(locale, '加班到站', 'Additional arrival') : copy(locale, '即時到站', 'Live arrival')) + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
           {leg.mode !== 'WALK' && <>
-            {leg.publishedHeadwayMinutes !== undefined && leg.publishedHeadwayMinutes > 0 && <p className="leg-headway">{copy(locale, '公布班距約 ', 'Published headway about ')}{leg.publishedHeadwayMinutes} min</p>}
             <LegStopTimeline leg={leg} locale={locale} />
             <LegArrivalBoard key={leg.id} leg={leg} locale={locale} laterConnection={route.timeMode !== 'now' || index > 0} />
           </>}

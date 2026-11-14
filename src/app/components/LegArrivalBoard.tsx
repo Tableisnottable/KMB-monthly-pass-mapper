@@ -28,7 +28,7 @@ export function LegArrivalBoard({ leg, locale, laterConnection }: { leg: Segment
     {laterConnection && <p className="connection-arrivals-note">{copy(locale, '以下為此站現在的班次，不是預計轉乘時刻的保證班次。行程時間仍按到達此站後的可用班次計算。', 'Current departures at this stop, not guaranteed departures at your later connection time. Journey timing still uses connections reachable after you arrive.')}</p>}
     <JointArrivalBoard departures={departures} cancellations={cancellations} operator={legOperator(leg)} routeNumber={leg.routeNumber}
       stopName={leg.originStop?.name} locale={locale} scheduledTime={leg.departureTime}
-      scheduledHeadway={leg.publishedHeadwayMinutes} timetableOnly={laterConnection || leg.serviceStatus === 'TIMETABLE'} />
+      timetableOnly={laterConnection || leg.serviceStatus === 'TIMETABLE'} />
     <div className="leg-arrivals-actions"><button type="button" onClick={polling.refresh} disabled={polling.loading}>{polling.loading ? copy(locale, '更新中…', 'Updating…') : copy(locale, '更新此站班次', 'Refresh stop departures')}</button></div>
     <RefreshStatus {...polling} locale={locale} />
   </div>;

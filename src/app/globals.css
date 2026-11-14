@@ -124,6 +124,7 @@ button {
 .planner-notice { margin: 16px 12px 0; padding: 12px; background: #fff; border-radius: 5px; font-size: 13px; line-height: 1.6; }
 .notice-error { color: #b53936; }
 .notice-warning { color: #966a20; background: #fffbea; }
+.notice-action { margin-left: 8px; color: #246d2c; font-weight: 700; text-decoration: underline; white-space: nowrap; }
 .results-pane { padding: 0 12px 20px; }
 .map-instruction { color: #fff; font-size: 20px; font-weight: 800; text-align: center; line-height: 1.4; margin: 23px 4px; }
 .quick-modes { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; height: 84px; }
@@ -280,7 +281,6 @@ button {
 .add-pass button { min-height: 38px; border-radius: 4px; padding: 7px 10px; background: #277f22; color: white; }
 .payment-pass-panel p { color: #687469; line-height: 1.7; }
 .directions-list > li > div { min-width: 0; flex: 1; }
-.leg-headway { display: inline-block; margin-top: 12px; padding: 4px 7px; border-radius: 4px; background: #edf2f8; color: #42607d; font-size: 12px; }
 .leg-stop-timeline { margin: 14px 0; padding-left: 13px; border-left: 4px solid var(--timeline-colour); }
 .timeline-endpoint { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.6; }
 .timeline-endpoint::before { content: ''; position: absolute; left: -21px; top: 5px; width: 10px; height: 10px; border: 2px solid var(--timeline-colour); border-radius: 50%; background: #fff; }
@@ -308,7 +308,14 @@ button {
 .joint-arrival-board td:first-child { width: 54px; color: #dce9ff; white-space: nowrap; }
 .joint-arrival-board td:nth-child(2) { width: 76px; white-space: nowrap; }
 .joint-arrival-board td:nth-child(2) strong { color: #ffd52a; font-size: 15px; }
-.joint-arrival-board td:nth-child(3) { width: 14px; color: #bcc6d3; }
+.joint-arrival-board td:nth-child(3) { min-width: 0; }
+.joint-arrival-board td:nth-child(3) > .departure-badges { display: inline-flex; margin-left: 6px; }
+.joint-arrival-board .timetable-difference { margin-top: 2px; }
+.arrival-board-scroll { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.joint-arrival-board .arrival-more-button { width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid #4b5866; border-radius: 4px; color: #dce9ff; font-size: 12px; }
+.arrival-help { margin-top: 8px; color: #b9c4d2; font-size: 11px; }
+.arrival-help summary { width: fit-content; min-height: 32px; padding: 6px 0; cursor: pointer; }
+.arrival-help p { margin: 6px 0 0; }
 .joint-arrival-board .joint-arrival-remark { display: block; font-size: 11px; color: #b9c4d2; overflow-wrap: anywhere; }
 .joint-arrival-board .joint-arrival-note { margin: 8px 0 0; color: #c2cbd7; font-size: 12px; }
 .timetables-page { max-width: 1180px; margin: 0 auto; padding: 24px; color: var(--text); }
@@ -593,6 +600,13 @@ button {
 .preference-toggle button[aria-pressed=true][data-level=must], .preference-toggle button[aria-pressed=true][data-level=prefer] { color: #fff; background: #2b8134; }
 .road-preferences-group { min-width: 0; margin: 24px 0; padding: 0; border: 0; }
 .road-preferences-group legend { font-size: 13px; font-weight: 800; color: #78836f; margin-bottom: 6px; }
+.strategic-route-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.strategic-route-item { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--line, #e2e6e4); }
+.strategic-route-title { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.strategic-route-number { display: inline-grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; color: #fff; font-size: 16px; font-weight: 800; border-radius: 7px 7px 9px 9px; }
+.strategic-route-item > p { min-height: 3em; margin: 8px 0; color: var(--muted, #626d69); font-size: 12px; line-height: 1.55; }
+.strategic-route-item .preference-row { padding-left: 0; }
+@media (max-width: 600px) { .strategic-route-grid { grid-template-columns: 1fr; gap: 4px; } .strategic-route-item > p { min-height: 0; } }
 .transport-settings-group { margin: 14px 0; border: 1px solid #dce4d8; border-radius: 8px; padding: 0 12px; }
 .settings-content .transport-settings-group summary { display: list-item; padding: 14px 0; min-height: 44px; font-size: 14px; font-weight: 700; color: #35553b; }
 .transport-settings-group[open] { padding-bottom: 10px; }

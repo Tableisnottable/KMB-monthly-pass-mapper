@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     importedOn: transportCoverage.importedOn, coverage: transportCoverage.counts,
     candidates: result.candidates, durationMs: Date.now() - started,
     originUncovered: !result.originStops.length, destinationUncovered: !result.destinationStops.length,
-    tooCloseToRide: walkMinutes <= 6, maxTransfers: 3,
+    tooCloseToRide: walkMinutes <= 6, maxTransfers: limits.transfers,
     limitations: transportCoverage.limitations,
   } }, { headers: { 'Cache-Control': 'no-store' } });
 }

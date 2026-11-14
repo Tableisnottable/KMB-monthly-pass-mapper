@@ -22,6 +22,15 @@ describe('Journey settings controls', () => {
     for (const shortcut of [0, 5, 10, 15, 30, 60]) expect(html).toContain(`aria-label="${shortcut} minutes"`);
     expect(html).toContain('actual transfer walking stays unchanged');
   });
+  it('shows coloured strategic routes with their corridor summaries', () => {
+    const html = render('roads');
+    expect(html).toContain('Cross-Harbour Tunnel');
+    expect(html).toContain('Ting Kau Bridge');
+    expect(html).toContain('Aberdeen to Sha Tin');
+    expect(html).toContain('Shenzhen Bay Port to Lam Tei');
+    expect(html).toContain('Eagle&#x27;s Nest Tunnel');
+    expect(html).toContain('background-color:#e5322b');
+  });
   it.each(['en', 'zh'] as const)('lists all supported types, companies and comparison controls in %s', locale => {
     const html = render('companies', 3, locale);
     for (const item of [...transitTypes, ...selectableOperators, ...comparisonTypes]) {

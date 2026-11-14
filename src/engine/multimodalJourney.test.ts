@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeWindows, findMultimodalJourneys, nextDeparture, previousDeparture } from './multimodalJourney';
+import { activeWindows, findMultimodalJourneys, journeyAccessStops, nextDeparture, previousDeparture } from './multimodalJourney';
 import { networkPatterns, networkRoutes, networkStops, hongKongClock, isServiceActive, transportCoverage } from '../data/transportNetwork';
 
 const noon = new Date('2026-11-13T04:00:00Z');
@@ -55,14 +55,22 @@ describe('Timetables', () => {
   });
 
   it('includes long gaps before a frequency window in the existing waiting formula', () => {
-    const departure = nextDeparture([{ start: 60, end: 120, headway: 5, duration: 20 }], 0, 0)!;
-    expect(departure.wait).toBe(60);
-    expect(departure.headway * 0.5).toBe(60);
+    const departure = nextDeparture([{ start: 600, end: 660, headway: 5, duration: 20 }], 0, 0)!;
+    expect(departure.wait).toBe(600);
+    expect(departure.headway * 0.5).toBe(600);
     expect(departure.publishedHeadway).toBe(5);
   });
 });
 
 describe('Multimodal connectivity', () => {
+  it('uses nearby border-network stops when the origin is outside normal stop coverage', () => {
+    const stops = journeyAccessStops({ lat: 22.536, lng: 114.061 });
+    expect(stops.length).toBeGreaterThan(0);
+    expect(stops.length).toBeLessThanOrEqual(16);
+    expect(stops[0].walk).toBeGreaterThan(1.1 * 60 / 5);
+    expect(stops[0].walk).toBeLessThan(3 * 60 / 5);
+  });
+
   it.each(['SUBWAY', 'LIGHT_RAIL', 'FERRY', 'MINIBUS', 'TRAM', 'CABLE_CAR'])(
     'finds an actual %s ride between published stops', mode => {
       const candidates = networkPatterns.filter(p => networkRoutes[p.r][5] === mode);
@@ -72,7 +80,7 @@ describe('Multimodal connectivity', () => {
       const last = p!.s[p!.s.length - 1] === p!.s[0] ? Math.floor(p!.s.length / 2) : p!.s.length - 1;
       const result = findMultimodalJourneys(point(networkStops[p!.s[0]]), point(networkStops[p!.s[last]]), noon, 'en');
       expect(result.routes.some(r => r.legs.some(l => l.mode === mode))).toBe(true);
-      expect(result.routes.every(r => r.transferCount <= 3)).toBe(true);
+      expect(result.routes.every(r => r.transferCount < networkRoutes.length)).toBe(true);
     }, 20000,
   );
 

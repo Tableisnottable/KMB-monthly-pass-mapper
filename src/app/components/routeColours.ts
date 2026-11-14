@@ -1,4 +1,4 @@
-/** Company colours stay visible; route-family accents add to the mix. */
+/** Bus lines use their operator colours; joint services show each operator. */
 export interface RouteSignColours {
   background: string;
   foreground: string;
@@ -29,21 +29,11 @@ const otherModes: Readonly<Record<string, string>> = {
   PTRAM: '#8d3069', WALK: '#9b9b9b',
 };
 
-function routeFamilyColour(operator: string, number: string): string | undefined {
-  if (!operator.split('+').some(member => companyPalette[member])) return;
-  if (/^NA?\d/.test(number)) return '#000000';
-  if (/^(?:X)?9\d{2}[A-Z]*$/.test(number)) return '#007d40';
-  if (/^[136]\d{2}[A-Z]*$/.test(number)) return '#d71920';
-}
-
 export function routeSignColours(operator: string, routeNumber = ''): RouteSignColours {
-  const number = routeNumber.trim().toUpperCase();
   const members = operator.split('+'), primary = companyPalette[members[0]], secondary = companyPalette[members[1]];
-  const family = routeFamilyColour(operator, number);
   if (primary) return { background: primary[0], foreground: primary[1], line: primary[0],
-    convention: operator + ' company display colours' + (family ? ' with route-family accent' : ''), verified: true,
-    lineColours: Array.from(new Set([...members.flatMap(member => companyPalette[member] ? [companyPalette[member][0]] : []), ...(family ? [family] : [])])),
-    ...(family ? { iconAccent: family } : {}),
+    convention: operator + ' company display colours', verified: true,
+    lineColours: Array.from(new Set(members.flatMap(member => companyPalette[member] ? [companyPalette[member][0]] : []))),
     ...(secondary ? { iconBackground: secondary[0], iconForeground: secondary[1] } : {}),
   };
   if (otherModes[operator]) {

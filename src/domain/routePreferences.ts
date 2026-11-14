@@ -14,6 +14,19 @@ export const corridorChoices = {
   lantau: [['tungchung', '東涌道', 'Tung Chung Road']],
 } as const;
 export type CorridorGroup = keyof typeof corridorChoices;
+export const visibleCorridorGroups = Object.keys(corridorChoices) as CorridorGroup[];
+export const strategicRouteDetails = [
+  { id: 'route1', color: '#e5322b', ends: ['香港仔至沙田', 'Aberdeen to Sha Tin'], path: ['香港仔', '黃竹坑', '香港仔隧道', '紅磡海底隧道', '九龍塘', '獅子山隧道', '沙田'], pathEn: ['Aberdeen', 'Wong Chuk Hang', 'Aberdeen Tunnel', 'Cross-Harbour Tunnel', 'Kowloon Tong', 'Lion Rock Tunnel', 'Sha Tin'] },
+  { id: 'route2', color: '#378bce', ends: ['鰂魚涌至馬料水', 'Quarry Bay to Ma Liu Shui'], path: ['鰂魚涌', '東區海底隧道', '觀塘', '大老山隧道', '馬料水'], pathEn: ['Quarry Bay', 'Eastern Harbour Crossing', 'Kwun Tong', 'Tate’s Cairn Tunnel', 'Ma Liu Shui'] },
+  { id: 'route3', color: '#208672', ends: ['西營盤至元朗', 'Sai Ying Pun to Yuen Long'], path: ['西營盤', '西區海底隧道', '青衣', '青衣大橋', '大欖隧道', '八鄉', '元朗'], pathEn: ['Sai Ying Pun', 'Western Harbour Crossing', 'Tsing Yi', 'Tsing Yi Bridge', 'Tai Lam Tunnel', 'Pat Heung', 'Yuen Long'] },
+  { id: 'route4', color: '#2765b1', ends: ['柴灣至堅尼地城', 'Chai Wan to Kennedy Town'], path: ['柴灣', '銅鑼灣', '灣仔', '中環', '上環', '西營盤', '堅尼地城'], pathEn: ['Chai Wan', 'Causeway Bay', 'Wan Chai', 'Central', 'Sheung Wan', 'Sai Ying Pun', 'Kennedy Town'] },
+  { id: 'route5', color: '#d47d9d', ends: ['牛頭角至荃灣', 'Ngau Tau Kok to Tsuen Wan'], path: ['牛頭角', '九龍灣', '啟德隧道', '紅磡', '油麻地', '荔枝角', '葵涌', '荃灣'], pathEn: ['Ngau Tau Kok', 'Kowloon Bay', 'Kai Tak Tunnel', 'Hung Hom', 'Yau Ma Tei', 'Lai Chi Kok', 'Kwai Chung', 'Tsuen Wan'] },
+  { id: 'route6', color: '#949b14', ends: ['將軍澳至西九龍', 'Tseung Kwan O to West Kowloon'], path: ['將軍澳', '將軍澳隧道', '藍田隧道', '茶果嶺', '九龍灣', '油麻地交匯處'], pathEn: ['Tseung Kwan O', 'Tseung Kwan O Tunnel', 'Lam Tin Tunnel', 'Cha Kwo Ling', 'Kowloon Bay', 'Yau Ma Tei Interchange'] },
+  { id: 'route7', color: '#85bd7d', ends: ['將軍澳至葵涌', 'Tseung Kwan O to Kwai Chung'], path: ['將軍澳', '將軍澳隧道', '觀塘', '九龍灣', '黃大仙', '深水埗', '荔枝角', '葵涌'], pathEn: ['Tseung Kwan O', 'Tseung Kwan O Tunnel', 'Kwun Tong', 'Kowloon Bay', 'Wong Tai Sin', 'Sham Shui Po', 'Lai Chi Kok', 'Kwai Chung'] },
+  { id: 'route8', color: '#966bb5', ends: ['沙田至赤鱲角', 'Sha Tin to Chek Lap Kok'], path: ['沙田', '大圍', '尖山隧道', '長沙灣', '昂船洲', '青衣', '南灣隧道', '青馬大橋', '東涌', '赤鱲角'], pathEn: ['Sha Tin', 'Tai Wai', 'Eagle’s Nest Tunnel', 'Cheung Sha Wan', 'Stonecutters Island', 'Tsing Yi', 'Nam Wan Tunnel', 'Tsing Ma Bridge', 'Tung Chung', 'Chek Lap Kok'] },
+  { id: 'route9', color: '#f59b55', ends: ['新界環迴幹線', 'New Territories Circular Route'], path: ['屯門', '大圍', '沙田', '馬料水', '大埔', '粉嶺', '上水', '落馬洲', '元朗', '洪水橋', '深井', '荃灣'], pathEn: ['Tuen Mun', 'Tai Wai', 'Sha Tin', 'Ma Liu Shui', 'Tai Po', 'Fanling', 'Sheung Shui', 'Lok Ma Chau', 'Yuen Long', 'Hung Shui Kiu', 'Sham Tseng', 'Tsuen Wan'] },
+  { id: 'route10', color: '#e56437', ends: ['深圳灣口岸至藍地', 'Shenzhen Bay Port to Lam Tei'], path: ['深圳灣口岸', '天水圍', '元朗公路', '藍地'], pathEn: ['Shenzhen Bay Port', 'Tin Shui Wai', 'Yuen Long Highway', 'Lam Tei'] },
+] as const;
 export type RoadLevel = 'normal' | 'prefer' | 'must' | 'ban';
 // Keep the original single-choice fields for saved links and older API clients.
 export type RoutePreferences = { harbour: string; shatin: string; airport: string; roads?: Record<string, RoadLevel> };

@@ -6,6 +6,7 @@ import { GET } from './route';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { DEFAULT_WEIGHTS } from '../../../engine/routeWeights';
 import { routeCorridors } from '../../../domain/routePreferences';
+import { journeyMatchesEndpoints } from '../../../domain/journeyEndpointMatch';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
 vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
@@ -136,11 +137,19 @@ describe('Multimodal journey API', () => {
   }, 30000);
 
   it('rejects inconsistent Must/Ban choices and invalid change times', async () => {
-    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D', 'limits=%7B%22walk%22%3A-1%7D', 'limits=%7B%22transfers%22%3A4%7D', 'changeMinutes=15&limits=%7B%22change%22%3A10%7D']) {
+    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D', 'limits=%7B%22walk%22%3A-1%7D', 'limits=%7B%22transfers%22%3A1.5%7D', 'changeMinutes=15&limits=%7B%22change%22%3A10%7D']) {
       const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.33882&fromLon=114.15387&toLat=22.31367&toLon=113.93763&' + query));
       expect(response.status).toBe(400);
     }
   });
+  it('returns visible cross-border journeys for sparse stop coverage without a transfer cap', async () => {
+    const from = { lat: 22.534, lng: 114.057 }, to = { lat: 22.244, lng: 114.156 };
+    const { data, meta } = await journey(from, to, { timeMode: 'depart', time: '2026-11-15T12:00:00+08:00' });
+    expect(data.length).toBeGreaterThan(0);
+    expect(data.every((route: Parameters<typeof journeyMatchesEndpoints>[0]) => journeyMatchesEndpoints(route, from, to))).toBe(true);
+    expect(meta.originUncovered).toBe(false); expect(meta.destinationUncovered).toBe(false);
+    expect(meta.maxTransfers).toBeNull();
+  }, 30000);
   it.each([0, 31, 60])('accepts a %i-minute transfer minimum and keeps physical walking time', async minutes => {
     const { data, meta } = await journey(cheungShaWan, airport, { timeMode: 'depart', time: '2026-11-14T10:00:00+08:00',
       changeMinutes: String(minutes), operators: 'KMB,LWB', requiredOperators: 'KMB', modes: 'BUS', requiredModes: 'BUS' });

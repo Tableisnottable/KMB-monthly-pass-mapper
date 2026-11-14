@@ -6,12 +6,16 @@ import { parseComparisonSelection } from '../../../domain/transportSelection';
 import { parseRoutePreferences } from '../../../domain/routePreferences';
 export const dynamic = 'force-dynamic';
 
+const ROUTING_AREA = { south: 22.1, north: 22.9, west: 113.75, east: 114.65 };
+const withinRoutingArea = (lat: number, lon: number) => lat >= ROUTING_AREA.south && lat <= ROUTING_AREA.north
+  && lon >= ROUTING_AREA.west && lon <= ROUTING_AREA.east;
+
 export async function GET(request: NextRequest) {
   const raw = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(k => request.nextUrl.searchParams.get(k));
   const values = raw.map(Number);
-  if (raw.some(v => !v?.trim()) || values.some(v => !Number.isFinite(v)) || values[0] < 22.1 || values[0] > 22.6
-    || values[2] < 22.1 || values[2] > 22.6 || values[1] < 113.8 || values[1] > 114.5 || values[3] < 113.8 || values[3] > 114.5) {
-    return NextResponse.json({ error: 'Valid Hong Kong endpoints are required.' }, { status: 400 });
+  if (raw.some(v => !v?.trim()) || values.some(v => !Number.isFinite(v))
+    || !withinRoutingArea(values[0], values[1]) || !withinRoutingArea(values[2], values[3])) {
+    return NextResponse.json({ error: 'Endpoints must be within the Hong Kong–Shenzhen routing area.' }, { status: 400 });
   }
   let selected;
   try { selected = parseComparisonSelection(request.nextUrl.searchParams.get('modes')); }

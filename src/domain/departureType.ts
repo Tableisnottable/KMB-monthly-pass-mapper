@@ -13,7 +13,9 @@ export interface DepartureEvidence {
   remark?: string;
   scheduleMatch?: 'MATCHED' | 'ADDED' | 'UNVERIFIED';
   addedReason?: 'PROVIDER' | 'NOT_IN_TIMETABLE';
-  changedReason?: 'PROVIDER' | 'OBSERVED_SPACING';
+  changedReason?: 'PROVIDER' | 'OBSERVED_SPACING' | 'POSSIBLE_SHIFT';
+  /** Generated from the published timetable, not returned by an ETA provider. */
+  timetableEstimate?: boolean;
 }
 
 export const providerMarksAdditional = (remark = '') => /(?:\bextra\b|\badditional\b|加班|加開|加开|特別加)/i.test(remark);

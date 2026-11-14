@@ -5,7 +5,7 @@ import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
 import { operatorInfo, transportOperators } from '../../../data/transportOperators';
-import { hongKongServiceDate, nextPublishedDeparture, routeTimetable } from '../../../data/networkTimetable';
+import { hongKongServiceDate, nextPublishedDeparture, routeTimetable, upcomingPublishedDepartures } from '../../../data/networkTimetable';
 import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
 import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
 import { departureTimingType, departureType } from '../../../domain/departureType';
@@ -114,12 +114,24 @@ export async function GET(request: NextRequest) {
       destination: leg.destinationStop!.name, minutes: leg.realtimeEta?.etaMinutes ?? leg.scheduledDepartureMinutes ?? null,
       publishedHeadwayMinutes: leg.publishedHeadwayMinutes,
       status: leg.serviceEnded ? 'NO_UPCOMING' : leg.serviceStatus };
-    const departures = leg.liveDepartures?.length ? leg.liveDepartures.map((departure, index) => ({ ...base, ...departure,
+    const observed = leg.liveDepartures ?? [];
+    // Append only beyond the provider's preview. A timetable row must not
+    // reintroduce a departure that may already have moved or been cancelled.
+    const previewEnd = Math.max(now.getTime() - 1, ...observed.flatMap(row => [Date.parse(row.time),
+      ...(departureType(row) === 'CHANGED' && row.timetableTime ? [Date.parse(row.timetableTime)] : [])]).filter(Number.isFinite));
+    const cancelled = new Set((leg.departureNotices ?? []).flatMap(row => row.time ? [Date.parse(row.time)] : []));
+    const estimates = leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? []
+      : upcomingPublishedDepartures(leg.networkPattern!, leg.boardingIndex ?? 0, now)
+        .filter(row => Date.parse(row.time) > previewEnd && !cancelled.has(Date.parse(row.time)));
+    const departures = [...observed, ...estimates].map((departure, index) => ({ ...base, ...departure,
       company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
-      id: `${r.id}:live:${index}`, departureType: departureType(departure), timingType: departureTimingType(departure), status: departureTimingType(departure) === 'SCHEDULED' ? 'TIMETABLE' : 'LIVE' })) : [{ ...base, id: r.id,
+      id: `${r.id}:${departure.timetableEstimate ? 'estimate' : 'live'}:${index}`, departureType: departureType(departure), timingType: departureTimingType(departure), status: departureTimingType(departure) === 'SCHEDULED' ? 'TIMETABLE' : 'LIVE' }));
+    const fallback = !departures.length && !cancelled.has(Date.parse(leg.departureTime ?? '')) ? [{ ...base, id: r.id,
       departureType: base.status === 'TIMETABLE' ? 'SCHEDULED' : undefined,
-      time: leg.departureTime ?? (base.minutes === null ? null : new Date(now.getTime() + base.minutes * 60000).toISOString()), scheduleMatch: 'UNVERIFIED' }];
-    return [...departures, ...(leg.departureNotices ?? []).map((notice, index) => ({ ...base, ...notice,
+      timingType: base.status === 'TIMETABLE' ? 'SCHEDULED' : undefined,
+      time: leg.departureTime ?? (base.minutes === null ? null : new Date(now.getTime() + base.minutes * 60000).toISOString()), scheduleMatch: 'UNVERIFIED',
+      timetableEstimate: base.status === 'TIMETABLE' || undefined }] : [];
+    return [...departures, ...fallback, ...(leg.departureNotices ?? []).map((notice, index) => ({ ...base, ...notice,
       id: `${r.id}:cancelled:${index}`, status: 'UNVERIFIED', minutes: null, time: notice.time ?? null,
       scheduleMatch: 'UNVERIFIED', company: operatorInfo(notice.operator ?? base.operator) }))];
   }).sort((a,b) => (a.minutes ?? Infinity) - (b.minutes ?? Infinity)), meta: { fetchedAt: now.toISOString(), stop: networkStop(stopIndex, locale) } },

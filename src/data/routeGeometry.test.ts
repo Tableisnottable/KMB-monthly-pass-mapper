@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { decodePolyline, evaluateStreetPath, followTrack, sliceAlignment, transitGeometry, routeOnStreets } from './routeGeometry';
+import { decodePolyline, evaluateStreetPath, followTrack, hasWalkableGeometry, sliceAlignment, transitGeometry, routeOnStreets } from './routeGeometry';
 import { networkPatterns, networkRoutes, networkStopIndex, railFare } from './transportNetwork';
 import { DEFAULT_PREFERENCES } from '../domain/routePreferences';
 import manifest from './alignments/manifest.json';
@@ -18,6 +18,20 @@ describe('Physical route geometry', () => {
   it('does not bridge disconnected railway tracks with a straight segment', () => {
     const graph = { points: [[22.3,114.1],[22.301,114.1],[22.32,114.1],[22.321,114.1]] as [number, number][], adjacent: [[[1,.1]],[[0,.1]],[[3,.1]],[[2,.1]]] as [number, number][][] };
     expect(followTrack(graph, [22.3,114.1], [22.321,114.1], .1)).toBeNull();
+  });
+  it('rejects a walking path with a long straight segment across water', () => {
+    expect(hasWalkableGeometry([[22.24, 114.12], [22.24, 114.126]])).toBe(false);
+    expect(hasWalkableGeometry([[22.24, 114.12], [22.2405, 114.121], [22.241, 114.122]])).toBe(true);
+  });
+  it('chooses a continuous walking alternative over a direct water-crossing chord', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'Ok', waypoints: [{ distance: 0 }, { distance: 0 }], routes: [
+      { distance: 620, duration: 400, geometry: { coordinates: [[114.12, 22.24], [114.126, 22.24]] } },
+      { distance: 900, duration: 700, geometry: { coordinates: [[114.12, 22.24], [114.121, 22.241], [114.122, 22.242], [114.123, 22.242], [114.124, 22.242], [114.125, 22.241], [114.126, 22.24]] } },
+    ] }));
+    vi.stubGlobal('fetch', fetcher);
+    const result = await routeOnStreets([[22.24, 114.12], [22.24, 114.126]], 'foot');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('alternatives=3');
+    expect(result).toMatchObject({ source: 'OSM_FOOT', distanceMetres: 900 });
   });
   it('enforces Must and Ban road rules and gives preferred road matches a ranking bonus', () => {
     const route = [[[22.3, 114.1], [22.3, 114.101]]] as [number, number][][];

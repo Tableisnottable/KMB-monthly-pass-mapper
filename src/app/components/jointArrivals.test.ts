@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { groupStationDepartures } from './jointArrivals';
+import { arrivalRemark, groupStationDepartures } from './jointArrivals';
 import { JointArrivalBoard } from './JointArrivalBoard';
 import type { LiveDeparture } from '../../data/networkTimetable';
 
@@ -21,9 +21,9 @@ describe('Joint operator arrival displays', () => {
       { ...row, id: 'route', routeId: 'joint-112' }]);
     expect(groups).toHaveLength(5);
   });
-  it('does not combine ordinary departures or mislabel non-bus services as joint buses', () => {
+  it('groups ordinary departures into one board without mislabelling non-bus services as joint buses', () => {
     expect(groupStationDepartures([{ ...row, operator: 'CTB', networkOperator: 'CTB' },
-      { ...row, id: 'second', operator: 'CTB', networkOperator: 'CTB' }])).toHaveLength(2);
+      { ...row, id: 'second', operator: 'CTB', networkOperator: 'CTB' }])).toHaveLength(1);
     expect(groupStationDepartures([{ ...row, mode: 'FERRY' }])[0].jointOperator).toBeUndefined();
   });
   it('renders clock times in Hong Kong time, chronological rows and the actual company on each row', () => {
@@ -39,7 +39,7 @@ describe('Joint operator arrival displays', () => {
     expect(html).toMatch(/02:54[\s\S]*?<strong>1<\/strong>[\s\S]*?九巴/);
     expect(html).toMatch(/03:15[\s\S]*?<strong>23<\/strong>[\s\S]*?城巴/);
     expect(html).toContain('data-departure-type="ADDITIONAL"');
-    expect(html).toContain('加班車');
+    expect(html).toContain('加班');
     expect(departures[0].minutes).toBe(46);
   });
   it('does not invent a company or turn invalid/unavailable predictions into live arrivals', () => {
@@ -55,9 +55,9 @@ describe('Joint operator arrival displays', () => {
   });
   it('shows a scheduled estimate on ordinary routes without labelling it live', () => {
     const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [], operator: 'KMB', routeNumber: '44', locale: 'en',
-      scheduledTime: '2026-11-14T02:00:00Z', scheduledHeadway: 12, timetableOnly: true }));
+      scheduledTime: '2026-11-14T02:00:00Z', timetableOnly: true }));
     expect(html).toContain('10:00'); expect(html).toContain('Boarding estimate'); expect(html).toContain('not live');
-    expect(html).toContain('12'); expect(html).not.toContain('Live arrivals');
+    expect(html).not.toContain('Published headway'); expect(html).not.toContain('Live arrivals');
   });
   it.each(['zh', 'en'] as const)('labels live, provider-scheduled and additional rows separately in %s', locale => {
     const departures: LiveDeparture[] = [
@@ -71,5 +71,50 @@ describe('Joint operator arrival displays', () => {
     expect(html).toContain(locale === 'zh' ? '時間表班次' : 'Scheduled · timetable');
     expect(html).toContain(locale === 'zh' ? '加班' : 'Additional');
     expect(html).not.toContain('Live arrivals · HKT');
+  });
+  it('keeps the board compact, preserving useful notices but hiding repeated status text and matching references', () => {
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { locale: 'zh', operator: 'KMB', departures: [
+      { time: '2026-11-14T13:30:00Z', minutes: 20, operator: 'KMB', remark: '原定班次 · Scheduled Bus · 行車受阻', scheduleMatch: 'MATCHED',
+        timetableTime: '2026-11-14T13:30:00Z', deviationMinutes: 0 },
+    ] }));
+    expect(html).not.toContain('原定班次 · Scheduled Bus');
+    expect(html).toContain('行車受阻');
+    expect(html).not.toContain('與參考時間相同');
+    expect(html).not.toContain('公布班距');
+    expect(html).toMatch(/<details class="arrival-help"><summary>班次說明<\/summary>/);
+    expect(html).not.toMatch(/<details[^>]*open/);
+    const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)![1];
+    expect(body).toContain('時間表內');
+    expect(body).not.toContain('時間表班次');
+    expect(body.match(/class="departure-type /g)).toHaveLength(1);
+  });
+  it('shows a compact possible-move arrow and keeps long-range timetable estimates separate from provider times', () => {
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { locale: 'zh', operator: 'KMB', departures: [
+      { time: '2026-11-14T13:20:00Z', minutes: 10, remark: 'Scheduled Bus', scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE',
+        departureType: 'CHANGED', changedReason: 'POSSIBLE_SHIFT', timetableTime: '2026-11-14T13:15:00Z', deviationMinutes: 5 },
+      { time: '2026-11-14T14:30:00Z', minutes: 80, scheduleMatch: 'MATCHED', departureType: 'SCHEDULED', timetableEstimate: true },
+    ] }));
+    expect(html).toContain('班次調整?');
+    expect(html).toContain('21:15 → 21:20');
+    expect(html).toContain('+5分 ?');
+    expect(html).toContain('時間表估算');
+    expect(html).toContain('<strong>80</strong>');
+    const changed = html.match(/<tr data-departure-type="CHANGED"[\s\S]*?<\/tr>/)![0];
+    expect(changed.match(/class="departure-type /g)).toHaveLength(1);
+  });
+  it('offers more departures while initially showing three rows', () => {
+    const departures: LiveDeparture[] = Array.from({ length: 13 }, (_, i) => ({
+      time: new Date(Date.parse('2026-11-14T13:00:00Z') + i * 15 * 60000).toISOString(), minutes: i * 15,
+      departureType: 'SCHEDULED', timetableEstimate: true, scheduleMatch: 'MATCHED',
+    }));
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { locale: 'en', operator: 'KMB', departures }));
+    expect(html.match(/<tr /g)).toHaveLength(3);
+    expect(html).toContain('More departures (+10)');
+    expect(html).toContain('aria-expanded="false"');
+  });
+  it('removes stock provider remarks without swallowing useful service messages', () => {
+    expect(arrivalRemark('原定班次 · Scheduled Bus')).toBe('');
+    expect(arrivalRemark('加班車 · Additional Bus')).toBe('');
+    expect(arrivalRemark('Scheduled Bus · 巴士已滿載')).toBe('巴士已滿載');
   });
 });

@@ -18,6 +18,20 @@ describe('journey endpoint matching', () => {
     expect(journeyMatchesEndpoints(route, { lat: 22.53, lng: 114.07 }, destination)).toBe(false);
   });
 
+  it('keeps legitimate border-stop access walks in both directions', () => {
+    const futian = { lat: 22.534, lng: 114.057 };
+    const huanggang = { id: '12743', name: 'Huanggang', lat: 22.5229, lng: 114.06709 };
+    const airportStop = { id: 'airport', name: 'Airport', ...destination };
+    const outbound: Route = { id: 'border-out', legs: [{ mode: 'BUS', operator: 'XB',
+      originStop: huanggang, destinationStop: airportStop }] };
+    const inbound: Route = { id: 'border-in', legs: [{ mode: 'BUS', operator: 'XB',
+      originStop: airportStop, destinationStop: huanggang }] };
+    expect(journeyMatchesEndpoints(outbound, futian, destination)).toBe(true);
+    expect(journeyMatchesEndpoints(inbound, destination, futian)).toBe(true);
+    expect(journeyMatchesEndpoints(outbound, { lat: 22.57, lng: 114.057 }, destination)).toBe(false);
+    expect(journeyMatchesEndpoints(inbound, destination, { lat: 22.57, lng: 114.057 })).toBe(false);
+  });
+
   it('keeps walking-only routes bound to the chosen places', () => {
     const walk: Route = { id: 'walk', legs: [{ mode: 'WALK', operator: 'WALK',
       originStop: { id: 'origin', name: 'Start', ...origin },
