@@ -7,8 +7,11 @@ const assets = join(root, '.free-worker/assets');
 await mkdir(assets, { recursive: true });
 await cp(join(root, 'public'), assets, { recursive: true });
 await cp(join(root, '.next/static'), join(assets, '_next/static'), { recursive: true });
-const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install'];
-for (const page of pages) await copyFile(join(root, '.next/server/app', page + '.html'), join(assets, page + '.html'));
+const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install', 'macau', 'macau/en'];
+for (const page of pages) {
+  await mkdir(dirname(join(assets, page + '.html')), { recursive: true });
+  await copyFile(join(root, '.next/server/app', page + '.html'), join(assets, page + '.html'));
+}
 await copyFile(join(root, '.next/server/app/_not-found.html'), join(assets, '404.html'));
 await mkdir(join(assets, 'api'), { recursive: true });
 await copyFile(join(root, '.next/server/app/api/sources.body'), join(assets, 'api/sources.json'));

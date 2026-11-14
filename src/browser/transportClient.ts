@@ -32,7 +32,7 @@ export async function transportFetch(input: string, init?: RequestInit): Promise
   if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   // Keep the journey calculator warm between completed searches. Abort still
   // terminates it, while a separate catalogue worker stays responsive.
-  const dedicated = url.pathname === '/api/journey';
+  const dedicated = url.pathname === '/api/journey' || url.pathname === '/api/macau' && url.searchParams.get('resource') === 'journey';
   const connection = dedicated ? journey ?? (journey = connect()) : shared ?? (shared = connect());
   const id = ++sequence;
   return new Promise<Response>((resolve, reject) => {

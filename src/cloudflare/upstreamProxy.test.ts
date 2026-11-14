@@ -26,6 +26,13 @@ describe('Free-hosting public provider proxy', () => {
     expect(url.searchParams.get('bounded')).toBe('1'); expect(url.searchParams.get('viewbox')).toBe('113.8,22.6,114.5,22.1');
     expect(providerCacheSeconds(url)).toBe(300);
   });
+  it('bounds explicitly scoped Macau geocoding without widening Hong Kong searches', () => {
+    const url = safeProviderUrl('https://nominatim.openstreetmap.org/search?q=airport&region=macau&viewbox=0,90,180,0')!;
+    expect(url.searchParams.get('viewbox')).toBe('113.51,22.24,113.62,22.09'); expect(url.searchParams.has('region')).toBe(false);
+    expect(safeProviderUrl('https://nominatim.openstreetmap.org/reverse?lat=22.17&lon=113.55&region=macau')).toBeDefined();
+    expect(safeProviderUrl('https://nominatim.openstreetmap.org/reverse?lat=22.3&lon=114.1&region=macau')).toBeUndefined();
+    expect(safeProviderUrl('https://nominatim.openstreetmap.org/search?q=airport&region=elsewhere')).toBeUndefined();
+  });
   it('does not follow upstream redirects or forward user credentials', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response('', { status: 302, headers: { Location: 'https://example.com' } }));
     const response = await proxyProvider(new Request('https://planner.example/api/upstream?url=' + encodeURIComponent('https://data.etabus.gov.hk/v1/transport/kmb/stop/'),

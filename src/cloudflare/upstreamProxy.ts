@@ -13,17 +13,20 @@ export function safeProviderUrl(value: string | null): URL | undefined {
     if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash
       || !paths[url.hostname]?.test(url.pathname)) return;
     if (url.hostname === 'nominatim.openstreetmap.org') {
+      const macau = url.searchParams.get('region') === 'macau';
+      if (url.searchParams.has('region') && !macau) return;
+      url.searchParams.delete('region');
       if (url.pathname === '/reverse') {
         const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
         if (!url.searchParams.get('lat') || !url.searchParams.get('lon') || !Number.isFinite(lat) || !Number.isFinite(lon)
-          || lat < 22.1 || lat > 22.6 || lon < 113.8 || lon > 114.5) return;
+          || (macau ? lat < 22.09 || lat > 22.24 || lon < 113.51 || lon > 113.62 : lat < 22.1 || lat > 22.6 || lon < 113.8 || lon > 114.5)) return;
         url.searchParams.set('format', 'jsonv2'); url.searchParams.set('zoom', '18');
         return url;
       }
       if (!url.searchParams.get('q') || url.searchParams.get('q')!.length > 180) return;
       // Bound by coordinates: some HK records are indexed under China's code,
       // so forcing countrycodes=hk would silently remove valid local places.
-      url.searchParams.delete('countrycodes'); url.searchParams.set('viewbox', '113.8,22.6,114.5,22.1');
+      url.searchParams.delete('countrycodes'); url.searchParams.set('viewbox', macau ? '113.51,22.24,113.62,22.09' : '113.8,22.6,114.5,22.1');
       url.searchParams.set('bounded', '1'); url.searchParams.set('limit', '6');
       url.searchParams.set('format', 'jsonv2');
     }

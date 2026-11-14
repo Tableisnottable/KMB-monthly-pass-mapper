@@ -200,7 +200,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const searchPanel = <section className="planner-toolbar" id="journey" aria-label={copy(locale, '規劃行程', 'Plan a journey')}>
     <div className="planner-toolbar-top"><h1 className="sr-only">{copy(locale, activeCity.nameTc, activeCity.nameEn)}</h1>
       <label className="city-control"><span className="sr-only">{copy(locale, '選擇城市', 'Choose city')}</span>
-        <select defaultValue={activeCity.id} title={copy(locale, '目前提供香港；其他城市將在資料準備後加入。', 'Hong Kong is currently available. More cities can be added when their data is ready.')}>
+        <select defaultValue={activeCity.id} onChange={event => { if (event.target.value === 'macau') window.location.assign(locale === 'en' ? '/macau/en' : '/macau'); }} title={copy(locale, '切換城市；澳門版本為預覽。', 'Switch city; Macao is a preview.')}>
           {supportedCities.map(city => <option key={city.id} value={city.id}>{copy(locale, city.nameTc, city.nameEn)}</option>)}
         </select></label><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} /></div>
     <JourneyPlaceSearch places={places} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}

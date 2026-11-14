@@ -26,6 +26,26 @@ async function request(path, status = 200) {
 }
 try {
   const [ready] = await once(thread, 'message'); assert.equal(ready.ready, true);
+  // Macau is a separate lazy adapter, with no HK fare or timetable assumptions.
+  const macau = await request('/api/macau?resource=routes');
+  assert.equal(macau.data.length, 117); assert.equal(macau.coverage.routes, 90);
+  const macauPlace = await request('/api/macau?resource=places&scope=local&q=Airport&lang=en');
+  assert(macauPlace.data.length > 0); assert(macauPlace.data.every(p => p.lng < 113.62));
+  const moParams = new URLSearchParams({ resource: 'journey', fromLat: '22.183668', fromLon: '113.529413',
+    toLat: '22.159403', toLon: '113.574648', time: '2026-11-14T14:00:00+08:00', lang: 'en' });
+  const moRoutes = await request('/api/macau?' + moParams); assert(moRoutes.data.length > 0);
+  for (const route of moRoutes.data) {
+    assert.equal(route.currency, 'MOP'); assert.equal(route.unverifiedBus, false);
+    assert(route.legs.every(leg => leg.operator === 'MO_LRT' && !leg.realtimeEta));
+  }
+  const moGeometry = await request('/api/macau?resource=geometry&legs=' + encodeURIComponent(JSON.stringify(
+    moRoutes.data[0].legs.map(leg => ({ id: leg.networkPatternId, board: leg.boardingIndex, alight: leg.alightingIndex })))));
+  assert.equal(moGeometry.missing, 0); assert(moGeometry.data.flatMap(p => p.paths.flat()).length > 20);
+  moParams.set('timeMode', 'arrive');
+  const moReverse = await request('/api/macau?' + moParams); assert(moReverse.data.length > 0);
+  assert(moReverse.data.every(route => Date.parse(route.arrivalTime) <= Date.parse(moParams.get('time'))));
+  await request('/api/macau?resource=journey&fromLat=0', 400);
+  console.log('Macau browser bundle passed: separate catalogue, bilingual local places, MOP fares, LRT depart/arrive and real tracks.');
   const catalogue = await request('/api/network?resource=routes&q=104');
   assert(catalogue.data.some(route => route.operator === 'KMB+CTB' && route.number === '104'));
   const operators = await request('/api/network?resource=operators'); assert(operators.data.length >= 17);
