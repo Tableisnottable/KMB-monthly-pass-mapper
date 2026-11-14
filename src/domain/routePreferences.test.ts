@@ -8,9 +8,12 @@ const leg = (number: string, operator?: string) => {
   return { operator: 'KMB', networkPatternId: p.id, boardingIndex: 0, alightingIndex: p.s.length - 1 };
 };
 describe('Company and road preferences', () => {
-  it('uses the corrected Nam Wan road label while retaining its saved corridor ID', () => {
-    expect(corridorChoices.airport.find(([id]) => id === 'airporttunnel')?.slice(1)).toEqual(['南灣', 'Nam Wan']);
+  it('uses corrected tunnel names while retaining saved corridor IDs', () => {
+    expect(corridorChoices.shatin.find(([id]) => id === 'eaglesnest')?.slice(1)).toEqual(['香港尖山隧道', "Eagle's Nest Tunnel"]);
+    expect(corridorChoices.airport.find(([id]) => id === 'airporttunnel')?.slice(1)).toEqual(['南灣隧道', 'Nam Wan Tunnel']);
+    expect(corridorChoices.airport.find(([id]) => id === 'tsingkau')?.slice(1)).toEqual(['汀九橋', 'Ting Kau Bridge']);
     expect(corridorIds).toContain('airporttunnel');
+    expect(corridorIds).toContain('tsingkau');
   });
   it('excludes banned companies and joint services containing a banned company', () => {
     expect(operatorAllowed('KMB', ['KMB'])).toBe(true); expect(operatorAllowed('KMB+CTB', ['KMB'])).toBe(false);
@@ -47,7 +50,7 @@ describe('Company and road preferences', () => {
     expect(legCorridors(leg('680'))).not.toContain('tkolam');
   });
   it('offers unique roads with actual travelled intervals and accepts their settings', () => {
-    expect(corridorIds.length).toBeGreaterThanOrEqual(28);
+    expect(corridorIds.length).toBeGreaterThanOrEqual(38);
     expect(new Set(corridorIds).size).toBe(corridorIds.length);
     for (const id of corridorIds) {
       const sample = intervals.find(row => row[2] === id)!;
@@ -56,6 +59,13 @@ describe('Company and road preferences', () => {
       const preferences = parseRoutePreferences(JSON.stringify({ roads: { [id]: 'ban' } }));
       expect(corridorLegAllowed(pattern, start, start + 1, preferences), id).toBe(false);
       expect(corridorLegAllowed(pattern, start + 1, start + 1, preferences), id).toBe(true);
+    }
+  });
+  it('offers all current strategic route numbers and tags represented road segments', () => {
+    for (let number = 1; number <= 10; number += 1) {
+      const id = `route${number}`;
+      expect(corridorChoices.strategic.some(([corridor]) => corridor === id)).toBe(true);
+      expect(intervals.some(([, , corridor]) => corridor === id), id).toBe(true);
     }
   });
   it('bans only the travelled interval, including backwards-search intervals', () => {

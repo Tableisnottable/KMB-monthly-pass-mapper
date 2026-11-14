@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { decodePolyline, followTrack, sliceAlignment, transitGeometry, routeOnStreets } from './routeGeometry';
+import { decodePolyline, evaluateStreetPath, followTrack, sliceAlignment, transitGeometry, routeOnStreets } from './routeGeometry';
 import { networkPatterns, networkRoutes, networkStopIndex, railFare } from './transportNetwork';
+import { DEFAULT_PREFERENCES } from '../domain/routePreferences';
 import manifest from './alignments/manifest.json';
 afterEach(() => vi.unstubAllGlobals());
 describe('Physical route geometry', () => {
@@ -17,6 +18,16 @@ describe('Physical route geometry', () => {
   it('does not bridge disconnected railway tracks with a straight segment', () => {
     const graph = { points: [[22.3,114.1],[22.301,114.1],[22.32,114.1],[22.321,114.1]] as [number, number][], adjacent: [[[1,.1]],[[0,.1]],[[3,.1]],[[2,.1]]] as [number, number][][] };
     expect(followTrack(graph, [22.3,114.1], [22.321,114.1], .1)).toBeNull();
+  });
+  it('enforces Must and Ban road rules and gives preferred road matches a ranking bonus', () => {
+    const route = [[[22.3, 114.1], [22.3, 114.101]]] as [number, number][][];
+    const otherRoute = [[[22.31, 114.11], [22.31, 114.111]]] as [number, number][][];
+    const geometry = new Map([['cht', route], ['ehc', otherRoute]]);
+    expect(evaluateStreetPath(route, { ...DEFAULT_PREFERENCES, roads: { cht: 'must' } }, geometry).allowed).toBe(true);
+    expect(evaluateStreetPath(otherRoute, { ...DEFAULT_PREFERENCES, roads: { cht: 'must' } }, geometry).allowed).toBe(false);
+    expect(evaluateStreetPath(route, { ...DEFAULT_PREFERENCES, roads: { cht: 'ban' } }, geometry).allowed).toBe(false);
+    expect(evaluateStreetPath(route, { ...DEFAULT_PREFERENCES, roads: { cht: 'prefer' } }, geometry).preferenceCost).toBe(-120);
+    expect(evaluateStreetPath(otherRoute, { ...DEFAULT_PREFERENCES, roads: { cht: 'prefer' } }, geometry).preferenceCost).toBe(0);
   });
   it.each(['td:1671','td:609','td:285'])('uses detailed official road alignments for %s', async id => {
     const i = networkPatterns.findIndex(p => p.id === id), p = networkPatterns[i];

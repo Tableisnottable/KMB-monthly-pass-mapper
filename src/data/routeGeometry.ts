@@ -1,6 +1,8 @@
 import { loadAlignmentData } from './alignmentData';
 import { networkPatterns, networkRoutes, networkStops } from './transportNetwork';
 import { haversineKm } from '../engine/journeyHelpers';
+import corridorSegments from './corridorSegments.json';
+import { corridorChoices, roadLevel, type CorridorGroup, type RoutePreferences } from '../domain/routePreferences';
 
 export type Coordinate = [number, number]; // Leaflet order: latitude, longitude.
 export type StreetProfile = 'foot' | 'bike' | 'car';
@@ -103,14 +105,85 @@ const cache = new Map<string, { value: GeometryResult; expires: number }>();
 const inFlight = new Map<string, Promise<GeometryResult>>();
 let nextPublicRequest = 0;
 const missing = (): GeometryResult => ({ paths: [], source: 'UNAVAILABLE' });
-export async function routeOnStreets(points: Coordinate[], mode: boolean | StreetProfile = false): Promise<GeometryResult> {
+const patternById = new Map(networkPatterns.map(pattern => [pattern.id, pattern]));
+const corridorGeometryCache = new Map<string, Coordinate[][]>();
+const corridorGeometryInflight = new Map<string, Promise<Coordinate[][]>>();
+
+async function corridorGeometry(id: string): Promise<Coordinate[][]> {
+  if (corridorGeometryCache.has(id)) return corridorGeometryCache.get(id)!;
+  if (corridorGeometryInflight.has(id)) return corridorGeometryInflight.get(id)!;
+  const pending = (async () => {
+    await ensureAlignments();
+    const paths: Coordinate[][] = [];
+    const segments = (corridorSegments as [string, number, string][]).filter(([, , corridor]) => corridor === id);
+    for (const [patternId, segment] of segments) {
+      const pattern = patternById.get(patternId);
+      if (!pattern || segment < 0 || segment + 1 >= pattern.s.length) continue;
+      const route = networkRoutes[pattern.r];
+      const stops = pattern.s.map(index => [networkStops[index][3], networkStops[index][4]] as Coordinate);
+      for (const lines of roadRows.get(`${route[0]}:${pattern.d}`) ?? []) for (const line of lines) {
+        const path = sliceAlignment(decodePolyline(line), stops, segment, segment + 1);
+        if (path && path.length > 1) paths.push(path);
+      }
+    }
+    return paths;
+  })().then(paths => { corridorGeometryCache.set(id, paths); return paths; })
+    .finally(() => corridorGeometryInflight.delete(id));
+  corridorGeometryInflight.set(id, pending);
+  return pending;
+}
+
+const corridorCell = (p: Coordinate) => `${Math.floor(p[0] / .0002)}:${Math.floor(p[1] / .0002)}`;
+function pathsOverlap(a: Coordinate[][], b: Coordinate[][]): boolean {
+  const cells = new Map<string, Coordinate[]>();
+  for (const line of b) for (const point of line) {
+    const key = corridorCell(point); cells.set(key, [...(cells.get(key) ?? []), point]);
+  }
+  for (const line of a) for (const point of line) {
+    const latCell = Math.floor(point[0] / .0002), lonCell = Math.floor(point[1] / .0002);
+    for (let lat = latCell - 1; lat <= latCell + 1; lat++) for (let lon = lonCell - 1; lon <= lonCell + 1; lon++) {
+      for (const candidate of cells.get(`${lat}:${lon}`) ?? []) if (distance(point, candidate) <= .025) return true;
+    }
+  }
+  return false;
+}
+
+export function evaluateStreetPath(paths: Coordinate[][], preferences: RoutePreferences, corridorPaths: ReadonlyMap<string, Coordinate[][]>) {
+  const active = Object.values(corridorChoices).flat().map(row => row[0] as string)
+    .filter(id => roadLevel(preferences, id) !== 'normal');
+  const matched = new Set(active.filter(id => {
+    const corridor = corridorPaths.get(id);
+    return corridor?.length ? pathsOverlap(paths, corridor) : false;
+  }));
+  if (active.some(id => roadLevel(preferences, id) === 'ban' && matched.has(id))) return { allowed: false, preferenceCost: 0 };
+  const allowed = (Object.keys(corridorChoices) as CorridorGroup[]).every(group => {
+    const required = corridorChoices[group].map(row => row[0] as string).filter(id => roadLevel(preferences, id) === 'must');
+    return !required.length || required.some(id => matched.has(id));
+  });
+  if (!allowed) return { allowed: false, preferenceCost: 0 };
+  const preferenceCost = (Object.keys(corridorChoices) as CorridorGroup[]).reduce((cost, group) => {
+    const preferred = corridorChoices[group].map(row => row[0] as string).filter(id => roadLevel(preferences, id) === 'prefer');
+    return cost - (preferred.some(id => matched.has(id)) ? 120 : 0);
+  }, 0);
+  return { allowed: true, preferenceCost };
+}
+
+async function evaluateStreetPathWithData(paths: Coordinate[][], preferences: RoutePreferences) {
+  const active = Object.values(corridorChoices).flat().map(row => row[0] as string)
+    .filter(id => roadLevel(preferences, id) !== 'normal');
+  const corridorPaths = new Map<string, Coordinate[][]>();
+  await Promise.all(active.map(async id => corridorPaths.set(id, await corridorGeometry(id))));
+  return evaluateStreetPath(paths, preferences, corridorPaths);
+}
+
+export async function routeOnStreets(points: Coordinate[], mode: boolean | StreetProfile = false, preferences?: RoutePreferences): Promise<GeometryResult> {
   const profile = typeof mode === 'boolean' ? mode ? 'foot' : 'car' : mode;
   const walking = profile === 'foot';
   const source = profile === 'bike' ? 'OSM_BIKE' as const : walking ? 'OSM_FOOT' as const : 'OSM_ROAD' as const;
   if (points.length < 2) return missing();
   // Do not replace nearby, distinct endpoints with a straight-line shortcut.
   if (points.every(p => distance(points[0], p) < .001)) return { paths: [], source, distanceMetres: 0, durationSeconds: 0 };
-  const key = `${profile}:${points.map(p => p.map(v => v.toFixed(5)).join(',')).join(';')}`;
+  const key = `${profile}:${points.map(p => p.map(v => v.toFixed(5)).join(',')).join(';')}:${preferences ? JSON.stringify(preferences) : ''}`;
   const saved = cache.get(key); if (saved && saved.expires > Date.now()) return saved.value;
   if (inFlight.has(key)) return inFlight.get(key)!;
   const promise = (async () => {
@@ -126,19 +199,26 @@ export async function routeOnStreets(points: Coordinate[], mode: boolean | Stree
         // concurrent users in this process. Production can use a private backend.
         const delay = Math.max(0, nextPublicRequest - Date.now()); nextPublicRequest = Date.now() + delay + 1100;
         if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-        const response = await fetch(`${base}/${chunk.map(([lat, lng]) => `${lng},${lat}`).join(';')}?overview=full&geometries=geojson&steps=false`, { signal: AbortSignal.timeout(12000) });
+        const response = await fetch(`${base}/${chunk.map(([lat, lng]) => `${lng},${lat}`).join(';')}?overview=full&geometries=geojson&steps=false${preferences ? '&alternatives=3' : ''}`, { signal: AbortSignal.timeout(12000) });
         if (!response.ok) return missing();
         const data = await response.json() as { code?: string; waypoints?: { distance: number }[]; routes?: { geometry: { coordinates: number[][] }; distance: number; duration?: number }[] };
-        const route = data.routes?.[0];
-        if (data.code !== 'Ok' || !route || data.waypoints?.some(p => !Number.isFinite(p.distance) || p.distance > (walking ? 150 : 100))) return missing();
-        const path = route.geometry.coordinates.map(p => [p[1], p[0]] as Coordinate);
-        if (path.length < 2 || path.some(p => p.some(v => !Number.isFinite(v))) || !Number.isFinite(route.distance) || route.distance < 0
-          || route.distance > Math.max(1200, chunk.reduce((n, p, i) => n + (i ? distance(chunk[i - 1], p) * 1000 : 0), 0) * (walking ? 5 : 8))) return missing();
-        paths.push(path);
-        distanceMetres += route.distance;
+        if (data.code !== 'Ok' || !data.routes?.length || data.waypoints?.some(p => !Number.isFinite(p.distance) || p.distance > (walking ? 150 : 100))) return missing();
+        const maxDistance = Math.max(1200, chunk.reduce((n, p, i) => n + (i ? distance(chunk[i - 1], p) * 1000 : 0), 0) * (walking ? 5 : 8));
+        const candidates = data.routes.map(route => ({ route, path: route.geometry.coordinates.map(p => [p[1], p[0]] as Coordinate) }))
+          .filter(({ route, path }) => path.length >= 2 && !path.some(p => p.some(v => !Number.isFinite(v)))
+            && Number.isFinite(route.distance) && route.distance >= 0 && route.distance <= maxDistance);
+        const valid = preferences ? (await Promise.all(candidates.map(async candidate => {
+          const evaluation = await evaluateStreetPathWithData([candidate.path], preferences);
+          return { ...candidate, ...evaluation, preferenceCost: (candidate.route.duration ?? candidate.route.distance / (walking ? 1.3 : 8)) + evaluation.preferenceCost };
+        }))).filter(candidate => candidate.allowed).sort((a, b) => a.preferenceCost - b.preferenceCost)
+          : candidates;
+        const routeChoice = valid[0];
+        if (!routeChoice) return missing();
+        paths.push(routeChoice.path);
+        distanceMetres += routeChoice.route.distance;
         // Geometry-only responses remain usable, but never invent a duration.
-        durationSeconds = route.duration !== undefined && Number.isFinite(route.duration) && route.duration >= 0
-          ? durationSeconds + route.duration : NaN;
+        durationSeconds = routeChoice.route.duration !== undefined && Number.isFinite(routeChoice.route.duration) && routeChoice.route.duration >= 0
+          ? durationSeconds + routeChoice.route.duration : NaN;
       }
       return { paths, source, distanceMetres, ...(Number.isFinite(durationSeconds) ? { durationSeconds } : {}) };
     } catch { return missing(); }

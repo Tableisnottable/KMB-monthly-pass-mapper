@@ -3,6 +3,7 @@ import { routeOnStreets, type Coordinate, type StreetProfile } from '../../../da
 import { travelOption, type TravelMode } from '../../../domain/travelOptions';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { parseComparisonSelection } from '../../../domain/transportSelection';
+import { parseRoutePreferences } from '../../../domain/routePreferences';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest) {
   let selected;
   try { selected = parseComparisonSelection(request.nextUrl.searchParams.get('modes')); }
   catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
+  let preferences;
+  try { preferences = parseRoutePreferences(request.nextUrl.searchParams.get('preferences')); }
+  catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
   const limiter = await getRateLimiter();
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   if (limiter && !(await limiter.limit({ key: 'travel-options:' + ip })).success) return NextResponse.json({ error: 'Please try again shortly.' }, { status: 429 });
@@ -23,7 +27,7 @@ export async function GET(request: NextRequest) {
   const profiles = new Map<StreetProfile, ReturnType<typeof routeOnStreets>>();
   const data = await Promise.all(modes.filter(([mode]) => selected === undefined || selected.includes(mode))
     .map(async ([mode, profile]) => {
-      if (!profiles.has(profile)) profiles.set(profile, routeOnStreets(points, profile));
+      if (!profiles.has(profile)) profiles.set(profile, routeOnStreets(points, profile, preferences));
       return travelOption(mode, await profiles.get(profile)!);
     }));
   return NextResponse.json({ data, attribution: '© OpenStreetMap contributors; routing by FOSSGIS / OSRM. Estimated travel times, not live traffic.' },

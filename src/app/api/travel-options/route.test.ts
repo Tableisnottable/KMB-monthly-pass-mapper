@@ -38,4 +38,11 @@ describe('Walking, cycling, taxi and driving API', () => {
     expect((await (await GET(new NextRequest(url + 'drive'))).json()).data[0].mode).toBe('drive');
     expect(vi.mocked(routeOnStreets).mock.calls.map(call => call[1])).toEqual(['car']);
   });
+  it('validates and passes road preferences to all routed modes', async () => {
+    const url = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=walk,cycle,taxi,drive&preferences=' + encodeURIComponent(JSON.stringify({ roads: { cht: 'ban' } }));
+    await GET(new NextRequest(url));
+    expect(vi.mocked(routeOnStreets).mock.calls.map(call => call[2]?.roads?.cht)).toEqual(['ban', 'ban', 'ban']);
+    const invalid = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&preferences=' + encodeURIComponent(JSON.stringify({ roads: { unknown: 'ban' } }));
+    expect((await GET(new NextRequest(invalid))).status).toBe(400);
+  });
 });

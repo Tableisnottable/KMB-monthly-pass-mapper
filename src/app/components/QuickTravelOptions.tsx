@@ -10,22 +10,24 @@ import { fareProfileLabel } from './FareProfileControl';
 import type { FareProfile } from '../../domain/journeyFares';
 import { PlannerIcon } from './PlannerIcon';
 import { JourneyEndpoints } from './JourneyEndpoints';
+import type { RoutePreferences } from '../../domain/routePreferences';
 
 export const travelModeLabel = (mode: TravelMode, locale: PlannerLocale) => mode === 'walk' ? copy(locale, '步行', 'Walk')
   : mode === 'cycle' ? copy(locale, '單車', 'Cycle') : mode === 'drive' ? copy(locale, '駕駛', 'Driving') : copy(locale, '的士', 'Taxi');
 const icon = (mode: TravelMode) => mode === 'taxi' || mode === 'drive' ? 'car' : mode;
 
-export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] = ['walk', 'cycle', 'taxi', 'drive']) {
+export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] = ['walk', 'cycle', 'taxi', 'drive'], preferences?: RoutePreferences) {
   const [state, setState] = useState<{ key: string; options: TravelOption[]; loading: boolean }>({ key: '', options: [], loading: false });
-  const key = places.origin && places.destination && modes.length ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') + '|' + modes.join(',') : '';
+  const key = places.origin && places.destination && modes.length ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') + '|' + modes.join(',') + '|' + JSON.stringify(preferences ?? {}) : '';
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     setState({ key, options: [], loading: true });
-    const [coordinates, selectedModes] = key.split('|');
+    const [coordinates, selectedModes, selectedPreferences] = key.split('|');
     const values = coordinates.split(',');
     const params = new URLSearchParams(Object.fromEntries(['fromLat', 'fromLon', 'toLat', 'toLon'].map((name, i) => [name, values[i]])));
     params.set('modes', selectedModes);
+    params.set('preferences', selectedPreferences);
     transportFetch('/api/travel-options?' + params, { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Travel options unavailable');
       const payload = await response.json() as { data: TravelOption[] };

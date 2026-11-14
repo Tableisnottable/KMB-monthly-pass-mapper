@@ -12,7 +12,7 @@ const changeTimeShortcuts = [0, 5, 10, 15, 30, 60];
 const companyOrder = ['KMB', 'LWB', 'CTB', 'MTR', 'LRT', 'LRTFeeder', 'GMB', 'NLB', 'TRAM', 'FERRY', 'PTRAM', 'DB', 'PI', 'XB'];
 const companiesInOrder = [...selectableOperators].sort((a, b) => companyOrder.indexOf(a.id) - companyOrder.indexOf(b.id));
 const groupLabels: Record<CorridorGroup, [string, string]> = {
-  harbour: ['過海', 'Cross-harbour'], shatin: ['往返沙田', 'To/from Sha Tin'], airport: ['往返機場', 'To/from airport'],
+  strategic: ['香港主要幹線', 'Hong Kong strategic routes'], harbour: ['過海', 'Cross-harbour'], shatin: ['往返沙田', 'To/from Sha Tin'], airport: ['往返機場', 'To/from airport'],
   northwest: ['新界西北', 'Northwest New Territories'], tko: ['往返將軍澳', 'To/from Tseung Kwan O'], south: ['港島主要道路', 'Hong Kong Island roads'],
   kowloon: ['九龍主要道路', 'Kowloon roads'], northeast: ['新界東北', 'Northeast New Territories'], saikung: ['西貢及清水灣', 'Sai Kung & Clear Water Bay'], lantau: ['大嶼山', 'Lantau Island'],
 };
@@ -78,6 +78,6 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
       {(Object.keys(corridorChoices) as CorridorGroup[]).map(group => <fieldset className="road-preferences-group" key={group}><legend>{copy(locale, ...groupLabels[group])}</legend>
         {corridorChoices[group].map(([id, zh, en]) => <PreferenceToggle key={id} label={copy(locale, zh, en)} locale={locale} positive="must" value={roadLevel(corridors, id)}
           onChange={level => onCorridors({ ...corridors, roads: { ...corridors.roads, [id]: level } })} />)}</fieldset>)}
-      <p>{copy(locale, '必須道路會篩走未經該路段的公共交通行程；禁止道路會於搜尋時排除該路段。鐵路、渡輪、未辨認道路及獨立步行／單車／的士／駕駛估算不受影響；道路資料未涵蓋全港。', 'Must roads filter out transit journeys that do not use them; Ban excludes the travelled segment during search. Rail, ferries, unclassified roads and separate walk/cycle/taxi/driving estimates are unaffected. Road coverage is incomplete.')}</p></>}
+      <p>{copy(locale, '必須及禁止道路規則會套用於公共交通及步行、單車、的士和駕駛估算；偏好道路會影響可選路徑排序。道路比對依賴已收錄的路線幾何，資料未涵蓋全港，未匹配到的道路不能可靠判斷；單車及步行通行限制亦請以現場標誌為準。', 'Must and Ban apply to public-transport journeys and walk, cycle, taxi and driving estimates; Prefer ranks matching alternatives. Matching depends on mapped corridor geometry and coverage is incomplete, so unmapped roads cannot be checked reliably. Follow access signs for walking and cycling.')}</p></>}
   </section>;
 }

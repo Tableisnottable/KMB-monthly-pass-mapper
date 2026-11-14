@@ -135,7 +135,7 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
   const [sort, setSort] = useState<JourneySort>('recommended');
   const [sortFare, setSortFare] = useState<'adult' | 'selected'>('selected');
   const comparisonModes = comparisonTypes.filter(type => comparisons[type.id]).map(type => type.id);
-  const travel = useTravelOptions(endpoints ?? { origin: null, destination: null }, comparisonModes);
+  const travel = useTravelOptions(endpoints ?? { origin: null, destination: null }, comparisonModes, preferences);
   const [travelMode, setTravelMode] = useState<TravelMode | null>(null);
   const selectedTravel = travel.options.find(option => option.mode === travelMode && option.available);
   const sidebar = useRef<HTMLDivElement>(null);
