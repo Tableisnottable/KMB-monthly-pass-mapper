@@ -4,21 +4,38 @@ export const corridorChoices = {
   harbour: [['cht', '紅磡海底隧道', 'Cross-Harbour Tunnel'], ['ehc', '東區海底隧道', 'Eastern Harbour Crossing'], ['whc', '西區海底隧道', 'Western Harbour Crossing']],
   shatin: [['lion', '獅子山隧道', 'Lion Rock Tunnel'], ['tate', '大老山隧道', "Tate’s Cairn Tunnel"], ['shingmun', '城門隧道', 'Shing Mun Tunnels'], ['tsingsha', '青沙公路', 'Tsing Sha Highway']],
   airport: [['lantau', '青嶼幹線', 'Lantau Link'], ['tmclk', '屯門赤鱲角隧道', 'Tuen Mun–Chek Lap Kok Tunnel']],
+  northwest: [['tailam', '大欖隧道', 'Tai Lam Tunnel'], ['tuenmun', '屯門公路', 'Tuen Mun Road'], ['twisk', '荃錦公路', 'Route Twisk']],
+  tko: [['tko', '將軍澳隧道', 'Tseung Kwan O Tunnel'], ['tkolam', '將軍澳－藍田隧道', 'Tseung Kwan O–Lam Tin Tunnel']],
+  south: [['aberdeen', '香港仔隧道', 'Aberdeen Tunnel'], ['gap', '黃泥涌峽道', 'Wong Nai Chung Gap Road']],
 } as const;
-export type RoutePreferences = { harbour: string; shatin: string; airport: string };
+export type CorridorGroup = keyof typeof corridorChoices;
+export type RoadLevel = 'normal' | 'prefer' | 'ban';
+// Keep the original single-choice fields for saved links and older API clients.
+export type RoutePreferences = { harbour: string; shatin: string; airport: string; roads?: Record<string, RoadLevel> };
 export const DEFAULT_PREFERENCES: RoutePreferences = { harbour: '', shatin: '', airport: '' };
+export const corridorIds = Object.values(corridorChoices).flat().map(row => row[0] as string);
+export function roadLevel(preferences: RoutePreferences, id: string): RoadLevel {
+  return preferences.roads?.[id] ?? ([preferences.harbour, preferences.shatin, preferences.airport].includes(id) ? 'prefer' : 'normal');
+}
+export function preferredRoads(preferences: RoutePreferences) { return corridorIds.filter(id => roadLevel(preferences, id) === 'prefer'); }
 const byPattern = new Map<string, [number, string][]>();
 for (const [pattern, segment, corridor] of intervals as [string, number, string][]) byPattern.set(pattern, [...(byPattern.get(pattern) ?? []), [segment, corridor]]);
 export function legCorridors(leg: Segment): string[] {
   if (!leg.networkPatternId || leg.boardingIndex === undefined || leg.alightingIndex === undefined) return [];
   return Array.from(new Set((byPattern.get(leg.networkPatternId) ?? []).filter(([segment]) => segment >= leg.boardingIndex! && segment < leg.alightingIndex!).map(([, id]) => id)));
 }
+export function corridorLegAllowed(pattern: string, start: number, end: number, preferences: RoutePreferences): boolean {
+  return !(byPattern.get(pattern) ?? []).some(([segment, id]) => segment >= start && segment < end && roadLevel(preferences, id) === 'ban');
+}
+export function routeRoadsAllowed(route: Route, preferences: RoutePreferences): boolean {
+  return routeCorridors(route).every(id => roadLevel(preferences, id) !== 'ban');
+}
 export function routeCorridors(route: Route): string[] { return Array.from(new Set((route.legs ?? route.segments ?? []).flatMap(legCorridors))); }
 export function preferencePenalty(route: Route, preferences: RoutePreferences): number {
   const ids = routeCorridors(route);
-  return (Object.keys(corridorChoices) as (keyof RoutePreferences)[]).reduce((sum, group) => {
-    const choice = preferences[group], family = corridorChoices[group].map(row => row[0] as string);
-    return sum + (choice && ids.some(id => family.includes(id)) && !ids.includes(choice) ? 15 : 0);
+  return (Object.keys(corridorChoices) as CorridorGroup[]).reduce((sum, group) => {
+    const family = corridorChoices[group].map(row => row[0] as string), preferred = family.filter(id => roadLevel(preferences, id) === 'prefer');
+    return sum + (preferred.length && ids.some(id => family.includes(id)) && !preferred.some(id => ids.includes(id)) ? 15 : 0);
   }, 0);
 }
 export function parseRoutePreferences(value: string | null): RoutePreferences {
@@ -27,9 +44,18 @@ export function parseRoutePreferences(value: string | null): RoutePreferences {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid route preferences.');
   const result = { ...DEFAULT_PREFERENCES };
   for (const [key, value] of Object.entries(raw)) {
-    if (!Object.hasOwn(corridorChoices, key) || typeof value !== 'string'
-      || value && !corridorChoices[key as keyof RoutePreferences].some(row => row[0] === value)) throw new Error('Invalid road corridor preference.');
-    result[key as keyof RoutePreferences] = value;
+    if (key === 'roads') {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid road preferences.');
+      result.roads = {};
+      for (const [id, level] of Object.entries(value)) {
+        if (!corridorIds.includes(id) || !['normal', 'prefer', 'ban'].includes(level as string)) throw new Error('Invalid road corridor preference.');
+        result.roads[id] = level as RoadLevel;
+      }
+    } else {
+      if (!['harbour', 'shatin', 'airport'].includes(key) || typeof value !== 'string'
+        || value && !corridorChoices[key as 'harbour'].some(row => row[0] === value)) throw new Error('Invalid road corridor preference.');
+      result[key as 'harbour'] = value;
+    }
   }
   return result;
 }

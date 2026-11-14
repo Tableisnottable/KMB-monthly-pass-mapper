@@ -7,6 +7,15 @@ export const WEIGHT_LIMITS: Record<keyof RouteWeights, [number, number]> = {
   unverified: [0, 30], kmb: [-5, 5], lwb: [-5, 5], mtr: [-5, 5], ctb: [-5, 5],
 };
 export const customWeights = (weights: RouteWeights) => (Object.keys(DEFAULT_WEIGHTS) as (keyof RouteWeights)[]).some(key => weights[key] !== DEFAULT_WEIGHTS[key]);
+/** Independent relative scales; do not round the stored/default coefficients. */
+export function weightPercent(key: keyof RouteWeights, value: number): number {
+  const [min, max] = WEIGHT_LIMITS[key];
+  return Math.max(0, Math.min(100, (value - min) / (max - min) * 100));
+}
+export function weightFromPercent(key: keyof RouteWeights, percent: number): number {
+  const [min, max] = WEIGHT_LIMITS[key];
+  return min + Math.max(0, Math.min(100, percent)) / 100 * (max - min);
+}
 export function parseRouteWeights(raw: string | null): RouteWeights {
   if (!raw) return { ...DEFAULT_WEIGHTS };
   const value: unknown = JSON.parse(raw);

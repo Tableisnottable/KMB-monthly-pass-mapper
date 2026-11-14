@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WEIGHTS, customWeights, parseRouteWeights } from './routeWeights';
+import { DEFAULT_WEIGHTS, WEIGHT_LIMITS, weightPercent, weightFromPercent, customWeights, parseRouteWeights } from './routeWeights';
 import { scoreRoutes, type Route } from './UpgradedScoringEngine';
 
 describe('User importance controls', () => {
+  it('maps 0–100% independently and round-trips every exact default without changing scoring', () => {
+    for (const key of Object.keys(DEFAULT_WEIGHTS) as (keyof typeof DEFAULT_WEIGHTS)[]) {
+      const [min, max] = WEIGHT_LIMITS[key];
+      expect(weightFromPercent(key, 0)).toBe(min); expect(weightFromPercent(key, 100)).toBe(max);
+      expect(weightPercent(key, min)).toBe(0); expect(weightPercent(key, max)).toBe(100);
+      expect(weightFromPercent(key, weightPercent(key, DEFAULT_WEIGHTS[key]))).toBeCloseTo(DEFAULT_WEIGHTS[key], 12);
+    }
+  });
   const routes: Route[] = [{ id: 'fast-costly', legs: [{ operator: 'KMB', mode: 'BUS', fare: 25, journeyTimeMinutes: 10, scheduledWaitMinutes: 0 }] },
     { id: 'slow-cheap', legs: [{ operator: 'KMB', mode: 'BUS', fare: 2, journeyTimeMinutes: 30, scheduledWaitMinutes: 0 }] }];
   it('preserves default scoring exactly and changes rankings when fare importance rises', () => {

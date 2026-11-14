@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     weights = parseRouteWeights(params.get('weights')); preferences = parseRoutePreferences(params.get('preferences')); }
   catch (err) { return NextResponse.json({ error: (err as Error).message }, { status: 400 }); }
   const { mode, date } = selection;
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', false, { operators, weights, minimumChangeMinutes });
+  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', false, { operators, weights, minimumChangeMinutes, preferences });
   const candidates: Route[] = selectJourneyAlternatives(result.routes.filter(route => !requiredOperators?.length
     || requiredOperators.every(id => route.legs.some(leg => (leg.networkOperator ?? leg.operator).split('+').includes(id)))), 64, preferences);
   // A current prediction says nothing about a trip on a selected future date.

@@ -149,17 +149,16 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
     setTravelMode(null);
     setSelectedId(route.id);
   }
-  return <FareProfileContext.Provider value={fareProfile}><div className={'planner-workspace' + (showMap ? ' map-visible' : '')}>
+  return <FareProfileContext.Provider value={fareProfile}><div className="planner-layout">{searchPanel}<div className={'planner-workspace' + (showMap ? ' map-visible' : '')}>
     <div className="planner-sidebar-scroll" ref={sidebar}>
       {showDetails && selectedTravel ? <TravelOptionDetails key={travel.key + selectedTravel.mode} option={selectedTravel} places={mapPlaces} locale={locale} time={time} profile={fareProfile}
-        onBack={() => { setShowDetails(false); setTravelMode(null); }} onMap={() => setShowMap(true)} /> : showDetails && selected ? <section className="trip-panel" id="journey" aria-label={copy(locale, '行程詳情', 'Journey details')}>
+        onBack={() => { setShowDetails(false); setTravelMode(null); }} onMap={() => setShowMap(true)} /> : showDetails && selected ? <section className="trip-panel" id="journey-details" aria-label={copy(locale, '行程詳情', 'Journey details')}>
         <div className="trip-heading"><button type="button" className="all-results-button" onClick={() => { setShowDetails(false); sidebar.current?.scrollTo({ top: 0 }); }}><span>{copy(locale, '所有行程結果', 'All journey results')}</span><PlannerIcon name="chevron" size={14} /></button><JourneyEndpoints places={mapPlaces} originFallback={selected.legs[0]?.originStop?.name} destinationFallback={selected.legs.at(-1)?.destinationStop?.name} /></div>
         <div className="trip-summary"><RouteSymbols route={selected} locale={locale} /><span className="trip-walk"><PlannerIcon name="walk" size={17} />{selected.legs.every(leg => leg.mode === 'WALK') ? journeyMinutes(selected) : selected.walkTransferTimeMinutes} min</span><span className="route-duration">{journeyMinutes(selected)}<small>min</small></span></div>
         <div className="trip-fare-comparison"><FareComparison routes={[selected]} locale={locale} profile={fareProfile} /></div>
         <button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
         <RouteDetails route={selected} locale={locale} weights={weights} />
       </section> : <>
-        {searchPanel}
         <button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
         <section className="results-pane" id="routes" aria-label={copy(locale, '行程選擇', 'Journey options')}>
           {endpoints && <><QuickTravelOptions options={travel.options} loading={travel.loading} locale={locale} onChoose={option => { setTravelMode(option.mode); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }} />
@@ -179,5 +178,5 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
       <JourneyMap route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={onMapPick} locale={locale} />
       <button type="button" className="mobile-close-map" onClick={() => setShowMap(false)}><PlannerIcon name="back" size={17} />{copy(locale, '返回行程', 'Back to journeys')}</button>
     </div>
-  </div></FareProfileContext.Provider>;
+  </div></div></FareProfileContext.Provider>;
 }

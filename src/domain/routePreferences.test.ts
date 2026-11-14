@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PREFERENCES, legCorridors, preferencePenalty, parseRoutePreferences } from './routePreferences';
+import { DEFAULT_PREFERENCES, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, type RoutePreferences } from './routePreferences';
 import { networkPatterns, networkRoutes } from '../data/transportNetwork';
 import { operatorAllowed, parseOperatorSelection } from './operatorSelection';
-const leg = (number: string) => {
-  const p = networkPatterns.find(p => networkRoutes[p.r][2] === number && networkRoutes[p.r][5] === 'BUS')!;
+const leg = (number: string, operator?: string) => {
+  const p = networkPatterns.find(p => networkRoutes[p.r][2] === number && networkRoutes[p.r][5] === 'BUS' && (!operator || networkRoutes[p.r][1] === operator))!;
   return { operator: 'KMB', networkPatternId: p.id, boardingIndex: 0, alightingIndex: p.s.length - 1 };
 };
 describe('Company and road preferences', () => {
@@ -32,5 +32,29 @@ describe('Company and road preferences', () => {
     expect(preferencePenalty({ id: 'b', legs: [leg('961')] }, preference)).toBe(0);
     expect(preferencePenalty({ id: 'c', legs: [{ operator: 'MTR', mode: 'SUBWAY' }] }, preference)).toBe(0);
     expect(() => parseRoutePreferences('{"harbour":"unknown"}')).toThrow();
+  });
+  it.each([['268C', 'tailam'], ['60X', 'tuenmun'], ['51', 'twisk'], ['98D', 'tko'], ['96', 'tkolam'], ['6X', 'aberdeen'], ['63', 'gap']])('recognises expanded road alternatives on %s', (number, id) => {
+    const variants = networkPatterns.filter(p => networkRoutes[p.r][2] === number && networkRoutes[p.r][5] === 'BUS');
+    expect(variants.some(p => legCorridors({ operator: networkRoutes[p.r][1], networkPatternId: p.id, boardingIndex: 0, alightingIndex: p.s.length - 1 }).includes(id))).toBe(true);
+  });
+  it('does not mistake the EHC approaches for the TKO–Lam Tin Tunnel', () => {
+    expect(legCorridors(leg('619'))).not.toContain('tkolam');
+    expect(legCorridors(leg('680'))).not.toContain('tkolam');
+  });
+  it('bans only the travelled interval, including backwards-search intervals', () => {
+    const full = leg('104'), preferences: RoutePreferences = { ...DEFAULT_PREFERENCES, roads: { cht: 'ban' } };
+    expect(corridorLegAllowed(full.networkPatternId, 0, full.alightingIndex, preferences)).toBe(false);
+    expect(corridorLegAllowed(full.networkPatternId, 0, 1, preferences)).toBe(true);
+    expect(corridorLegAllowed(leg('961').networkPatternId, 0, leg('961').alightingIndex, preferences)).toBe(true);
+  });
+  it('accepts multiple preferred roads and lets explicit neutral override a legacy preference', () => {
+    const preferences = parseRoutePreferences('{"harbour":"whc","roads":{"cht":"prefer","whc":"normal","ehc":"prefer"}}');
+    expect(roadLevel(preferences, 'whc')).toBe('normal');
+    expect(preferencePenalty({ id: 'a', legs: [leg('104')] }, preferences)).toBe(0);
+    expect(preferencePenalty({ id: 'b', legs: [leg('619')] }, preferences)).toBe(0);
+    expect(preferencePenalty({ id: 'c', legs: [leg('961')] }, preferences)).toBe(15);
+  });
+  it.each(['{"roads":{"unknown":"ban"}}', '{"roads":{"cht":"must"}}', '{"roads":[]}', '{"roads":null}', '{"__proto__":"cht"}'])('rejects unsafe road states %s', raw => {
+    expect(() => parseRoutePreferences(raw)).toThrow();
   });
 });

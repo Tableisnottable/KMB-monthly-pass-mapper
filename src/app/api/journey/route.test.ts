@@ -5,6 +5,7 @@ import { networkPatterns, networkRoutes, weightingDate } from '../../../data/tra
 import { GET } from './route';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { DEFAULT_WEIGHTS } from '../../../engine/routeWeights';
+import { routeCorridors } from '../../../domain/routePreferences';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
 vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
@@ -112,4 +113,11 @@ describe('Multimodal journey API', () => {
       expect(response.status).toBe(400);
     }
   });
+  it.each(['depart', 'arrive'])('excludes banned road intervals during %s graph search while retaining alternatives', async mode => {
+    const { data } = await journey(cheungShaWan, airport, { timeMode: mode, time: '2026-11-14T14:00:00+08:00', preferences: '{"roads":{"lantau":"ban"}}' });
+    const transit = data.filter((route: { legs: { mode: string }[] }) => route.legs.some(leg => leg.mode !== 'WALK'));
+    expect(transit.length).toBeGreaterThan(0);
+    for (const route of transit) expect(routeCorridors(route)).not.toContain('lantau');
+    expect(transit.some((route: Parameters<typeof routeCorridors>[0]) => routeCorridors(route).includes('tmclk'))).toBe(true);
+  }, 30000);
 });

@@ -19,7 +19,8 @@
     "data:transport": "python scripts/import-transport.py",
     "data:residents": "python scripts/import-residents.py",
     "data:student-fares": "python scripts/import-student-fares.py",
-    "data:corridors": "python scripts/import-corridors.py"
+    "data:corridors": "python scripts/import-corridors.py",
+    "data:schools": "python scripts/import-school-places.py"
   },
   "keywords": [],
   "author": "",

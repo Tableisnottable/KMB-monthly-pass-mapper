@@ -8,14 +8,13 @@ import type { PlaceResult } from './PlaceAutocomplete';
 import { JourneyPlaceSearch } from './JourneyPlaceSearch';
 import { PlannerBoard } from './PlannerBoard';
 import { PlannerIcon } from './PlannerIcon';
-import { HongKongArtwork } from './HongKongArtwork';
 import { LiveTransitSearch } from './LiveTransitSearch';
 import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { type JourneyTimeSelection } from '../../engine/journeyTime';
 import { FareProfileControl } from './FareProfileControl';
 import type { FareProfile } from '../../domain/journeyFares';
-import { JourneyPreferences, defaultCompanies } from './JourneyPreferences';
-import { DEFAULT_PREFERENCES, type RoutePreferences } from '../../domain/routePreferences';
+import { JourneyPreferences, defaultCompanies, type SettingsSection, type CompanyPreferences } from './JourneyPreferences';
+import { DEFAULT_PREFERENCES, corridorIds, roadLevel, type RoutePreferences } from '../../domain/routePreferences';
 import { DEFAULT_WEIGHTS, customWeights, type RouteWeights } from '../../engine/routeWeights';
 import { RouteWeightSettings } from './RouteWeightSettings';
 
@@ -28,6 +27,7 @@ interface JourneyMeta {
   originUncovered?: boolean;
   destinationUncovered?: boolean;
 }
+type PlannerSettings = { companies: CompanyPreferences; preferences: RoutePreferences; changeMinutes: number; weights: RouteWeights };
 
 export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes: ScoredRoute[]; locale?: PlannerLocale }) {
   const [routes, setRoutes] = useState(initialRoutes);
@@ -43,24 +43,39 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [weights, setWeights] = useState<RouteWeights>({ ...DEFAULT_WEIGHTS });
   const [arrivalsOpen, setArrivalsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
+  const [draft, setDraft] = useState<PlannerSettings>(() => ({ companies: defaultCompanies(), preferences: { ...DEFAULT_PREFERENCES }, changeMinutes: 3, weights: { ...DEFAULT_WEIGHTS } }));
   const [places, setPlaces] = useState<JourneyLocations>({ origin: null, destination: null });
   const [activeField, setActiveField] = useState<JourneyField>('origin');
   const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult } | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   const arrivalsDialog = useRef<HTMLDialogElement>(null);
   const menuDialog = useRef<HTMLDialogElement>(null);
+  const settingsDialog = useRef<HTMLDialogElement>(null);
   const labelLookups = useRef(new Map<string, AbortController>());
   useEffect(() => () => activeSearch.current?.abort(), []);
   useEffect(() => () => { for (const controller of Array.from(labelLookups.current.values())) controller.abort(); }, []);
   useEffect(() => { if (menuOpen) menuDialog.current?.showModal(); else menuDialog.current?.close(); }, [menuOpen]);
   useEffect(() => { if (arrivalsOpen) arrivalsDialog.current?.showModal(); else arrivalsDialog.current?.close(); }, [arrivalsOpen]);
+  useEffect(() => { if (settingsSection) { if (!settingsDialog.current?.open) settingsDialog.current?.showModal(); } else settingsDialog.current?.close(); }, [settingsSection]);
+
+  function openSettings(section: SettingsSection) {
+    setDraft({ companies: { ...companies }, preferences: { ...preferences }, changeMinutes, weights: { ...weights } });
+    setSettingsSection(section);
+  }
+  function defaultSettings() { return { companies: defaultCompanies(), preferences: { ...DEFAULT_PREFERENCES }, changeMinutes: 3, weights: { ...DEFAULT_WEIGHTS } }; }
+  function applySettings(value: typeof draft) {
+    const changed = JSON.stringify(value) !== JSON.stringify({ companies, preferences, changeMinutes, weights });
+    setCompanies(value.companies); setPreferences(value.preferences); setChangeMinutes(value.changeMinutes); setWeights(value.weights); setSettingsSection(null);
+    if (changed) { resetJourney(); if (places.origin && places.destination) void handleSearch(places.origin, places.destination, value); }
+  }
 
   function resetJourney() {
     activeSearch.current?.abort(); activeSearch.current = null;
     setSearching(false); setRoutes([]); setMeta(null); setSearched(false); setError(null); setEndpoints(null);
   }
 
-  async function handleSearch(origin: PlaceResult, destination: PlaceResult, appliedWeights = weights) {
+  async function handleSearch(origin: PlaceResult, destination: PlaceResult, applied = { companies, preferences, changeMinutes, weights }) {
     activeSearch.current?.abort();
     const controller = new AbortController();
     activeSearch.current = controller;
@@ -70,9 +85,9 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     try {
       const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng), lang: locale });
       params.set('timeMode', time.mode);
-      params.set('operators', Object.entries(companies).filter(([, level]) => level !== 'ban').map(([id]) => id).join(','));
-      params.set('requiredOperators', Object.entries(companies).filter(([, level]) => level === 'must').map(([id]) => id).join(','));
-      params.set('weights', JSON.stringify(appliedWeights)); params.set('preferences', JSON.stringify(preferences)); params.set('changeMinutes', String(changeMinutes));
+      params.set('operators', Object.entries(applied.companies).filter(([, level]) => level !== 'ban').map(([id]) => id).join(','));
+      params.set('requiredOperators', Object.entries(applied.companies).filter(([, level]) => level === 'must').map(([id]) => id).join(','));
+      params.set('weights', JSON.stringify(applied.weights)); params.set('preferences', JSON.stringify(applied.preferences)); params.set('changeMinutes', String(applied.changeMinutes));
       if (time.mode !== 'now') params.set('time', time.value + ':00+08:00');
       const response = await fetch('/api/journey?' + params, { cache: 'no-store', signal: controller.signal });
       const payload = await response.json() as { data?: ScoredRoute[]; meta?: JourneyMeta; error?: string };
@@ -140,19 +155,26 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的公共交通路線', 'No supported transit journey found')
     : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
 
-  const searchPanel = <aside className="planner-sidebar" id="journey">
-    <div className="city-banner"><HongKongArtwork /><div><h1>Hong Kong</h1><button type="button" className="city-switch" disabled title={copy(locale, '目前提供香港路線規劃', 'Journey planning currently covers Hong Kong')}>{copy(locale, '切換城市', 'Switch City')}</button></div></div>
-    <FareProfileControl value={fareProfile} onChange={setFareProfile} locale={locale} />
+  const filterSections: [SettingsSection, string, string, number | string][] = [
+    ['companies', '交通公司', 'Companies', Object.values(companies).filter(level => level !== 'normal').length],
+    ['roads', '道路', 'Roads', corridorIds.filter(id => roadLevel(preferences, id) !== 'normal').length],
+    ['changes', '轉乘時間', 'Change time', changeMinutes === 3 ? 0 : changeMinutes + copy(locale, '分', ' min')],
+    ['importance', '重要性', 'Importance', customWeights(weights) ? copy(locale, '自訂', 'Custom') : 0],
+  ];
+  const settingsChanged = filterSections.some(([, , , count]) => Boolean(count));
+  const searchPanel = <section className="planner-toolbar" id="journey" aria-label={copy(locale, '規劃行程', 'Plan a journey')}>
+    <div className="planner-toolbar-top"><h1>{copy(locale, '香港', 'Hong Kong')}</h1><FareProfileControl value={fareProfile} onChange={setFareProfile} locale={locale} /></div>
     <JourneyPlaceSearch places={places} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}
       onSwap={swap} onSearch={() => { if (places.origin && places.destination) void handleSearch(places.origin, places.destination); }}
       searching={searching} locale={locale} time={time} onTimeChange={value => { resetJourney(); setTime(value); }} />
-    <JourneyPreferences companies={companies} onCompanies={value => { resetJourney(); setCompanies(value); }}
-      corridors={preferences} onCorridors={value => { resetJourney(); setPreferences(value); }} changeMinutes={changeMinutes}
-      onChangeMinutes={value => { resetJourney(); setChangeMinutes(value); }} locale={locale} />
-    {customWeights(weights) && <p className="planner-notice notice-warning">{copy(locale, '自訂重要性正在影響推薦排序。可在選單還原預設。', 'Custom importance is affecting recommendations. Reset it in the menu if needed.')}</p>}
+    <div className="planner-filter-bar" role="group" aria-label={copy(locale, '行程篩選器', 'Journey filters')}>
+      {filterSections.map(([id, zh, en, count]) => <button type="button" key={id} className={count ? 'filter-chip is-active' : 'filter-chip'}
+        aria-haspopup="dialog" onClick={() => openSettings(id)}>{copy(locale, zh, en)}{Boolean(count) && <small>{count}</small>}<PlannerIcon name="chevron" size={12} /></button>)}
+      <button type="button" className="filter-reset" disabled={!settingsChanged} onClick={() => applySettings(defaultSettings())}>{copy(locale, '重設', 'Reset')}</button>
+    </div>
     {error && <p className="planner-notice notice-error" role="alert">{error}</p>}
     {notice && <p className="planner-notice notice-warning" role="status">{notice}</p>}
-  </aside>;
+  </section>;
 
   return <main className="compass-app" lang={locale === 'en' ? 'en' : 'zh-HK'}>
     <a className="planner-skip-link" href="#journey">{copy(locale, '跳至行程規劃', 'Skip to journey planner')}</a>
@@ -172,10 +194,16 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     <dialog className="menu-dialog" ref={menuDialog} onCancel={() => setMenuOpen(false)} onClose={() => setMenuOpen(false)}>
       <div className="dialog-heading"><strong>Transit Compass HK</strong><button type="button" onClick={() => setMenuOpen(false)} aria-label={copy(locale, '關閉選單', 'Close menu')}><PlannerIcon name="close" size={22} /></button></div>
       <nav aria-label={copy(locale, '更多選項', 'More options')}><a href={locale === 'en' ? '/en' : '/'}>{copy(locale, '規劃行程', 'Get Me Somewhere')}</a><button type="button" onClick={() => { setMenuOpen(false); setArrivalsOpen(true); }}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href={'/timetables?lang=' + locale}>{copy(locale, '營辦商及班次時間表', 'Companies & timetables')}</a><a href="/traffic">{copy(locale, '道路交通消息', 'Road traffic')}</a><a href="/updates">{copy(locale, '巴士服務消息', 'Bus service updates')}</a><a href={'/install?lang=' + locale}>{copy(locale, '安裝 App', 'Install app')}</a><a href={locale === 'en' ? '/' : '/en'}>{locale === 'en' ? '繁體中文' : 'English'}</a></nav>
-      <details className="weight-method"><summary>{copy(locale, '路線權重', 'Route weighting')}<PlannerIcon name="chevron" size={14} /></summary>
-        <RouteWeightSettings value={weights} locale={locale} onApply={value => { setWeights(value); setMenuOpen(false); resetJourney(); if (places.origin && places.destination) void handleSearch(places.origin, places.destination, value); }} />
-      </details>
       <div className="menu-footnote"><a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a><p><a href="/api/sources">{copy(locale, '資料來源及鳴謝', 'Data sources & attribution')}</a></p><p>{copy(locale, '獨立交通規劃原型。鐵路、巴士、小巴、電車、渡輪及步行。車程及票價為估算。', 'Independent transit prototype. Rail, buses, minibuses, trams, ferries and walking. Times and fares are estimates.')}</p></div>
+    </dialog>
+    <dialog className="settings-dialog" ref={settingsDialog} aria-labelledby="journey-settings-title" onCancel={() => setSettingsSection(null)} onClose={() => setSettingsSection(null)}>
+      <div className="dialog-heading"><h2 id="journey-settings-title">{copy(locale, '行程設定', 'Journey settings')}</h2><button type="button" onClick={() => setSettingsSection(null)} aria-label={copy(locale, '取消並關閉設定', 'Cancel and close settings')}><PlannerIcon name="close" size={22} /></button></div>
+      <nav className="settings-sections" aria-label={copy(locale, '設定類別', 'Settings sections')}>{filterSections.map(([id, zh, en]) => <button type="button" key={id} aria-pressed={settingsSection === id} onClick={() => { setSettingsSection(id); settingsDialog.current?.querySelector('.settings-content')?.scrollTo({ top: 0 }); }}>{copy(locale, zh, en)}</button>)}</nav>
+      <div className="settings-content">{settingsSection === 'importance' ? <RouteWeightSettings value={draft.weights} onChange={value => setDraft({ ...draft, weights: value })} locale={locale} />
+        : settingsSection && <JourneyPreferences section={settingsSection} companies={draft.companies} onCompanies={value => setDraft({ ...draft, companies: value })}
+          corridors={draft.preferences} onCorridors={value => setDraft({ ...draft, preferences: value })} changeMinutes={draft.changeMinutes} onChangeMinutes={value => setDraft({ ...draft, changeMinutes: value })} locale={locale} />}</div>
+      <footer className="settings-footer"><button type="button" className="settings-reset" onClick={() => setDraft(defaultSettings())}>{copy(locale, '重設所有設定', 'Reset all settings')}</button>
+        <button type="button" className="settings-apply" onClick={() => applySettings(draft)}>{places.origin && places.destination ? copy(locale, '套用並搜尋', 'Apply & search') : copy(locale, '套用設定', 'Apply settings')}</button></footer>
     </dialog>
     <dialog className="arrivals-dialog" ref={arrivalsDialog} onCancel={() => setArrivalsOpen(false)} onClose={() => setArrivalsOpen(false)}>
       <div className="dialog-heading"><h2>{copy(locale, '查詢車站到站時間', 'Station arrivals')}</h2><button type="button" onClick={() => setArrivalsOpen(false)} aria-label={copy(locale, '關閉到站時間', 'Close arrivals')}><PlannerIcon name="close" size={22} /></button></div><LiveTransitSearch locale={locale} />

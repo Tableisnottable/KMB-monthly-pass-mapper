@@ -7,8 +7,8 @@ import { hongKongClock, isServiceActive, networkPatterns, networkRoutes, network
 type Point = { lat: number; lng: number };
 import { DEFAULT_WEIGHTS, type RouteWeights } from './routeWeights';
 import { operatorAllowed } from '../domain/operatorSelection';
-import { DEFAULT_PREFERENCES, preferencePenalty, routeCorridors, type RoutePreferences } from '../domain/routePreferences';
-export interface JourneySearchOptions { operators?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number }
+import { DEFAULT_PREFERENCES, preferencePenalty, preferredRoads, routeCorridors, corridorLegAllowed, routeRoadsAllowed, type RoutePreferences } from '../domain/routePreferences';
+export interface JourneySearchOptions { operators?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences }
 type Label = { stop: number; elapsed: number; cost: number; legs: Segment[]; walk: number; pendingWalk: number; originWalk: number; used: number[]; readyDelay: number };
 type Window = { start: number; end: number; headway: number; duration: number };
 const WALK_SPEED = 5 / 60, MAX_ROUNDS = 4, MAX_WAIT = 90, MAX_JOURNEY = 240;
@@ -139,6 +139,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
         if ((reverse ? pattern.p : pattern.a)[position] === 0) for (const boarding of boardings) {
           const { label, wait, duration, interval } = boarding;
           const start = reverse ? position : boarding.position, end = reverse ? boarding.position : position;
+          if (options.preferences && !corridorLegAllowed(pattern.id, start, end, options.preferences)) continue;
           const scale = pattern.t[pattern.t.length - 1] > 0 ? duration / pattern.t[pattern.t.length - 1] : 1;
           const ride = Math.max(1, Math.round((pattern.t[end] - pattern.t[start]) * scale)), elapsed = label.elapsed + wait + ride;
           if (elapsed > MAX_JOURNEY) continue;
@@ -233,7 +234,7 @@ export function dedupeJourneys(routes: ScoredRoute[]): ScoredRoute[] {
 export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40, preferences: RoutePreferences = DEFAULT_PREFERENCES) {
   if (limit <= 0) return [];
   const rank = (route: ScoredRoute) => route.finalScore + preferencePenalty(route, preferences);
-  const ranked = dedupeJourneys(routes).sort((a, b) => rank(a) - rank(b));
+  const ranked = dedupeJourneys(routes).filter(route => routeRoadsAllowed(route, preferences)).sort((a, b) => rank(a) - rank(b));
   const durations = new Map(ranked.map(r => [r, r.legs.reduce((sum, l) => sum + (l.journeyTimeMinutes ?? 0) + (l.scheduledWaitMinutes ?? 0), r.walkTransferTimeMinutes)]));
   const duration = (r: ScoredRoute) => durations.get(r)!;
   const family = (leg: Segment) => leg.networkPattern === undefined || leg.mode !== 'MINIBUS'
@@ -254,7 +255,7 @@ export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40, pre
       if (!chosen.has(r)) { chosen.add(r); added++; }
     }
   };
-  const preferred = Object.values(preferences).filter(Boolean);
+  const preferred = preferredRoads(preferences);
   if (preferred.length) add(ranked.filter(route => routeCorridors(route).some(id => preferred.includes(id))), Math.min(6, limit));
   add(direct, Math.min(8, Math.max(1, Math.floor(limit / 3))));
   // Choose a useful cheaper feeder for each onward service instead of filling

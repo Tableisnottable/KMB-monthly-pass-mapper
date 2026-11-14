@@ -28,6 +28,9 @@ try {
   const catalogue = await request('/api/network?resource=routes&q=104');
   assert(catalogue.data.some(route => route.operator === 'KMB+CTB' && route.number === '104'));
   const operators = await request('/api/network?resource=operators'); assert(operators.data.length >= 17);
+  const school = await request('/api/places?q=CSWCSS');
+  assert(school.data[0].name.includes('CHEUNG SHA WAN CATHOLIC SECONDARY SCHOOL'));
+  assert.equal(school.data[0].type, 'school');
   // These handlers must exist in the production browser bundle, not just Next.
   await request('/api/place-label?lat=nope', 400);
   await request('/api/travel-options?fromLat=nope', 400);

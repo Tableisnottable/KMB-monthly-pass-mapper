@@ -1,0 +1,26 @@
+{
+  "provider": "Education Bureau",
+  "source": "https://www.edb.gov.hk/attachment/en/student-parents/sch-info/sch-search/sch-location-info/SCH_LOC_EDB.csv",
+  "catalogue": "https://data.gov.hk/en-data/dataset/hk-edb-schinfo-school-location-and-information",
+  "importedOn": "2026-11-14",
+  "sourceRows": 3496,
+  "places": 3022,
+  "rejectedRows": 28,
+  "duplicateSessionsCombined": 446,
+  "fields": [
+    "schoolNumber",
+    "nameTc",
+    "nameEn",
+    "addressTc",
+    "addressEn",
+    "lat",
+    "lng"
+  ],
+  "files": [
+    "schools-0.json",
+    "schools-1.json",
+    "schools-2.json",
+    "schools-3.json"
+  ],
+  "note": "Published school location points, not verified entrances. Initials are search aliases, not official school names; ambiguous matches remain separate."
+}

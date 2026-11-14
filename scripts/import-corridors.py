@@ -11,6 +11,15 @@ GATES = [
     ('lion', 22.3515, 114.1785, .25), ('tate', 22.36114, 114.21122, .20),
     ('shingmun', 22.37618, 114.14759, .20), ('tsingsha', 22.3570, 114.1640, .35),
     ('lantau', 22.3510, 114.0780, .35), ('tmclk', 22.35540, 113.95406, .20),
+    # OSM named road-way points, checked against the imported TD alignments.
+    # Tai Lam motorway 157935798 (not the similarly named non-road tunnel);
+    # Tuen Mun Rd 158584361; Route Twisk 300687180;
+    # TKO 28109408; TKO-Lam Tin 1121976751 (inside tunnel, not EHC ramp); Aberdeen 155997128;
+    # Wong Nai Chung Gap Rd 1061013212. OSM contributors, ODbL 1.0.
+    ('tailam', 22.3912052, 114.0616553, .18), ('tuenmun', 22.3656734, 114.0476138, .10),
+    ('twisk', 22.4041156, 114.1037819, .08), ('tko', 22.3194734, 114.2462032, .12),
+    ('tkolam', 22.3026283, 114.2442178, .15), ('aberdeen', 22.2618034, 114.1804956, .12),
+    ('gap', 22.2572219, 114.1924079, .06),
 ]
 
 
@@ -88,7 +97,7 @@ def main():
     output = ROOT / 'src/data/corridorSegments.json'
     output.write_text(json.dumps(sorted(rows), separators=(',', ':')) + '\n', encoding='utf8')
     print(f'Tagged {len(rows)} travelled corridor intervals ({output.stat().st_size} bytes).')
-    for number in ['104', '619', '961', 'A31', 'A33X', '286X', '170', '49X', '680']:
+    for number in ['104', '619', '961', 'A31', 'A33X', '286X', '170', '49X', '680', '268C', '60X', '51', '98D', '96', '6', '6X']:
         ids = {p['id'] for p in patterns if routes[p['r']][2] == number}
         print(number, sorted({key for pid, _, key in rows if pid in ids}))
 

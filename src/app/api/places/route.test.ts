@@ -10,6 +10,21 @@ async function search(query: string) {
 }
 
 describe('Transit place suggestions', () => {
+  it('finds CSWCSS without depending on the upstream geocoder', async () => {
+    const fetch = vi.fn(async () => { throw new Error('offline'); }); vi.stubGlobal('fetch', fetch);
+    const response = await search('CSWCSS');
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data[0].name).toContain('長沙灣天主教英文中學');
+    expect(data[0].lat).toBeCloseTo(22.33857, 5);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('keeps partial school matches when the upstream fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
+    const response = await search('catholic cheung sha wan');
+    expect(response.status).toBe(200);
+    expect((await response.json()).data[0].name).toContain('長沙灣天主教');
+  });
   it.each(['Hong Kong International Airport', '香港國際機場', 'HKG'])(
     'offers the ground transport centre before the airport centroid for %s', async query => {
       vi.stubGlobal('fetch', vi.fn(async () => Response.json([{

@@ -2,6 +2,7 @@ import { DocumentLink as Link } from '../components/DocumentLink';
 import coverage from '../../data/transport/manifest.json';
 import alignments from '../../data/alignments/manifest.json';
 import { operatorInfo } from '../../data/transportOperators';
+import schoolPlaces from '../../data/places/schools-manifest.json';
 
 const names: Record<string, string> = {
   KMB: '九巴 KMB', CTB: '城巴 Citybus', LWB: '龍運 Long Win', 'KMB+CTB': '九巴／城巴聯營 Joint KMB/Citybus',
@@ -36,12 +37,15 @@ export default function CoveragePage() {
           <li>另提供路網步行、單車及的士時間估算；的士車費按咪錶，未提供數字估價或即時交通預測。Separate street-network walking, cycling and taxi time estimates are available. Taxi fares are metered; numeric taxi fares and live traffic predictions are not supplied.</li>
           <li>學生比較採用已匯入港鐵、輕鐵及港鐵巴士學生票價；未核實的學生優惠採成人價並標示。Student comparisons use imported MTR, Light Rail and MTR Bus tariffs; adult-fare fallbacks for unverified student discounts are labelled.</li>
           <li>紅色小巴、昂坪360及未有納入固定路線資料的私人服務暫不支援。Red minibuses, Ngong Ping 360 and private services absent from the imported fixed-route feeds are not included.</li>
+          <li>學校搜尋包含 {schoolPlaces.places.toLocaleString()} 個教育局公布校址，支援中英文及英文名稱首字母（例如 CSWCSS）。首字母只供搜尋，可能有多個同名結果；位置並非已核實入口。School search includes published EDB premises, bilingual names and name initials. Ambiguous matches remain separate; points are not verified entrances.</li>
+          <li>道路設定只套用於已辨認的公共交通路段，涵蓋過海、沙田、機場、新界西北、將軍澳及港島南的指定走廊。未辨認道路及獨立步行／單車／的士估算不受影響。Road controls cover identified transit segments in six corridor groups, not every road. Unclassified paths and separate walking/cycling/taxi estimates are unaffected.</li>
       </ul>
       <h2 className="mt-6 text-xl font-bold">官方來源 Official sources</h2>
       <ul className="mt-3 space-y-2 text-sm">{Object.entries(coverage.sources).map(([name, url]) => <li key={name}><a className="text-cm-greenDark underline" href={url}>{name}</a></li>)}
         <li><a className="text-cm-greenDark underline" href="https://portal.csdi.gov.hk/csdi-webpage/apidoc/LocationSearchAPI">地政總署 Lands Department station coordinates</a></li>
         <li><a className="text-cm-greenDark underline" href="https://portal.csdi.gov.hk/geoportal/?datasetId=td_rcd_1638844988873_41214">運輸署／CSDI 巴士道路線形 TD / CSDI alignments</a></li>
         <li><a className="text-cm-greenDark underline" href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors · ODbL 1.0</a></li>
+        <li><a className="text-cm-greenDark underline" href={schoolPlaces.catalogue}>教育局學校位置及資料 Education Bureau school locations · {schoolPlaces.importedOn}</a></li>
         <li><Link className="text-cm-greenDark underline" href="/api/sources">完整來源及鳴謝 Full source catalogue</Link></li>
       </ul>
     </section>

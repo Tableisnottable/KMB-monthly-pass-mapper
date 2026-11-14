@@ -403,7 +403,6 @@ button {
 .field-clear { top: 4px; right: 3px; width: 44px; height: 44px; }
 .search-fields { padding-right: 0; }
 .swap-button { position: static; width: auto; align-self: flex-end; height: 38px; min-width: 70px; margin-top: 0; border-radius: 5px; background: #edf4e9; color: #277f22; }
-.swap-button::after { content: '⇅'; margin-left: 4px; }
 .swap-button:hover { background: #dfeeda; }
 .search-place-actions { display: flex; margin-top: 6px; }
 .use-location-button { display: flex; align-items: center; gap: 7px; min-height: 44px; font-size: 13px; color: #277f22; text-align: left; }
@@ -451,3 +450,110 @@ button {
 .endpoint-coordinate { font-size: 10px; color: #647165; }
 .selected-place-description { display: block; color: #687263; font-size: 11px; line-height: 1.5; padding: 5px 6px 2px; white-space: normal; overflow-wrap: anywhere; }
 .selected-place-description .endpoint-coordinate { display: block; }
+/* Compact journey bar: endpoints first, optional filters below. */
+.planner-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.planner-toolbar { position: relative; z-index: 1190; flex: 0 0 auto; padding: 12px 20px 0; background: #fff; border-bottom: 1px solid #dbe1db; box-shadow: 0 3px 10px #1723190a; }
+.planner-toolbar-top { display: flex; gap: 20px; align-items: center; margin-bottom: 10px; }
+.planner-toolbar-top h1 { margin: 0; font-size: 14px; font-weight: 800; color: #3d5144; }
+.planner-toolbar .fare-profile-control { margin: 0; padding: 0; background: transparent; border: 0; }
+.planner-toolbar .fare-profile-control > div { display: flex; gap: 4px; }
+.planner-toolbar .fare-profile-control button { min-height: 32px; padding: 4px 12px; border-radius: 5px; border-color: transparent; color: #526157; }
+.planner-toolbar .fare-profile-control button[aria-pressed=true] { color: #216c2a; background: #e9f5e8; border-color: #cce3c8; }
+.planner-toolbar .journey-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; margin: 0; padding: 0; border: 0; background: transparent; }
+.planner-toolbar .search-fields { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 7px; align-items: center; }
+.planner-toolbar .place-input { height: 52px; border-radius: 6px; border-color: #c4cec6; background: #fafcf9; }
+.planner-toolbar .place-input:focus-within { border-color: #298333; outline: 2px solid #29833320; }
+.planner-toolbar .field-label { font-size: 13px; width: auto; padding: 0 8px 0 12px; color: #69796e; font-weight: 600; }
+.planner-toolbar .place-input input { padding-left: 3px; font-size: 16px; }
+.planner-toolbar .field-clear { top: 16px; }
+.planner-toolbar .swap-button { position: static; width: 36px; height: 44px; border-radius: 5px; border: 1px solid #d3dbd2; background: #fff; color: #5b7061; }
+.planner-toolbar .swap-button svg { transform: rotate(90deg); }
+.planner-toolbar .swap-button:hover { background: #edf4eb; }
+.journey-time-controls { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.journey-time-controls select, .journey-time-controls input { min-height: 52px; border: 1px solid #c4cec6; border-radius: 6px; padding: 8px 10px; background: #fafcf9; color: #3d5144; font: inherit; font-size: 14px; min-width: 0; }
+.journey-time-controls input { width: 225px; }
+.journey-time-controls .time-apply { height: 52px; min-width: 60px; border-radius: 6px; background: #287e2d; }
+.planner-toolbar .search-place-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin: 5px 0 0; gap: 12px; font-size: 11px; color: #768279; }
+.planner-toolbar .use-location-button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 0; min-height: 28px; color: #46624b; font-size: 12px; }
+.planner-filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 7px 0 12px; }
+.filter-chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 6px 13px; border: 1px solid #ced7ce; border-radius: 6px; background: #fff; color: #4b5d50; font-size: 13px; }
+.filter-chip svg { transform: rotate(90deg); }
+.filter-chip:hover { background: #f0f6ee; }
+.filter-chip.is-active { border-color: #61a260; background: #edf7eb; color: #216b29; }
+.filter-chip small { background: #287e2d; color: #fff; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.filter-reset { min-height: 36px; padding: 4px 8px; font-size: 12px; color: #4c6451; text-decoration: underline; }
+.filter-reset:disabled { opacity: .4; }
+.planner-layout > .planner-workspace { flex: 1; min-height: 0; }
+.planner-sidebar-scroll { padding-top: 8px; }
+.planner-toolbar .planner-notice { margin: 0 0 10px; padding: 9px 12px; font-size: 12px; }
+.settings-dialog { width: min(660px, calc(100% - 32px)); max-height: calc(100dvh - 40px); padding: 0; border: 1px solid #d7dfd5; border-radius: 14px; color: #344b3b; background: #fff; box-shadow: 0 20px 90px #0003; overflow: hidden; }
+.settings-dialog[open] { display: flex; flex-direction: column; }
+.settings-dialog::backdrop { background: #14211bc0; }
+.settings-dialog .dialog-heading { flex: 0 0 auto; padding: 17px 22px 12px; margin: 0; }
+.settings-dialog .dialog-heading h2 { font-size: 20px; font-weight: 800; }
+.settings-dialog .dialog-heading button { min-width: 44px; min-height: 44px; display: grid; place-items: center; border-radius: 6px; }
+.settings-sections { display: flex; gap: 4px; padding: 0 20px 10px; flex-shrink: 0; border-bottom: 1px solid #e4eae1; }
+.settings-sections button { flex: 1; min-height: 44px; border-radius: 6px; font-size: 13px; font-weight: 700; padding: 6px; }
+.settings-sections button[aria-pressed=true] { background: #e6f3e3; color: #24782c; }
+.settings-content { overflow-y: auto; padding: 4px 22px 20px; min-height: 0; overscroll-behavior: contain; }
+.settings-content .journey-preferences { margin: 0; padding: 0; }
+.settings-content p { font-size: 12px; color: #657467; line-height: 1.65; margin: 10px 0; }
+.settings-content h3 { font-size: 16px; font-weight: 800; margin: 15px 0 10px; }
+.settings-content .company-shortcuts { margin: 14px 0; }
+.preference-row { display: grid; grid-template-columns: minmax(0, 1fr) 126px; gap: 14px; align-items: center; padding: 6px 0; border-bottom: 1px solid #edf0eb; font-size: 13px; }
+.preference-toggle { display: flex; border: 1px solid #d5ddd2; border-radius: 7px; overflow: hidden; background: #f5f7f3; }
+.preference-toggle button { width: 42px; min-height: 42px; font-size: 20px; color: #a3ada0; border-right: 1px solid #e0e5dc; }
+.preference-toggle button:last-child { border: 0; }
+.preference-toggle button[aria-pressed=true][data-level=normal] { color: #526a76; background: #e0e9ec; }
+.preference-toggle button[aria-pressed=true][data-level=ban] { color: #fff; background: #b73f3f; }
+.preference-toggle button[aria-pressed=true][data-level=must], .preference-toggle button[aria-pressed=true][data-level=prefer] { color: #fff; background: #2b8134; }
+.road-preferences-group { min-width: 0; margin: 24px 0; padding: 0; border: 0; }
+.road-preferences-group legend { font-size: 13px; font-weight: 800; color: #78836f; margin-bottom: 6px; }
+.settings-footer { display: flex; flex-shrink: 0; justify-content: space-between; gap: 10px; padding: 14px 22px; border-top: 1px solid #e0e7dc; background: #fafcf8; }
+.settings-footer button { min-height: 44px; padding: 9px 15px; border-radius: 6px; font-size: 13px; font-weight: 700; }
+.settings-reset { color: #5e6d60; border: 1px solid #d0d9ca; }
+.settings-apply { color: #fff; background: #287e2d; }
+@media (max-width: 1100px) { .planner-toolbar .journey-search { grid-template-columns: minmax(0, 1fr) 240px; } .journey-time-controls { flex-wrap: wrap; } .journey-time-controls input { width: 100%; order: 3; min-height: 44px; } .journey-time-controls select { flex: 1; } }
+@media (max-width: 700px) {
+  .planner-toolbar { padding: 9px 12px 0; }
+  .planner-toolbar-top { gap: 8px; justify-content: space-between; margin-bottom: 8px; }
+  .planner-toolbar-top h1 { font-size: 12px; }
+  .planner-toolbar .fare-profile-control button { padding: 4px 8px; font-size: 11px; min-height: 34px; }
+  .planner-toolbar .journey-search { grid-template-columns: minmax(0, 1fr); }
+  .planner-toolbar .search-fields { grid-template-columns: minmax(0, 1fr) 34px; gap: 7px; }
+  .planner-toolbar .search-fields .place-field:last-child { grid-column: 1; grid-row: 2; }
+  .planner-toolbar .swap-button { grid-column: 2; grid-row: 1 / 3; width: 34px; height: 44px; }
+  .planner-toolbar .swap-button svg { transform: none; }
+  .planner-toolbar .place-input { height: 44px; }
+  .planner-toolbar .field-clear { top: 12px; }
+  .journey-time-controls { margin-top: 8px; flex-wrap: nowrap; }
+  .journey-time-controls select { min-height: 44px; flex: 1; padding: 6px; font-size: 12px; }
+  .journey-time-controls input { width: 0; flex: 2; order: 0; font-size: 11px; padding: 4px; }
+  .journey-time-controls .time-apply { height: 44px; min-width: 49px; }
+  .planner-toolbar .search-place-actions { font-size: 9px; margin-top: 1px; }
+  .planner-toolbar .use-location-button { font-size: 11px; }
+  .planner-filter-bar { gap: 5px; padding: 5px 0 9px; }
+  .filter-chip { flex: 1; gap: 4px; padding: 5px 7px; font-size: 11px; min-height: 40px; }
+  .filter-chip small { padding: 1px 4px; font-size: 9px; }
+  .filter-reset { padding: 3px; font-size: 11px; }
+  .settings-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 24px); border-radius: 10px; }
+  .settings-dialog .dialog-heading { padding: 10px 14px; }
+  .settings-sections { padding: 0 10px 8px; }
+  .settings-sections button { font-size: 11px; }
+  .settings-content { padding: 0 14px 16px; }
+  .settings-footer { padding: 10px 14px; }
+  .settings-footer button { padding: 8px 11px; font-size: 12px; }
+  .preference-row { gap: 10px; font-size: 12px; }
+}
+.planner-toolbar .swap-button { min-width: 0; align-self: center; }
+.planner-toolbar .place-input input { min-height: 0; }
+.planner-toolbar .field-clear { top: 4px; right: 3px; }
+.settings-dialog button:focus-visible { outline: 3px solid #347eaa; outline-offset: -3px; }
+@media (max-width: 700px) { .planner-toolbar .place-input { min-height: 44px; } .planner-toolbar .field-clear { top: 0; } }
+@media (max-width: 700px) {
+  .planner-filter-bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .filter-chip { flex: 0 0 auto; white-space: nowrap; min-height: 40px; }
+  .filter-reset { flex: 0 0 auto; white-space: nowrap; }
+}
+.planner-toolbar .selected-place-description { display: block; margin-top: 4px; font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #718074; }
+.planner-toolbar .endpoint-coordinate { display: none; }
