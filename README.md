@@ -6,6 +6,19 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 
 產品採用中立 operator-neutral branding；KMB、LWB、MTR 及 Citybus 只會作為營辦商 metadata、route information 或 data-source attribution，不會使用交通公司 logo、品牌視覺或商業產品作為本產品 identity 或主要 selling point / The product is operator-neutral; KMB, LWB, MTR, and Citybus appear only as operator metadata, route information, or source attribution, never as the product identity or primary selling point.
 
+## Quick start / 快速開始
+
+Use **Node.js 22.12.0 or newer**, matching [package.json](package.json). From the repository root:
+
+```powershell
+npm ci
+npm run dev
+```
+
+Open `http://localhost:3000` for Traditional Chinese or `http://localhost:3000/en` for English. The main journey map uses Leaflet and OpenStreetMap; no Google Maps key is required. Live arrivals, place search and map tiles require an internet connection.
+
+The checked-in [transport manifest](src/data/transport/manifest.json) records a network import on November 13, 2026, with agency metadata refreshed on November 14, 2026. Those are snapshot dates, not a guarantee that fares, calendars or live feeds remain current. See local development and Cloudflare deployment below for the full setup.
+
 ## Product scope / 產品範圍
 
 ### Journey workspace / 行程介面
@@ -37,7 +50,7 @@ Map tiles use OpenStreetMap with visible attribution. No map API key is required
 - 接入 KMB 及 Citybus official route、stop、ETA APIs，並以 server-side proxy 保護 client boundary / Connect to official KMB and Citybus route, stop, and ETA APIs through server-side proxies.
 - 使用 OpenStreetMap Nominatim 提供香港 free-text place search，並提供 external Google Maps handoff / Use OpenStreetMap Nominatim for Hong Kong free-text place search with external Google Maps handoff links.
 - 提供 traffic sources、service alerts、route updates、calendar export、saved-place UI 及 English page `/en` / Provide traffic sources, service alerts, route updates, calendar export, saved-place UI, and an English page at `/en`.
-- 支援以 OpenNext 部署至 Cloudflare Workers / Support deployment to Cloudflare Workers through OpenNext.
+- 使用 static pages、browser Web Workers 和受限制的 upstream proxy 部署至 Cloudflare Workers / Deploy static pages, browser Web Worker calculations and a restricted upstream proxy to Cloudflare Workers.
 
 ## Routes and APIs / 頁面與 API
 
@@ -61,7 +74,7 @@ Map tiles use OpenStreetMap with visible attribution. No map API key is required
 | `/api/updates` | Service update response / 服務更新回應 |
 | `/api/sources` | Data-source catalogue / 資料來源清單 |
 
-目前 route search 是 production-shaped prototype，具備清晰 API boundaries，但尚未成為完整 door-to-door geospatial router / The current route search is a production-shaped prototype with clear API boundaries, not yet a complete door-to-door geospatial router.
+目前 `/api/journey` 是 bounded multimodal journey planner，具備地點搜尋、步行路徑及轉乘，但不保證窮盡所有路線 / `/api/journey` provides bounded multimodal planning with place search, walking paths and transfers; it does not guarantee exhaustive route discovery. `/api/routes` remains a separate scoring fixture.
 
 `/api/journey` searches the imported graph; `/api/routes` remains a separate small scoring demonstration. The search keeps a bounded set of time/score labels per stop and round; it does not enumerate every possible path. Direction, pickup/drop-off restrictions, Hong Kong calendar dates, holiday exceptions, frequency windows and previous-day GTFS times above 24:00 are applied. Known timetable waits longer than half a published headway use an equivalent interval as the existing scoring engine's input, so a service starting in an hour is not scored as an immediate five-minute-frequency service. The published headway and estimated wait remain separate metadata.
 
@@ -86,22 +99,23 @@ The importer downloads bilingual Transport Department GTFS, MTR/Light Rail topol
 ```text
 Browser / 瀏覽器
   |
-  +-- Next.js App Router pages + client components
-  |     +-- JourneyPlaceSearch / PlaceAutocomplete
-  |     +-- LiveTransitSearch / GoogleMapPanel
-  |     +-- route cards、traffic、updates、calendar UI
+  +-- Next.js pages + client components
+  |     +-- JourneyPlanner / JourneyPlaceSearch / JourneyMap (Leaflet)
+  |     +-- station arrivals、timetables、traffic、updates、PWA installation
   |
-  +-- Next.js route handlers
-  |     +-- /api/places  -> OpenStreetMap Nominatim
-  |     +-- /api/transit -> KMB / Citybus official APIs
-  |     +-- /api/eta     -> approved ETA upstreams
-  |     +-- /api/routes  -> scoring prototype
+  +-- transportFetch -> browser Web Workers
+  |     +-- reused journey, timetable, geometry and provider handlers
+  |     +-- imported transport graph + scoring and fare modules
+  |     +-- external requests -> /api/upstream restricted edge proxy
   |
-  +-- Domain and data modules / 領域及資料模組
-        +-- UpgradedScoringEngine
-        +-- monthly-pass and fare calculations / 月票及車費計算
-        +-- traffic sources and service alerts / 交通來源及服務警示
-        +-- official transit adapters / 官方交通 adapters
+  +-- Cloudflare deployment
+  |     +-- static pages/assets + lightweight src/cloudflare/worker.ts
+  |     +-- /api/sources -> static source catalogue
+  |     +-- direct calculation API requests -> 409 BROWSER_COMPUTATION
+  |
+  +-- Local Next.js server
+        +-- route handlers also accept direct HTTP requests for development
+        +-- /api/routes remains a separate small scoring demonstration
 ```
 
 主要 source locations 包括以下檔案 / Important source locations include:
@@ -115,8 +129,12 @@ src/
   data/hkTransitApi.ts                 KMB and Citybus upstream adapters
   data/hkTrafficSources.ts             Hong Kong traffic source catalogue
   domain/monthlyPass.ts                Monthly-pass and fare insight helpers
-  engine/UpgradedScoringEngine.ts     Route scoring and BBI prototype
-  lib/cloudflare.ts                    Optional Cloudflare binding helper
+  engine/UpgradedScoringEngine.ts     Journey scoring and normal-fare calculations
+  browser/transportClient.ts           Fetch-compatible background-worker client
+  browser/transport.worker.ts          Browser execution of transport handlers
+  cloudflare/worker.ts                 Lightweight deployment entry point
+  cloudflare/upstreamProxy.ts          Allowlisted public-provider proxy
+  lib/cloudflare.ts                    Optional Next.js binding helper
 ```
 
 ## Scoring engine / 路線評分引擎
@@ -126,7 +144,7 @@ src/
 ```text
 Final score
   = sum(segment scores)
-  + walking transfer time * 1.35
+  + walking time * 1.35
   + long-distance transfer surcharge
   + (transfer count * 8)
   + normal adult fare * 0.45
@@ -169,7 +187,7 @@ Journey cards, combined groups and selected journeys show **Without pass** and
 **With KMB pass** separately. Combined cards calculate the minimum and maximum
 for each comparison from their actual member journeys. The pass calculation
 uses KMB's terms effective 2025-11-14, verified on 2026-11-14; see
-`src/domain/KMB_PASS_RULES.md` for the source and assumptions. It distinguishes
+[KMB_PASS_RULES.md](src/domain/KMB_PASS_RULES.md) for the source and assumptions. It distinguishes
 included rides, LWB A/NA and KMB HK1 discounts, P960/P968 charges, excluded routes
 and joint-service operating companies. A joint timetable without a known company
 shows a conditional range. Unknown fares remain unknown. The HK$834 pass purchase
@@ -251,14 +269,14 @@ GET /api/transit?operator=KMB&stop=stop-id&route=234X
 
 ### Requirements / 系統需求
 
-- Node.js `20.19+` 或 Node.js `22+` / Node.js `20.19+` or Node.js `22+`
+- Node.js `22.12.0+`, matching the `engines.node` requirement in `package.json` / 符合套件指定的 Node.js 最低版本
 - npm package manager / npm 套件管理器
 - Network access to official transit、geocoding and traffic upstreams / 需要連接官方交通、地點及交通資訊服務
 
 Install and run / 安裝及啟動：
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -278,10 +296,16 @@ Available scripts / 可用指令：
 | `npm run dev` | Start Next.js development server / 啟動開發伺服器 |
 | `npm run build` | Build and type-check production output / 建立及檢查 production build |
 | `npm run start` | Serve the production build / 啟動 production build |
-| `npm run lint` | Run repository lint command / 執行 repository lint |
+| `npm test` | Run the Vitest suite / 執行 Vitest 測試 |
+| `npm run test:browser` | Build and test the generated browser worker / 建立並測試 browser worker |
 | `npm run cf:build` | Build static pages, browser calculator and lightweight Cloudflare proxy |
 | `npm run cf:preview` | Build and run Wrangler preview / 建立並啟動 Wrangler 預覽 |
 | `npm run cf:deploy` | Build and deploy with Wrangler / 建立並使用 Wrangler 部署 |
+| `npm run data:citybus` | Refresh Citybus matching catalogues / 更新城巴配對目錄 |
+| `npm run data:transport -- --cache <external-folder>` | Rebuild the imported transport snapshot / 重建交通 snapshot |
+| `npm run data:residents -- --cache <external-folder>` | Refresh the residents’ service directory / 更新居民服務目錄 |
+
+The existing `npm run lint` script still invokes `next lint`, which is absent from the installed Next.js 16 CLI. It is not a working validation command for this checkout; the script needs a separate tooling update. Use `npm test`, `npm run test:browser` and `npm run build` for the checks documented here.
 
 ## Environment and Cloudflare / 環境變數及 Cloudflare
 
@@ -291,13 +315,13 @@ Available scripts / 可用指令：
 cp .env.example .env.local
 ```
 
-Optional Google Maps embed / 可選 map embed：
+Legacy Google Maps embed component only / 僅適用於舊版 Google Maps embed component：
 
 ```env
 NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Hong+Kong&output=embed
 ```
 
-未設定時，系統使用 Hong Kong map fallback 並仍提供 external Google Maps links / If unset, the application uses a Hong Kong map fallback and still provides external Google Maps links.
+The main `JourneyMap` uses Leaflet/OpenStreetMap and does not use this setting. `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL` applies only to the retained `GoogleMapPanel` component; external Google Maps handoff links are separate. / 主行程地圖不需要此設定。
 
 不要提交 credentials、API keys 或 private endpoints / Do not commit credentials, API keys, or private endpoints.
 
@@ -309,7 +333,7 @@ Use **Install app** when offered, or Chrome's **⋮ → Install and create short
 → Install** (some versions show **Add to home screen** or **Install app**).
 The manifest supplies standard and maskable icons, an app identity and standalone
 display, so the installed web app opens from the home screen or app drawer.
-This is a PWA, not a native APK or Play Store release. Hosting stays free.
+This is a PWA, not a native APK or Play Store release. Deployment uses the repository’s Cloudflare Worker configuration; account usage limits still apply.
 Other Android browsers may offer **Install app** or **Add to home screen**;
 installation availability and app-versus-shortcut behavior depend on the browser.
 Open the site in a full browser, rather than a messaging app's embedded browser.
@@ -336,8 +360,9 @@ may take longer to calculate large searches. No route data or geometry is reduce
 track chunks in `.free-worker/assets`. The small edge Worker only proxies an
 explicit list of public transport/geocoder/router endpoints, with rate limiting,
 short live-data caching and no upstream redirects or forwarded user credentials.
-Builds and generated public assets are ignored by Git; only source chunks below
-1 MB are committed. `npm run test:browser` exercises the actual generated bundle,
+Build output and generated public assets are ignored by Git; only source chunks below
+1 MB are committed. This deployment is staged by `scripts/stage-free-worker.mjs`;
+it does not run an OpenNext server bundle. `npm run test:browser` exercises the actual generated bundle,
 including the A20, A23, 44→A31 and 44→E32 examples and arrive-by searches.
 
 ```bash
@@ -432,3 +457,5 @@ python scripts/import-alignments.py --cache C:/path/outside/repository/cache
 Install `osmium` in that cache's `python-libs` directory first. The importer downloads CSDI line features and the Geofabrik Hong Kong PBF into the external cache. Only compact derived chunks smaller than 890 KB are committed. Track data is ODbL 1.0; see `src/data/alignments/NOTICE.md`. Raw downloads, dependencies, logs and builds stay out of Git.
 
 `/api/journey` accepts `timeMode=now|depart|arrive` and an explicit-offset ISO timestamp in `time` for scheduled modes. `/api/journey-geometry` loads physical paths for the selected result. The default public OSRM service is cached and serialized; production can set `OSRM_FOOT_URL` and `OSRM_CAR_URL` to private services. Road fallback follows roads through stops and may differ from the operator's exact alignment. Missing paths are reported and suppressed. Public service availability and per-process rate limiting are not a production SLA.
+
+The `OSRM_FOOT_URL` and `OSRM_CAR_URL` overrides apply to the Next.js server handlers. The current browser-worker build substitutes those variables with `undefined` and uses the configured public-provider proxy; adding a Cloudflare secret alone does not change its routing endpoints.
