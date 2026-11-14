@@ -180,12 +180,17 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
             family: reverse ? pattern.r + ',' + label.family : label.family + ',' + pattern.r, readyDelay: 0 }, simpleOnly && round === 0 ? 48 : 4);
           const endWalk = endings.get(index);
           if (endWalk !== undefined && limitAllows(limits.walk, label.walk + endWalk)) {
-            bestCompleteCost = Math.min(bestCompleteCost, cost + endWalk * weights.walk);
             const complete = legs.map(l => ({ ...l }));
             if (reverse) complete[0].accessWalkMinutes = endWalk;
-            results.push({ id: 'multi:' + complete.map(l => l.id).join('|'), legs: complete,
+            const result: Route = { id: 'multi:' + complete.map(l => l.id).join('|'), legs: complete,
               walkTransferTimeMinutes: label.walk + endWalk, originWalkMinutes: reverse ? endWalk : label.originWalk,
-              destinationWalkMinutes: reverse ? label.originWalk : endWalk, transferCount: round, timeMode: reverse ? 'arrive' : 'depart' });
+              destinationWalkMinutes: reverse ? label.originWalk : endWalk, transferCount: round, timeMode: reverse ? 'arrive' : 'depart' };
+            // A route that will be removed by a Must/Ban road filter must not
+            // tighten the search bound and prune compliant alternatives.
+            if (!options.preferences || routeRoadsAllowed(result, options.preferences)) {
+              bestCompleteCost = Math.min(bestCompleteCost, cost + endWalk * weights.walk);
+            }
+            results.push(result);
           }
         }
         if ((reverse ? pattern.a : pattern.p)[position] !== 0 || step === pattern.s.length - 1) continue;

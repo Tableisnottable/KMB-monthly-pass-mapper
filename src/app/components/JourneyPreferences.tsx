@@ -74,10 +74,10 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
         <a className="transport-coverage-link" href="/coverage">{copy(locale, '查看全部資料涵蓋範圍', 'View full data coverage')}</a>
       </details></>}
     {section === 'roads' && <><h3>{copy(locale, '選擇道路', 'Choose road corridors')}</h3>
-      <p>{copy(locale, '× 禁止 · ／ 正常 · ✓ 較喜歡。可選多條偏好道路，並非強制必經。', '× Ban · ／ Normal · ✓ Prefer. You can prefer several alternatives; preference is not a requirement.')}</p>
+      <p>{copy(locale, '× 禁止 · ／ 正常 · ✓ 必須。同一組有多條必須道路時，行程經過其中一條即可；不同組別的必須道路則都要經過。', '× Ban · ／ Normal · ✓ Must. If several roads in one group are Must, a route may use any one of them. Must roads in separate groups are all required.')}</p>
       {(Object.keys(corridorChoices) as CorridorGroup[]).map(group => <fieldset className="road-preferences-group" key={group}><legend>{copy(locale, ...groupLabels[group])}</legend>
-        {corridorChoices[group].map(([id, zh, en]) => <PreferenceToggle key={id} label={copy(locale, zh, en)} locale={locale} positive="prefer" value={roadLevel(corridors, id)}
+        {corridorChoices[group].map(([id, zh, en]) => <PreferenceToggle key={id} label={copy(locale, zh, en)} locale={locale} positive="must" value={roadLevel(corridors, id)}
           onChange={level => onCorridors({ ...corridors, roads: { ...corridors.roads, [id]: level } })} />)}</fieldset>)}
-      <p>{copy(locale, '只適用於已辨認的公共交通道路路段。偏好為同組其他道路加 15 分；禁止於搜尋時排除該路段。鐵路、渡輪、未辨認道路及獨立步行／單車／的士／駕駛估算不受影響，並非涵蓋全港所有道路。', 'Applies to identified transit road segments. Prefer adds 15 points to other roads in the same group; Ban excludes the travelled segment during search. Rail, ferries, unclassified roads and separate walk/cycle/taxi/driving estimates are unaffected. This does not cover every Hong Kong road.')}</p></>}
+      <p>{copy(locale, '必須道路會篩走未經該路段的公共交通行程；禁止道路會於搜尋時排除該路段。鐵路、渡輪、未辨認道路及獨立步行／單車／的士／駕駛估算不受影響；道路資料未涵蓋全港。', 'Must roads filter out transit journeys that do not use them; Ban excludes the travelled segment during search. Rail, ferries, unclassified roads and separate walk/cycle/taxi/driving estimates are unaffected. Road coverage is incomplete.')}</p></>}
   </section>;
 }

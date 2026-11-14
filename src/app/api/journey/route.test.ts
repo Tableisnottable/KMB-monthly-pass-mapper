@@ -96,6 +96,15 @@ describe('Multimodal journey API', () => {
     expect(data.some((r: { legs: { mode: string }[] }) => r.legs.some(l => l.mode === 'BUS' || l.mode === 'SUBWAY'))).toBe(true);
   }, 20000);
 
+  it('keeps cross-harbour routes when the selected tunnel is a hard requirement', async () => {
+    const { data } = await journey({ lat: 22.28231, lng: 114.12335 }, { lat: 22.33604, lng: 114.16581 }, {
+      preferences: JSON.stringify({ roads: { cht: 'must' } }),
+    });
+    expect(data.length).toBeGreaterThan(0);
+    expect(data.some((route: Parameters<typeof routeCorridors>[0]) => routeCorridors(route).includes('cht'))).toBe(true);
+    expect(data.every((route: Parameters<typeof routeCorridors>[0]) => routeCorridors(route).includes('cht'))).toBe(true);
+  }, 30000);
+
   it('reports uncovered endpoints separately from unavailable connections', async () => {
     const { data, meta } = await journey({ lat: 0, lng: 0 }, airport);
     expect(data).toEqual([]); expect(meta.originUncovered).toBe(true);

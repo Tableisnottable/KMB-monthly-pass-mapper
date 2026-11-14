@@ -29,6 +29,10 @@ GATES = [
     ('lungcheung', 22.3443732, 114.1760268, .08), ('northlantau', 22.3145281, 113.9961558, .08),
     ('pokfulam', 22.2805995, 114.1315595, .06), ('taiporoad', 22.3382524, 114.1629050, .06),
     ('tolo', 22.4234711, 114.2120053, .08), ('tungchung', 22.2585694, 113.9393280, .08),
+    # Major Route 8 and airport road tunnels; checkpoints sit inside each tunnel.
+    ('cheungtsing', 22.35420, 114.10420, .08),
+    ('eaglesnest', 22.35450, 114.16060, .08), ('shatinheights', 22.36680, 114.17450, .08),
+    ('taiwai', 22.37130, 114.17720, .08), ('airporttunnel', 22.30600, 113.93720, .08),
 ]
 
 
