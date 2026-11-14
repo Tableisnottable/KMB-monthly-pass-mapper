@@ -1,5 +1,6 @@
 import type { ScoredRoute, Segment, TransitLeg } from '../../engine/UpgradedScoringEngine';
 import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, type PlannerLocale } from './plannerUi';
+import { getMonthlyPassInsight } from '../../domain/monthlyPass';
 
 export interface JourneyGroup { id: string; routes: ScoredRoute[] }
 export type JourneySort = 'recommended' | 'fastest' | 'cheapest' | 'transfers' | 'walking';
@@ -50,6 +51,16 @@ export function groupFareLabel(group: JourneyGroup, locale: PlannerLocale): stri
 export function groupDurationLabel(group: JourneyGroup): string {
   const minutes = group.routes.map(journeyMinutes), min = Math.min(...minutes), max = Math.max(...minutes);
   return min === max ? String(min) : `${min}–${max}`;
+}
+
+export function groupPassFareLabel(group: JourneyGroup, locale: PlannerLocale): string {
+  const fares = group.routes.map(route => getMonthlyPassInsight(route));
+  if (fares.some(fare => !fare.available)) return copy(locale, '票價待查', 'Fare unavailable');
+  const min = Math.min(...fares.map(fare => fare.passFareMin)), max = Math.max(...fares.map(fare => fare.passFareMax));
+  if (max > 0 && group.routes.some(route => route.legs.some(leg => leg.fareStatus === 'FULL_FARE'))) {
+    return copy(locale, '最多 ', 'Up to ') + '$' + max.toFixed(2);
+  }
+  return min === max ? '$' + min.toFixed(2) : '$' + min.toFixed(2) + '–$' + max.toFixed(2);
 }
 
 /** Compact A/B → C/D only when every displayed combination really exists. */

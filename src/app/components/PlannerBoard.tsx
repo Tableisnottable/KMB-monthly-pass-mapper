@@ -8,7 +8,9 @@ import { PlannerIcon } from './PlannerIcon';
 import { RouteDetails } from './RouteDetails';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { copy, fareLabel, hasEndedService, journeyMinutes, legOperator, modeIcon, modeLabel, routeBadgeStyle, routeSignColours, type JourneyLocations, type PlannerLocale } from './plannerUi';
-import { combinedLegChoices, groupDurationLabel, groupFareLabel, groupJourneysByStops, type JourneyGroup, type JourneySort } from './journeyGroups';
+import { combinedLegChoices, groupDurationLabel, groupPassFareLabel, groupJourneysByStops, type JourneyGroup, type JourneySort } from './journeyGroups';
+import { FareComparison } from './FareComparison';
+import { KMB_PASS_RULES } from '../../domain/monthlyPass';
 import { AddedDeparture } from './AddedDeparture';
 import { operatorName } from '../../data/transportOperators';
 
@@ -29,9 +31,10 @@ function JourneyRow({ route, locale, onSelect, selected = false }: { route: Scor
   const live = first?.realtimeEta?.isLive;
   const isWalk = route.legs.every(leg => leg.mode === 'WALK');
   return <button type="button" className={'route-option' + (ended ? ' ended' : '') + (selected ? ' is-selected' : '')} onClick={onSelect} aria-pressed={selected}
-    aria-label={journeyMinutes(route) + ' minute journey, ' + route.legs.map(leg => leg.routeNumber || leg.mode).join(', ') + ', ' + fareLabel(route, locale)}>
+    aria-label={journeyMinutes(route) + ' minute journey, ' + route.legs.map(leg => leg.routeNumber || leg.mode).join(', ') + ', ' + copy(locale, '無月票 ', 'Without pass ') + fareLabel(route, locale) + ', ' + copy(locale, '使用九巴月票 ', 'With KMB pass ') + groupPassFareLabel({ id: route.id, routes: [route] }, locale)}>
     {selected && <span className="route-selected-label"><PlannerIcon name="pin" size={13} />{copy(locale, '已選取 · 地圖顯示中', 'Selected on map')}</span>}
-    <span className="route-option-top"><RouteSymbols route={route} locale={locale} /><span className="route-option-price">{fareLabel(route, locale)}</span><span className="route-duration">{live && !ended && <PlannerIcon name="signal" size={17} />}{journeyMinutes(route)}<small>min</small></span></span>
+    <span className="route-option-top"><RouteSymbols route={route} locale={locale} /><span className="route-duration">{live && !ended && <PlannerIcon name="signal" size={17} />}{journeyMinutes(route)}<small>min</small></span></span>
+    <FareComparison routes={[route]} locale={locale} />
     {route.departureTime && route.arrivalTime && <span className="route-clock-line">{hongKongTimeLabel(route.departureTime)} → {hongKongTimeLabel(route.arrivalTime)} <small>HKT · {copy(locale, '普通成人', 'Normal adult')}</small></span>}
     <span className="route-service-line">{ended ? <span className="service-ended">{copy(locale, '暫無班次', 'No upcoming service')}</span>
       : isWalk ? copy(locale, '全程步行', 'Walk all the way')
@@ -54,7 +57,8 @@ function JourneyChoiceGroup({ group, locale, onSelect, onPreview, selectedId, se
       <span className="journey-card-labels"><span className="combined-card-label"><PlannerIcon name="layers" size={13} />{copy(locale, '合併路線', 'Combined routes')}</span>
         {selectedRoute && <span className="route-selected-label"><PlannerIcon name="pin" size={13} />{copy(locale, '已選取 · 地圖顯示中', 'Selected on map')}</span>}</span>
       <span className="route-option-top"><span className="combined-option-count">{group.routes.length} {copy(locale, '個行程', 'journeys')}</span>
-        <span className="route-option-price">{groupFareLabel(group, locale)}</span><span className="route-duration">{groupDurationLabel(group)}<small>min</small></span></span>
+        <span className="route-duration">{groupDurationLabel(group)}<small>min</small></span></span>
+      <FareComparison routes={group.routes} locale={locale} />
       <span className="combined-route-symbols">{choices ? <RouteSymbols route={best} locale={locale} choices={choices} compact />
         : group.routes.map((route, index) => <span className="combined-complete-path" key={route.id}>{index > 0 && <small>{copy(locale, '或', 'or')}</small>}<RouteSymbols route={route} locale={locale} /></span>)}</span>
       <span className="combined-stop-pair">{sameBoarding ? best.legs[0].originStop?.name : searchOrigin ?? copy(locale, '附近上車站', 'Nearby boarding stops')} → {best.legs.at(-1)?.destinationStop?.name}</span>
@@ -74,7 +78,7 @@ function JourneySortControl({ value, onChange, locale }: { value: JourneySort; o
     <select aria-label={copy(locale, '行程排序', 'Sort journeys')} value={value} onChange={event => onChange(event.target.value as JourneySort)}>
       <option value="recommended">{copy(locale, '建議排序', 'Recommended')}</option>
       <option value="fastest">{copy(locale, '最快', 'Fastest')}</option>
-      <option value="cheapest">{copy(locale, '最便宜', 'Cheapest')}</option>
+      <option value="cheapest">{copy(locale, '最便宜（無月票）', 'Cheapest (without pass)')}</option>
       <option value="transfers">{copy(locale, '最少轉乘', 'Fewest transfers')}</option>
       <option value="walking">{copy(locale, '最少步行', 'Least walking')}</option>
     </select>
@@ -115,7 +119,8 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
     <div className="planner-sidebar-scroll" ref={sidebar}>
       {showDetails && selected ? <section className="trip-panel" id="journey" aria-label={copy(locale, '行程詳情', 'Journey details')}>
         <div className="trip-heading"><button type="button" className="all-results-button" onClick={() => { setShowDetails(false); sidebar.current?.scrollTo({ top: 0 }); }}><span>{copy(locale, '所有行程結果', 'All journey results')}</span><PlannerIcon name="chevron" size={14} /></button><div className="trip-endpoints"><strong>{endpoints?.origin.name ?? selected.legs[0]?.originStop?.name}</strong><span>↓</span><strong>{endpoints?.destination.name ?? selected.legs[selected.legs.length - 1]?.destinationStop?.name}</strong></div></div>
-        <div className="trip-summary"><RouteSymbols route={selected} locale={locale} /><span className="trip-fare">{fareLabel(selected, locale)}</span><span className="trip-walk"><PlannerIcon name="walk" size={17} />{selected.legs.every(leg => leg.mode === 'WALK') ? journeyMinutes(selected) : selected.walkTransferTimeMinutes} min</span><span className="route-duration">{journeyMinutes(selected)}<small>min</small></span></div>
+        <div className="trip-summary"><RouteSymbols route={selected} locale={locale} /><span className="trip-walk"><PlannerIcon name="walk" size={17} />{selected.legs.every(leg => leg.mode === 'WALK') ? journeyMinutes(selected) : selected.walkTransferTimeMinutes} min</span><span className="route-duration">{journeyMinutes(selected)}<small>min</small></span></div>
+        <div className="trip-fare-comparison"><FareComparison routes={[selected]} locale={locale} /></div>
         <button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
         <RouteDetails route={selected} locale={locale} />
       </section> : <>
@@ -131,6 +136,7 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
             {walking && <div className="route-group"><h2>{copy(locale, '步行', 'Walk')}</h2><div className="route-list"><JourneyRow route={walking} locale={locale} onSelect={() => choose(walking)} selected={selected?.id === walking.id} /></div></div>}
             {endedGroups.length > 0 && <div className="route-group"><div className="route-group-heading"><h2>{copy(locale, '暫無班次', 'No upcoming service')}</h2>{recommendedGroups.length === 0 && <JourneySortControl value={sort} onChange={setSort} locale={locale} />}</div><div className="route-list">{endedGroups.map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} onPreview={preview} selectedId={selected?.id} searchOrigin={mapPlaces.origin?.name} />)}</div></div>}
             <p className="route-estimate-note">{copy(locale, '車程及票價為估算，路線按你的權重排列。', 'Times and fares are estimates. Routes use your weighted ranking.')} <a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a></p>
+            <p className="route-estimate-note">{copy(locale, '月票價假設已有有效九巴月票及足夠每日乘車額，不包括購買月票費用。無月票價為普通成人車費。', 'Pass fares assume a valid KMB Monthly Pass and sufficient daily rides; the pass purchase price is separate. Without-pass fares are normal adult fares.')} <a href={KMB_PASS_RULES.sourceUrl} target="_blank" rel="noreferrer">{copy(locale, '九巴月票條款', 'KMB pass terms')}</a></p>
           </> : <p className="map-instruction" role="status">{emptyHint}</p>}
         </section>
       </>}

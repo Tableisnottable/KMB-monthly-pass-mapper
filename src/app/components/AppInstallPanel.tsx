@@ -50,7 +50,7 @@ export function AppInstallPanel() {
     <section className="install-card">
       <img src="/icons/app-192.png" width="80" height="80" alt="" />
       <p className="install-eyebrow">TRANSIT COMPASS HK</p>
-      <h1>{text('在 Pixel 8 安裝 App', 'Install on your Pixel 8')}</h1>
+      <h1>{text('在 Android 安裝 App', 'Install on Android')}</h1>
       <p>{text('將交通規劃器加入主畫面，以獨立 App 視窗開啟。使用相同的路線權重、普通成人車費、班次及地圖。', 'Add the planner to your home screen and open it in its own app window. Use the same route scoring, adult fares, timetables and maps.')}</p>
       {installed ? <p className="install-status" role="status">{text('已在 App 視窗開啟。', 'You are using the installed app.')}</p>
         : prompt && <button className="install-primary" type="button" disabled={busy} onClick={() => void install()}>{busy ? text('正在開啟安裝…', 'Opening installer…') : text('安裝 App', 'Install app')}</button>}
@@ -58,10 +58,11 @@ export function AppInstallPanel() {
       {!installed && <>
         <h2>{text('使用 Android Chrome 安裝', 'Install with Chrome on Android')}</h2>
         <ol>
-          <li>{text('在 Pixel 8 的 Chrome 開啟此頁面。', 'Open this page in Chrome on your Pixel 8.')}</li>
+          <li>{text('在 Android 手機或平板的 Chrome 開啟此頁面。', 'Open this page in Chrome on your Android phone or tablet.')}</li>
           <li>{text('點選右上角 ⋮ 選單，再選「安裝及建立捷徑」→「安裝」。部分版本會顯示「加入主畫面」或「安裝應用程式」。', 'Tap the ⋮ menu, then Install and create shortcut → Install. Some versions show Add to home screen or Install app.')}</li>
           <li>{text('確認安裝，然後從主畫面或應用程式列表開啟 Transit Compass。', 'Confirm installation, then open Transit Compass from your home screen or app drawer.')}</li>
         </ol>
+        <p className="install-note">{text('其他 Android 瀏覽器可在選單尋找「安裝應用程式」或「加入主畫面」。安裝功能及 App／捷徑形式視乎瀏覽器；請直接使用瀏覽器開啟，避免使用通訊 App 內置瀏覽器。', 'In other Android browsers, look in the menu for Install app or Add to home screen. Availability and whether it opens as an app or shortcut depend on the browser. Open this page directly in your browser, rather than inside a messaging app.')}</p>
       </>}
       <a className="install-primary" href={english ? '/en' : '/'}>{text('開啟交通規劃器', 'Open the planner')}</a>
       <p className="install-note">{text('免費安裝的網頁 App，毋須 Play 商店。仍需網絡載入資料、地圖及即時到站；並非完整離線 App。首次搜尋可能較慢。', 'Free installable web app; no Play Store needed. An internet connection is still needed for data, maps and live arrivals. Full offline routing is not included. The first search may take longer.')}</p>

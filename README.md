@@ -163,7 +163,17 @@ Waiting uses a reachable fresh live arrival minus access walking, or the actual 
 
 ### Normal adult fares
 
-`calculateFare` sums the published adult leg fares. Paid-area MTR/Light Rail changes are combined into one published OD fare before scoring. The planner uses adult Octopus rail fares and normal adult fares for other modes; it does not invent interchange offers, concessions or pass discounts. `discountedFare` retains its existing API field name but is the undiscounted normal adult total; `bbiDiscountApplied` is zero. Full-fare fallbacks are marked as upper bounds. Operator-specific interchange rules and pass eligibility still need a dated, verified ruleset.
+`calculateFare` sums the published adult leg fares. Paid-area MTR/Light Rail changes are combined into one published OD fare before scoring. The planner uses adult Octopus rail fares and normal adult fares for other modes; it does not invent interchange offers or concessions. `discountedFare` retains its existing API field name but is the undiscounted normal adult total; `bbiDiscountApplied` is zero. Full-fare fallbacks are marked as upper bounds. Ranking and the cheapest sort continue to use these without-pass adult fares.
+
+Journey cards, combined groups and selected journeys show **Without pass** and
+**With KMB pass** separately. Combined cards calculate the minimum and maximum
+for each comparison from their actual member journeys. The pass calculation
+uses KMB's terms effective 2025-11-14, verified on 2026-11-14; see
+`src/domain/KMB_PASS_RULES.md` for the source and assumptions. It distinguishes
+included rides, LWB A/NA and KMB HK1 discounts, P960/P968 charges, excluded routes
+and joint-service operating companies. A joint timetable without a known company
+shows a conditional range. Unknown fares remain unknown. The HK$834 pass purchase
+price is separate, and a valid pass with enough daily rides is assumed.
 
 ## Data sources and API behaviour / 資料來源及 API 行為
 
@@ -293,12 +303,16 @@ NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Hong+Kong&output
 
 ### Install on Android / 在 Android 安裝
 
-Open `/install` in Chrome on a Pixel 8 (or `/install?lang=zh` for Chinese).
+Open `/install` in Chrome on an Android phone or tablet (or `/install?lang=zh`
+for Chinese). There is no device-brand restriction.
 Use **Install app** when offered, or Chrome's **⋮ → Install and create shortcut
 → Install** (some versions show **Add to home screen** or **Install app**).
 The manifest supplies standard and maskable icons, an app identity and standalone
 display, so the installed web app opens from the home screen or app drawer.
 This is a PWA, not a native APK or Play Store release. Hosting stays free.
+Other Android browsers may offer **Install app** or **Add to home screen**;
+installation availability and app-versus-shortcut behavior depend on the browser.
+Open the site in a full browser, rather than a messaging app's embedded browser.
 
 The service worker caches only an offline help page. It does not cache API
 responses, route calculations, map tiles or old Next.js assets. An internet
@@ -355,7 +369,7 @@ data stays explicitly unavailable; published headways are not fabricated arrival
 
 1. `/api/routes` 目前回傳小型 scored-route fixture，並非 complete route graph / currently returns a small scored-route fixture, not a complete route graph。
 2. Multimodal search is bounded to three transfers and a limited set of labels/alternatives. Rail timings/headways and walking durations are estimated. Topology-only rail searches use conservative estimated 06:00–00:00 terminal windows, explicitly unverified; these are not official first/last-train times. No claim of exhaustive path discovery is made.
-3. Normal adult totals exclude unverified interchange offers. A full published fare is used as an upper bound when sectional pricing is missing; monthly-pass coverage remains a separate prototype model.
+3. Normal adult totals exclude unverified interchange offers. A full published fare is used as an upper bound when sectional pricing is missing. The separate monthly-pass estimate cannot read an Octopus card's validity or remaining daily rides; its dated rules need review when the operator changes policy.
 4. Place search 依賴 Nominatim availability 及 usage policy / depends on Nominatim availability and usage policy。
 5. Map embed 及 external links 受第三方 browser/network policies 影響 / depend on third-party browser and network policies。
 6. Traffic alerts 及 source catalogues 需要 maintained refresh process / require a maintained data-refresh process。

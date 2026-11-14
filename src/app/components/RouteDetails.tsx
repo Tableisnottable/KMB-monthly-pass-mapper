@@ -1,7 +1,7 @@
 'use client';
 
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
-import { getMonthlyPassInsight } from '../../domain/monthlyPass';
+import { getMonthlyPassInsight, getPassLegFare, KMB_PASS_RULES } from '../../domain/monthlyPass';
 import { PlannerIcon } from './PlannerIcon';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
 import { copy, legOperator, modeIcon, modeLabel, routeBadgeStyle, type PlannerLocale } from './plannerUi';
@@ -28,12 +28,17 @@ export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: Pl
     {route.departureTime && route.arrivalTime && <p className="journey-clock-summary">{hongKongTimeLabel(route.departureTime)} → {hongKongTimeLabel(route.arrivalTime)} <small>Hong Kong time · {copy(locale, '普通成人', 'Normal adult')}</small></p>}
     <ol className="directions-list">
       {!walkOnly && (route.originWalkMinutes ?? 0) > 0 && <li><span className="step-marker"><PlannerIcon name="walk" size={15} /></span><div><strong>{copy(locale, '步行至上車站', 'Walk to your stop')}</strong><small>{route.legs[0]?.originStop.name} · {route.originWalkMinutes} min</small></div></li>}
-      {route.legs.map((leg, index) => <li key={leg.id}>
+      {route.legs.map((leg, index) => {
+        const pass = getPassLegFare(leg);
+        const passLabel = !pass.available ? copy(locale, '票價待查', 'Fare unavailable')
+          : '$' + pass.minimum.toFixed(2) + (pass.maximum !== pass.minimum ? '–$' + pass.maximum.toFixed(2) : '');
+        return <li key={leg.id}>
         <span className="step-marker step-operator-marker" style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
         <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} <AddedDeparture departure={leg.liveDepartures?.[0]} locale={locale} /></strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>
           {leg.departureTime && leg.arrivalTime && <small>{hongKongTimeLabel(leg.departureTime)} → {hongKongTimeLabel(leg.arrivalTime)} HKT</small>}
-          {leg.mode !== 'WALK' && leg.fareStatus !== 'UNAVAILABLE' && <small className="leg-adult-fare">{copy(locale, '成人票價 ', 'Adult fare ')}HK${(leg.fare ?? 0).toFixed(2)}{leg.fareStatus === 'FULL_FARE' ? ' · ' + copy(locale, '全程票價上限', 'full-fare upper bound') : leg.fare === 0 ? ' · ' + copy(locale, '已包括在鐵路票價內', 'included in rail fare') : ''}</small>}
+          {leg.mode !== 'WALK' && leg.fareStatus !== 'UNAVAILABLE' && <small className="leg-adult-fare">{copy(locale, '無月票 ', 'Without pass ')}HK${(leg.fare ?? 0).toFixed(2)}{leg.fareStatus === 'FULL_FARE' ? ' · ' + copy(locale, '全程票價上限', 'full-fare upper bound') : leg.fare === 0 ? ' · ' + copy(locale, '已包括在鐵路票價內', 'included in rail fare') : ''}</small>}
+          {leg.mode !== 'WALK' && <small className="leg-pass-fare">{copy(locale, '使用九巴月票 ', 'With KMB pass ')}{passLabel}{leg.fareStatus === 'FULL_FARE' && pass.maximum > 0 ? ' · ' + copy(locale, '票價上限', 'upper bound') : ''}{pass.operatorDependent ? ' · ' + copy(locale, '視乎實際營辦商', 'depends on the operating company') : ''}</small>}
           <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + copy(locale, '即時到站', 'Live arrival') + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
           {leg.mode === 'BUS' && legOperator(leg).includes('+') && <JointArrivalBoard departures={leg.liveDepartures ?? []}
             operator={legOperator(leg)} routeNumber={leg.routeNumber} stopName={leg.originStop?.name} locale={locale} />}
@@ -43,7 +48,7 @@ export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: Pl
           {leg.fareStatus === 'UNAVAILABLE' && <small>{copy(locale, '此路段票價未有資料。', 'Fare data for this leg is unavailable.')}</small>}
           {index < route.legs.length - 1 && <small className="transfer-note">{copy(locale, '在此轉乘；全程轉乘步行約', 'Change here; total transfer walking about')} {transferWalk} min</small>}
         </div>
-      </li>)}
+      </li>; })}
       <li><span className="step-marker"><PlannerIcon name="pin" size={16} /></span><div><strong>{copy(locale, '抵達目的地', 'Arrive at your destination')}</strong>{!walkOnly && (route.destinationWalkMinutes ?? 0) > 0 && <small>{copy(locale, '下車後步行', 'Walk after alighting')} {route.destinationWalkMinutes} min</small>}</div></li>
     </ol>
     <details className="score-explanation"><summary>{copy(locale, '為甚麼推薦這條路線？', 'Why this route?')}<span>{route.finalScore.toFixed(1)}</span></summary>
@@ -51,11 +56,14 @@ export function RouteDetails({ route, locale }: { route: ScoredRoute; locale: Pl
       <dl>{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value > 0 ? '+' : ''}{value.toFixed(2)}</dd></div>)}<div className="score-total"><dt>{copy(locale, '總評分', 'Total score')}</dt><dd>{route.finalScore.toFixed(2)}</dd></div></dl>
       <p>{copy(locale, '候車使用可趕及的即時 ETA 或時間表；步行 ×1.35、每次轉乘 +8、每 HK$1 +0.45、未核實服務每段 +4。', 'Waiting uses a reachable live ETA or timetable. Walking ×1.35; +8 per transfer; +0.45 per HK$1; +4 per unverified leg.')}</p>
     </details>
-    {!walkOnly && <p className="fare-explanation">{copy(locale, '普通成人單程票價；港鐵及輕鐵採成人八達通。不自動扣除未核實轉乘優惠、月票或優惠票價。', 'Normal adult single fares; adult Octopus for MTR and Light Rail. Unverified interchange offers, passes and concessions are excluded.')}</p>}
+    {!walkOnly && <p className="fare-explanation">{copy(locale, '無月票價為普通成人車費；港鐵及輕鐵採成人八達通。月票價假設已有有效九巴月票及足夠每日乘車額，不包括購買月票費用。不扣除未核實轉乘優惠。', 'Without-pass fares are normal adult fares, using adult Octopus for rail. Pass fares assume a valid KMB Monthly Pass and sufficient daily rides; the purchase price is separate. Unverified interchange offers are excluded.')}</p>}
     {!walkOnly && <details className="score-explanation"><summary>{copy(locale, '月票分析', 'Monthly pass estimate')}<PlannerIcon name="chevron" size={14} /></summary>
-      <p>{insight.coveredLegCount > 0 ? copy(locale, '按現有月票模型，每程估計節省 HK$ ', 'Under the current pass model, estimated saving per trip HK$ ') + insight.savingThisTrip.toFixed(2) : copy(locale, '這條路線沒有月票涵蓋的交通段。', 'No legs on this route are covered by the current pass model.')}</p>
+      <p>{!insight.available ? copy(locale, '票價資料不足，暫不能計算月票節省。', 'Fare data is incomplete; pass savings cannot be calculated.')
+        : insight.benefitLegCount > 0 ? copy(locale, '每程估計節省 HK$ ', 'Estimated saving per trip HK$ ') + insight.savingMin.toFixed(2) + (insight.savingMax !== insight.savingMin ? '–' + insight.savingMax.toFixed(2) : '')
+          : copy(locale, '此行程的月票價與無月票價相同。', 'The with-pass and without-pass fares are the same for this journey.')}</p>
       {insight.breakEvenTrips && <p>{copy(locale, '月票 HK$ ', 'Pass HK$ ') + insight.passPrice + copy(locale, ' · 約 ', ' · about ') + insight.breakEvenTrips + copy(locale, ' 程回本', ' trips to break even')}</p>}
-      <p>{copy(locale, '票價、轉乘優惠及月票涵蓋屬原型估算，請向營辦商核實。', 'Fares, interchange discounts and pass coverage are prototype estimates. Confirm with the operator.')}</p>
+      <p>{copy(locale, '假設每日最多 10 程額仍足夠；B1 另設每日 2 程額。聯營班次視乎實際營辦商。票價經四捨五入估算，以營辦商收費為準。', 'Assumes enough of the daily 10-ride quota remains; B1 has a separate two-ride quota. Joint services depend on the bus company. Rounded fare estimates are subject to the operator’s final charge.')}</p>
+      <p><a href={KMB_PASS_RULES.sourceUrl} target="_blank" rel="noreferrer">{copy(locale, '九巴月票官方條款', 'Official KMB Monthly Pass terms')}</a> · {copy(locale, '核實日期 ', 'Verified ')}{KMB_PASS_RULES.verifiedOn}</p>
     </details>}
   </div>;
 }

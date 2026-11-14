@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scoreRoutes, type Route } from '../../engine/UpgradedScoringEngine';
-import { combinedLegChoices, groupDurationLabel, groupFareLabel, groupJourneysByStops } from './journeyGroups';
+import { combinedLegChoices, groupDurationLabel, groupFareLabel, groupPassFareLabel, groupJourneysByStops } from './journeyGroups';
 
 function journey(id: string, services: string[], fare: number, origin = 'start', destination = 'end', transfer = 'change'): Route {
   return { id, walkTransferTimeMinutes: 3, legs: services.map((routeNumber, i) => ({
@@ -97,5 +97,28 @@ describe('Journey sorting', () => {
     unknown.legs![0].fareStatus = 'UNAVAILABLE';
     const routes = scoreRoutes([unknown, journey('known', ['B'], 30, 'known-stop')]);
     expect(groupJourneysByStops(routes, 'cheapest').map(group => group.routes[0].id)).toEqual(['known', 'unknown']);
+  });
+});
+
+describe('Combined monthly-pass fares', () => {
+  it('calculates separate min–max ranges from actual member journeys', () => {
+    const first = journey('covered', ['44', 'A31'], 20.6);
+    first.legs![0].operator = 'KMB'; first.legs![0].fare = 8.9;
+    first.legs![1].operator = 'LWB';
+    const second = journey('payable', ['A23'], 34.6); second.legs![0].operator = 'CTB';
+    const group = { id: 'comparison', routes: scoreRoutes([first, second]) };
+    expect(groupFareLabel(group, 'en')).toBe('$29.50–$34.60');
+    expect(groupPassFareLabel(group, 'en')).toBe('$5.60–$34.60');
+  });
+  it('shows a single zero payable fare when all member rides are included', () => {
+    const first = journey('one', ['44'], 8.9); first.legs![0].operator = 'KMB';
+    const second = journey('two', ['E32'], 13.9); second.legs![0].operator = 'LWB';
+    expect(groupPassFareLabel({ id: 'included', routes: scoreRoutes([first, second]) }, 'en')).toBe('$0.00');
+  });
+  it('retains fare-unavailable and full-fare upper-bound qualifications', () => {
+    const unknown = journey('unknown', ['A23'], 0); unknown.legs![0].fareStatus = 'UNAVAILABLE';
+    expect(groupPassFareLabel({ id: 'unknown', routes: scoreRoutes([unknown]) }, 'en')).toBe('Fare unavailable');
+    const bound = journey('bound', ['A31'], 20.6); bound.legs![0].operator = 'LWB'; bound.legs![0].fareStatus = 'FULL_FARE';
+    expect(groupPassFareLabel({ id: 'bound', routes: scoreRoutes([bound]) }, 'en')).toBe('Up to $5.60');
   });
 });
