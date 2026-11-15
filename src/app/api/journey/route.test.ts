@@ -31,6 +31,44 @@ describe('Multimodal journey API', () => {
   });
   afterEach(() => { vi.useRealTimers(); });
 
+  it.each(['depart', 'arrive'])('retains repeated start, middle and end Via places during %s searches', async timeMode => {
+    vi.mocked(routeOnStreets).mockImplementation(async points => ({ paths: [points], source: 'OSM_FOOT', durationSeconds: 600, distanceMetres: 700 }));
+    const query = new URLSearchParams({ fromLat: '22.3', fromLon: '114.17', toLat: '22.32', toLon: '114.17',
+      modes: '', timeMode, time: '2026-11-14T12:00:00+08:00' });
+    for (const [lat, name] of [['22.3', 'Start visit'], ['22.31', 'First visit'], ['22.31', 'Second visit'], ['22.32', 'End visit']]) {
+      query.append('viaLat', lat); query.append('viaLon', '114.17'); query.append('viaName', name);
+    }
+    const response = await GET(new NextRequest('http://localhost/api/journey?' + query));
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data).toHaveLength(1);
+    expect(data[0].viaStops.map((m: { stop: { name: string }; legIndex: number }) => [m.stop.name, m.legIndex]))
+      .toEqual([['Start visit', 0], ['First visit', 1], ['Second visit', 1], ['End visit', 2]]);
+    expect(data[0].legs).toHaveLength(2);
+    expect(data[0].discountedFare).toBe(0);
+    expect(Date.parse(data[0].arrivalTime) - Date.parse(data[0].departureTime)).toBe(20 * 60000);
+  });
+
+  it.each(['depart', 'arrive'])('visits two Via places in order with connected %s times', async timeMode => {
+    const query = new URLSearchParams({ fromLat: String(cheungShaWan.lat), fromLon: String(cheungShaWan.lng), toLat: '22.279', toLon: '114.165',
+      modes: 'SUBWAY', operators: 'MTR', timeMode, time: '2026-11-14T12:00:00+08:00', walkComparison: 'false' });
+    for (const [lat, lon, name] of [['22.3192', '114.1693', 'Mong Kok'], ['22.297', '114.172', 'Tsim Sha Tsui']]) {
+      query.append('viaLat', lat); query.append('viaLon', lon); query.append('viaName', name);
+    }
+    const response = await GET(new NextRequest('http://localhost/api/journey?' + query));
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.length).toBeGreaterThan(0);
+    for (const route of data) {
+      expect(route.viaStops.map((marker: { stop: { name: string } }) => marker.stop.name)).toEqual(['Mong Kok', 'Tsim Sha Tsui']);
+      expect(route.viaStops[0].legIndex).toBeLessThan(route.viaStops[1].legIndex);
+      for (let i = 1; i < route.legs.length; i++) expect(Date.parse(route.legs[i].departureTime)).toBeGreaterThanOrEqual(Date.parse(route.legs[i - 1].arrivalTime));
+      expect(route.discountedFare).toBeCloseTo(route.legs.reduce((sum: number, leg: { fare: number }) => sum + leg.fare, 0), 2);
+      if (timeMode === 'arrive') expect(Date.parse(route.arrivalTime)).toBeLessThanOrEqual(Date.parse(query.get('time')!));
+      else expect(route.departureTime).toBe(new Date(query.get('time')!).toISOString());
+    }
+  }, 30000);
+
   it.each(['depart', 'arrive'])('plans through Mong Kok with connected %s times and complete fares', async timeMode => {
     const time = '2026-11-14T12:00:00+08:00';
     const { data, meta } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {

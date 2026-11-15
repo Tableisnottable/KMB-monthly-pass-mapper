@@ -5,7 +5,7 @@ import { transportFetch } from '../../browser/transportClient';
 import type { TravelMode, TravelOption } from '../../domain/travelOptions';
 import { travelClock } from '../../domain/travelOptions';
 import { hongKongTimeLabel, type JourneyTimeSelection } from '../../engine/journeyTime';
-import { copy, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { copy, locationVias, readyJourney, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { fareProfileLabel } from './FareProfileControl';
 import type { FareProfile } from '../../domain/journeyFares';
 import { PlannerIcon } from './PlannerIcon';
@@ -18,7 +18,7 @@ const icon = (mode: TravelMode) => mode === 'taxi' || mode === 'drive' ? 'car' :
 
 export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] = ['walk', 'cycle', 'taxi', 'drive'], preferences?: RoutePreferences) {
   const [state, setState] = useState<{ key: string; options: TravelOption[]; loading: boolean }>({ key: '', options: [], loading: false });
-  const key = places.origin && places.destination && modes.length ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') + '|' + modes.join(',') + '|' + JSON.stringify(preferences ?? {}) + '|' + (places.via ? [places.via.lat, places.via.lng].join(',') : '') : '';
+  const key = places.origin && places.destination && readyJourney(places) && modes.length ? [places.origin.lat, places.origin.lng, places.destination.lat, places.destination.lng].join(',') + '|' + modes.join(',') + '|' + JSON.stringify(preferences ?? {}) + '|' + JSON.stringify(locationVias(places).map(p => [p!.lat, p!.lng])) : '';
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
@@ -26,7 +26,7 @@ export function useTravelOptions(places: JourneyLocations, modes: TravelMode[] =
     const [coordinates, selectedModes, selectedPreferences, viaCoordinates] = key.split('|');
     const values = coordinates.split(',');
     const params = new URLSearchParams(Object.fromEntries(['fromLat', 'fromLon', 'toLat', 'toLon'].map((name, i) => [name, values[i]])));
-    if (viaCoordinates) { const [lat, lon] = viaCoordinates.split(','); params.set('viaLat', lat); params.set('viaLon', lon); }
+    for (const [lat, lon] of JSON.parse(viaCoordinates) as number[][]) { params.append('viaLat', String(lat)); params.append('viaLon', String(lon)); }
     params.set('modes', selectedModes);
     params.set('preferences', selectedPreferences);
     transportFetch('/api/travel-options?' + params, { signal: controller.signal }).then(async response => {
@@ -70,7 +70,7 @@ export function TravelOptionDetails({ option, places, locale, time, profile, onB
     <div className="route-details"><h4>{copy(locale, '路徑時間估算', 'Estimated route time')}</h4>
       {clock && <p className="journey-clock-summary">{hongKongTimeLabel(clock.departure)} → {hongKongTimeLabel(clock.arrival)} <small>Hong Kong time</small></p>}
       <p>{((option.distanceMetres ?? 0) / 1000).toFixed(1)} km · {option.minutes} {copy(locale, '分鐘', 'min')}</p>
-      {option.mode === 'drive' && places.origin && places.destination && <p><a className="driving-directions-link" target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?' + new URLSearchParams({ api: '1', origin: `${places.origin.lat},${places.origin.lng}`, destination: `${places.destination.lat},${places.destination.lng}`, travelmode: 'driving', ...(places.via ? { waypoints: `${places.via.lat},${places.via.lng}` } : {}) })}>{copy(locale, '開啟駕駛導航', 'Open driving directions')} ↗</a></p>}
+      {option.mode === 'drive' && places.origin && places.destination && <p><a className="driving-directions-link" target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?' + new URLSearchParams({ api: '1', origin: `${places.origin.lat},${places.origin.lng}`, destination: `${places.destination.lat},${places.destination.lng}`, travelmode: 'driving', ...(locationVias(places).length ? { waypoints: locationVias(places).map(p => `${p!.lat},${p!.lng}`).join('|') } : {}) })}>{copy(locale, '開啟駕駛導航', 'Open driving directions')} ↗</a></p>}
       <p className="fare-explanation">{option.mode === 'drive'
         ? copy(locale, '私家車道路路徑及時間估算，並非即時交通或車道導航。未計塞車、泊車及油費；公共交通的公司、道路偏好及票價設定不適用。請按實際路牌及道路限制行駛。', 'Estimated private-car route and time, not live traffic or lane guidance. Congestion, parking and fuel are excluded. Public-transport company, road preference and fare settings do not apply. Follow actual road signs and restrictions.')
         : option.mode === 'taxi'

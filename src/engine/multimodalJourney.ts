@@ -361,7 +361,7 @@ function combineRailFares(result: Route) {
 export function dedupeJourneys(routes: ScoredRoute[]): ScoredRoute[] {
   const seen = new Set<string>();
   return [...routes].sort((a, b) => a.finalScore - b.finalScore).filter(route => {
-    const key = route.legs.map(l => l.networkPattern === undefined || l.mode !== 'MINIBUS' ? `${l.operator}:${l.routeNumber}` : networkRoutes[networkPatterns[l.networkPattern].r][0]).join('|');
+    const key = route.legs.map(l => l.networkPattern === undefined || l.mode !== 'MINIBUS' ? `${l.operator}:${l.routeNumber}` : networkRoutes[networkPatterns[l.networkPattern].r][0]).join('|') + (route.viaStops ? JSON.stringify(route.viaStops) : '');
     if (seen.has(key)) return false; seen.add(key); return true;
   });
 }

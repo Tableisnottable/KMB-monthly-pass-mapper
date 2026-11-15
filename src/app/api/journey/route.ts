@@ -14,7 +14,7 @@ import { parseRoutePreferences, routeRoadsAllowed } from '../../../domain/routeP
 import { parseChangeMinutes, parseTransitSelection } from '../../../domain/transportSelection';
 import { parseJourneyLimits, withinJourneyLimits } from '../../../domain/journeyLimits';
 
-import { parseJourneyVia } from '../../../domain/journeyVia';
+import { parseJourneyVias, type ViaStop } from '../../../domain/journeyVia';
 import { joinViaJourney } from '../../../engine/viaJourney';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +39,7 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
   const locale = params.get('lang') === 'en' ? 'en' : 'zh';
   const started = Date.now();
   let via;
-  try { via = parseJourneyVia(params); }
+  try { via = parseJourneyVias(params); }
   catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
   let selection;
   let operators: string[] | undefined, requiredOperators: string[] | undefined;
@@ -57,7 +57,7 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
     weights = parseRouteWeights(params.get('weights')); preferences = parseRoutePreferences(params.get('preferences')); }
   catch (err) { return NextResponse.json({ error: (err as Error).message }, { status: 400 }); }
   const { mode, date } = selection;
-  if (via) return planViaJourney(params, via, date, now);
+  if (via.length) return planViaJourney(params, via, date, now);
   const walkingRoute = !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false'
     && limits.walk !== 0 && withinRoutingArea(fromLat, fromLon) && withinRoutingArea(toLat, toLon)
     ? routeOnStreets([[fromLat, fromLon], [toLat, toLon]], 'foot', preferences) : undefined;
@@ -99,18 +99,9 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
   } }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
-/** Reuse the normal planner for each stage; only the public request is rate limited. */
-async function planViaJourney(params: URLSearchParams, via: NonNullable<ReturnType<typeof parseJourneyVia>>, date: Date, now: Date): Promise<NextResponse> {
+/** Plan stages in order (backwards for arrive-by), keeping a bounded beam rather than a recursive product. */
+async function planViaJourney(params: URLSearchParams, vias: ViaStop[], date: Date, now: Date): Promise<NextResponse> {
   const started = Date.now(), mode = params.get('timeMode') ?? 'now', reverse = mode === 'arrive';
-  const atStart = via.lat === Number(params.get('fromLat')) && via.lng === Number(params.get('fromLon'));
-  const atEnd = via.lat === Number(params.get('toLat')) && via.lng === Number(params.get('toLon'));
-  if (atStart || atEnd) {
-    const direct = new URLSearchParams(params);
-    for (const key of ['viaLat', 'viaLon', 'viaName']) direct.delete(key);
-    const response = await planJourney(direct, now), payload = await response.json();
-    return NextResponse.json({ ...payload, data: payload.data?.map((route: ScoredRoute) => ({ ...route, via, viaLegIndex: atStart ? 0 : route.legs.length })),
-      meta: { ...payload.meta, via } }, { status: response.status, headers: { 'Cache-Control': 'no-store' } });
-  }
   const preferences = parseRoutePreferences(params.get('preferences'));
   const weights = parseRouteWeights(params.get('weights')), limits = parseJourneyLimits(params.get('limits'));
   const requiredOperators = parseOperatorSelection(params.get('requiredOperators'));
@@ -120,47 +111,87 @@ async function planViaJourney(params: URLSearchParams, via: NonNullable<ReturnTy
   const base = new URLSearchParams(params);
   for (const key of ['viaLat', 'viaLon', 'viaName', 'requiredOperators', 'requiredModes']) base.delete(key);
   base.set('preferences', JSON.stringify(stagePreferences));
-  async function stage(first: boolean, anchor: Date, timeMode: string) {
-    const query = new URLSearchParams(base);
-    query.set(first ? 'toLat' : 'fromLat', String(via.lat));
-    query.set(first ? 'toLon' : 'fromLon', String(via.lng));
-    query.set('timeMode', timeMode); query.set('time', anchor.toISOString());
-    const response = await planJourney(query, now);
-    if (!response.ok) throw new Error((await response.json()).error ?? 'Via journey unavailable.');
-    return await response.json() as { data: ScoredRoute[]; meta: Record<string, unknown> };
-  }
-  const seed = await stage(!reverse, date, reverse ? 'arrive' : mode);
-  // Keep searches bounded on phones, including options that can satisfy a Must
-  // rule on only one side of the waypoint. Cache identical timetable anchors.
-  const seeds = new Set<ScoredRoute>();
-  const add = (route?: ScoredRoute) => { if (route) seeds.add(route); };
-  for (const id of requiredOperators ?? []) add(seed.data.find(r => r.legs.some(l => (l.networkOperator ?? l.operator).split('+').includes(id))));
-  for (const id of requiredModes ?? []) add(seed.data.find(r => r.legs.some(l => l.mode === id)));
-  add(seed.data.find(r => routeRoadsAllowed(r, preferences)));
-  for (const route of seed.data) { if (seeds.size >= 6) break; add(route); }
-  const onwardCache = new Map<string, ReturnType<typeof stage>>();
-  const combined: Route[] = [];
+  const origin = { lat: Number(params.get('fromLat')), lng: Number(params.get('fromLon')) };
+  const destination = { lat: Number(params.get('toLat')), lng: Number(params.get('toLon')) };
+  const points = [origin, ...vias, destination];
   const change = parseChangeMinutes(params.get('changeMinutes'));
-  for (const route of Array.from(seeds)) {
-    const transit = route.legs.some(l => l.mode !== 'WALK');
-    const anchor = new Date(Date.parse(reverse ? route.departureTime! : route.arrivalTime!) + (reverse ? -1 : 1) * (transit ? change : 0) * 60_000);
-    const key = anchor.toISOString();
-    if (!onwardCache.has(key)) onwardCache.set(key, stage(reverse, anchor, reverse ? 'arrive' : 'depart'));
-    const onward = await onwardCache.get(key)!;
-    for (const other of onward.data) {
-      const joined = reverse ? joinViaJourney(other, route, via) : joinViaJourney(route, other, via);
-      if (joined) { joined.timeMode = mode as Route['timeMode']; combined.push(joined); }
+  let beam: ScoredRoute[] = [], firstMeta: Record<string, unknown> = {}, candidates = 0;
+  let pendingMarkers: ViaStop[] = [];
+  const initial = reverse ? points.length - 2 : 0;
+  for (let offset = 0; offset < points.length - 1; offset++) {
+    const index = reverse ? initial - offset : offset;
+    const from = points[index], to = points[index + 1];
+    const boundary = reverse ? vias[index] : vias[index - 1];
+    if (from.lat === to.lat && from.lng === to.lng) {
+      const stop = Object.keys(firstMeta).length ? (reverse ? vias[index] : vias[index - 1]) : (reverse ? vias[index - 1] : vias[index]);
+      if (stop) {
+        if (beam.length) beam = beam.map(route => {
+          const markers = reverse ? [{ stop, legIndex: 0 }, ...(route.viaStops ?? [])]
+            : [...(route.viaStops ?? []), { stop, legIndex: route.legs.length }];
+          return { ...route, viaStops: markers, via: markers[0].stop, viaLegIndex: markers[0].legIndex };
+        });
+        else pendingMarkers.push(stop);
+      }
+      continue;
     }
+    const cache = new Map<string, Promise<{ data: ScoredRoute[]; meta: Record<string, unknown> }>>();
+    const stage = async (anchor: Date, timeMode: string) => {
+      const query = new URLSearchParams(base);
+      query.set('fromLat', String(from.lat)); query.set('fromLon', String(from.lng));
+      query.set('toLat', String(to.lat)); query.set('toLon', String(to.lng));
+      query.set('timeMode', timeMode); query.set('time', anchor.toISOString());
+      const response = await planJourney(query, now);
+      if (!response.ok) throw new Error((await response.json()).error ?? 'Via journey unavailable.');
+      return await response.json() as { data: ScoredRoute[]; meta: Record<string, unknown> };
+    };
+    if (!beam.length && !Object.keys(firstMeta).length) {
+      const result = await stage(date, reverse ? 'arrive' : mode);
+      firstMeta = result.meta; beam = result.data; candidates += beam.length;
+      if (pendingMarkers.length) beam = beam.map(route => {
+        const markers = pendingMarkers.map(stop => ({ stop, legIndex: reverse ? route.legs.length : 0 }));
+        if (reverse) markers.reverse();
+        return { ...route, viaStops: markers, via: markers[0].stop, viaLegIndex: markers[0].legIndex };
+      });
+    } else {
+      const seeds = new Set<ScoredRoute>();
+      const add = (route?: ScoredRoute) => { if (route) seeds.add(route); };
+      for (const id of requiredOperators ?? []) add(beam.find(r => r.legs.some(l => (l.networkOperator ?? l.operator).split('+').includes(id))));
+      for (const id of requiredModes ?? []) add(beam.find(r => r.legs.some(l => l.mode === id)));
+      add(beam.find(r => routeRoadsAllowed(r, preferences)));
+      for (const route of beam) { if (seeds.size >= 6) break; add(route); }
+      const combined: Route[] = [];
+      for (const route of Array.from(seeds)) {
+        const anchor = new Date(Date.parse(reverse ? route.departureTime! : route.arrivalTime!)
+          + (reverse ? -1 : 1) * (route.legs.some(l => l.mode !== 'WALK') ? change : 0) * 60_000);
+        const key = anchor.toISOString();
+        if (!cache.has(key)) cache.set(key, stage(anchor, reverse ? 'arrive' : 'depart'));
+        const next = await cache.get(key)!;
+        for (const other of next.data) {
+          const joined = reverse ? joinViaJourney(other, route, boundary) : joinViaJourney(route, other, boundary);
+          if (joined) { joined.timeMode = mode as Route['timeMode']; combined.push(joined); }
+        }
+      }
+      candidates += combined.length;
+      beam = selectJourneyAlternatives(scoreRoutes(combined.filter(route => withinJourneyLimits(route, limits)), weightingDate(date), weights), 40, stagePreferences);
+    }
+    if (!beam.length) break;
   }
-  const allowed = combined.filter(route => withinJourneyLimits(route, limits) && routeRoadsAllowed(route, preferences)
-    && (!requiredOperators?.length || requiredOperators.every(id => route.legs!.some(l => (l.networkOperator ?? l.operator).split('+').includes(id))))
-    && (!requiredModes?.length || requiredModes.every(id => route.legs!.some(l => l.mode === id)))
+  // All waypoints may coincide with the endpoints; still return the normal zero-distance comparison.
+  if (!Object.keys(firstMeta).length) {
+    const direct = new URLSearchParams(params);
+    for (const key of ['viaLat', 'viaLon', 'viaName']) direct.delete(key);
+    const response = await planJourney(direct, now), payload = await response.json();
+    return NextResponse.json({ ...payload, data: payload.data?.map((route: ScoredRoute) => ({ ...route, viaStops: vias.map(stop => ({ stop, legIndex: 0 })) })), meta: { ...payload.meta, vias } }, { status: response.status });
+  }
+  const allowed = beam.filter(route => withinJourneyLimits(route, limits) && routeRoadsAllowed(route, preferences)
+    && (!requiredOperators?.length || requiredOperators.every(id => route.legs.some(l => (l.networkOperator ?? l.operator).split('+').includes(id))))
+    && (!requiredModes?.length || requiredModes.every(id => route.legs.some(l => l.mode === id)))
     && (!reverse || Date.parse(route.arrivalTime!) <= date.getTime() + 1));
-  const scored = selectJourneyAlternatives(scoreRoutes(allowed, weightingDate(date), weights), 40, preferences);
-  return NextResponse.json({ data: scored, meta: { ...seed.meta, via, timeMode: mode, requestedTime: date.toISOString(),
-    originUncovered: reverse ? false : seed.meta.originUncovered, destinationUncovered: reverse ? seed.meta.destinationUncovered : false,
-    tooCloseToRide: false, candidates: combined.length, durationMs: Date.now() - started,
+  const data = selectJourneyAlternatives(allowed, 40, preferences);
+  return NextResponse.json({ data, meta: { ...firstMeta, via: vias[0], vias, timeMode: mode, requestedTime: date.toISOString(),
+    originUncovered: reverse ? false : firstMeta.originUncovered, destinationUncovered: reverse ? firstMeta.destinationUncovered : false,
+    tooCloseToRide: false, candidates, durationMs: Date.now() - started,
     requiredOperators: requiredOperators ?? [], requiredModes: requiredModes ?? [], preferences,
-    live: scored.some(r => r.legs.some(l => l.realtimeEta?.isLive)),
+    live: data.some(r => r.legs.some(l => l.realtimeEta?.isLive)),
   } }, { headers: { 'Cache-Control': 'no-store' } });
 }

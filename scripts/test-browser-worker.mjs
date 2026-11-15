@@ -100,6 +100,18 @@ try {
       if (timeMode === 'arrive') assert(Date.parse(route.arrivalTime) <= Date.parse(viaParams.get('time')));
     }
   }
+  viaParams.append('viaLat', '22.297'); viaParams.append('viaLon', '114.172'); viaParams.append('viaName', 'Tsim Sha Tsui');
+  for (const timeMode of ['depart', 'arrive']) {
+    viaParams.set('timeMode', timeMode);
+    const multiple = await request('/api/journey?' + viaParams);
+    assert(multiple.data.length > 0, 'Missing multiple Via journeys');
+    for (const route of multiple.data) {
+      assert.deepEqual(route.viaStops.map(marker => marker.stop.name), ['Mong Kok', 'Tsim Sha Tsui']);
+      assert(route.viaStops[0].legIndex < route.viaStops[1].legIndex);
+      for (let i = 1; i < route.legs.length; i++) assert(Date.parse(route.legs[i].departureTime) >= Date.parse(route.legs[i - 1].arrivalTime));
+      if (timeMode === 'arrive') assert(Date.parse(route.arrivalTime) <= Date.parse(viaParams.get('time')));
+    }
+  }
   const mapLeg = result.data[0].legs[0];
   const mapToken = [mapLeg.networkPattern, mapLeg.boardingIndex, mapLeg.alightingIndex].join(':');
   const deepMap = await request('/api/journey-geometry?' + borderParams + '&legs=' + Array(5).fill(mapToken).join(','));

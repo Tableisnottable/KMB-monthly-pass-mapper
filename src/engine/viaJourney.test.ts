@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { joinViaJourney } from './viaJourney';
 import { scoreRoutes, type Route } from './UpgradedScoringEngine';
 import { DEFAULT_LIMITS, withinJourneyLimits } from '../domain/journeyLimits';
-import { parseJourneyVia } from '../domain/journeyVia';
+import { parseJourneyVia, parseJourneyVias, appendJourneyVias } from '../domain/journeyVia';
 
 const via = { id: 'via', name: 'Mong Kok', lat: 22.319, lng: 114.17 };
 const before: Route = { id: 'first', originWalkMinutes: 2, destinationWalkMinutes: 3, walkTransferTimeMinutes: 5,
@@ -13,6 +13,25 @@ const after: Route = { id: 'second', originWalkMinutes: 4, destinationWalkMinute
   legs: [{ id: 'bus', mode: 'BUS', operator: 'CTB', fare: 8, journeyTimeMinutes: 10, accessWalkMinutes: 4, scheduledWaitMinutes: 2 }] };
 
 describe('Via journeys', () => {
+  it('retains every boundary when joining multiple stages forwards or backwards', () => {
+    const second = { ...via, id: 'via-1', name: 'Tsim Sha Tsui', lat: 22.297 };
+    const third = { ...after, id: 'third', departureTime: '2026-11-14T02:43:00Z', arrivalTime: '2026-11-14T03:00:00Z' };
+    const forward = joinViaJourney(joinViaJourney(before, after, via)!, third, second)!;
+    const reverse = joinViaJourney(before, joinViaJourney(after, third, second)!, via)!;
+    for (const joined of [forward, reverse]) {
+      expect(joined.viaStops).toEqual([{ stop: via, legIndex: 1 }, { stop: second, legIndex: 2 }]);
+      expect(joined.legs).toHaveLength(3);
+      expect(joined.transferCount).toBe(2);
+      expect(scoreRoutes([joined])[0].discountedFare).toBe(22);
+    }
+  });
+  it('round trips multiple Via coordinates in order and rejects mismatched lists', () => {
+    const params = new URLSearchParams();
+    appendJourneyVias(params, [via, { ...via, lat: 22.297, name: 'Tsim Sha Tsui' }]);
+    expect(parseJourneyVias(params).map(p => p.name)).toEqual(['Mong Kok', 'Tsim Sha Tsui']);
+    params.append('viaLat', '22.3');
+    expect(() => parseJourneyVias(params)).toThrow('every waypoint');
+  });
   it('charges both stage walks and fares once, retaining time and waypoint boundaries', () => {
     const joined = joinViaJourney(before, after, via)!;
     expect(joined).toMatchObject({ via, viaLegIndex: 1, originWalkMinutes: 2, destinationWalkMinutes: 1,

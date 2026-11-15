@@ -78,6 +78,7 @@ export interface TransitLeg extends Segment {
 export interface Route {
   id: string;
   /** Exact intermediate place and the first leg after visiting it. */
+  viaStops?: { stop: Stop; legIndex: number }[];
   via?: Stop;
   viaLegIndex?: number;
   segments?: Segment[];

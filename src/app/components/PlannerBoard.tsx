@@ -117,7 +117,7 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
   routes: ScoredRoute[];
   searchPanel: ReactNode;
   emptyHint?: string;
-  endpoints: { origin: PlaceResult; destination: PlaceResult; via?: PlaceResult } | null;
+  endpoints: { origin: PlaceResult; destination: PlaceResult; vias?: PlaceResult[] } | null;
   places: JourneyLocations;
   onMapPick: (lat: number, lng: number) => void;
   locale?: PlannerLocale;

@@ -9,7 +9,8 @@ import { JourneyPlaceSearch } from './JourneyPlaceSearch';
 import { PlannerBoard } from './PlannerBoard';
 import { PlannerIcon } from './PlannerIcon';
 import { LiveTransitSearch } from './LiveTransitSearch';
-import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { appendJourneyVias } from '../../domain/journeyVia';
+import { copy, readyJourney, locationVias, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { type JourneyTimeSelection } from '../../engine/journeyTime';
 import type { FareProfile } from '../../domain/journeyFares';
 import { JourneyPreferences, defaultCompanies, type SettingsSection, type CompanyPreferences } from './JourneyPreferences';
@@ -63,8 +64,10 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [draft, setDraft] = useState<PlannerSettings>(defaultSettings);
   const [places, setPlaces] = useState<JourneyLocations>({ origin: null, destination: null });
+  const [viaKeys, setViaKeys] = useState<string[]>([]);
+  const nextViaKey = useRef(0);
   const [activeField, setActiveField] = useState<JourneyField>('origin');
-  const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult; via?: PlaceResult } | null>(null);
+  const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult; vias?: PlaceResult[] } | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   const arrivalsDialog = useRef<HTMLDialogElement>(null);
   const menuDialog = useRef<HTMLDialogElement>(null);
@@ -87,7 +90,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     setTransport(value.transport); setComparisons(value.comparisons);
     setCompanies(value.companies); setPreferences(value.preferences); setChangeMinutes(value.changeMinutes); setWeights(value.weights); setSettingsSection(null);
     setLimits(value.limits);
-    if (changed) { resetJourney(); if (places.origin && places.destination && places.via !== null) void handleSearch(places.origin, places.destination, value); }
+    if (changed) { resetJourney(); if (places.origin && places.destination && readyJourney(places)) void handleSearch(places.origin, places.destination, value); }
   }
 
   function resetJourney() {
@@ -95,17 +98,17 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     setSearching(false); setRoutes([]); setMeta(null); setSearched(false); setError(null); setEndpoints(null);
   }
 
-  async function handleSearch(origin: PlaceResult, destination: PlaceResult, applied = { companies, transport, comparisons, preferences, changeMinutes, weights, limits }, background = false, signal?: AbortSignal, via: PlaceResult | null = places.via ?? null) {
+  async function handleSearch(origin: PlaceResult, destination: PlaceResult, applied = { companies, transport, comparisons, preferences, changeMinutes, weights, limits }, background = false, signal?: AbortSignal, vias: PlaceResult[] = locationVias(places).filter((p): p is PlaceResult => Boolean(p))) {
     if (background && activeSearch.current) return;
     activeSearch.current?.abort();
     const controller = new AbortController();
     activeSearch.current = controller;
-    if (!background) { setSearching(true); setError(null); setRoutes([]); setMeta(null); setSearched(false); setEndpoints({ origin, destination, via: via ?? undefined }); }
+    if (!background) { setSearching(true); setError(null); setRoutes([]); setMeta(null); setSearched(false); setEndpoints({ origin, destination, vias }); }
     const abort = () => controller.abort(); signal?.addEventListener('abort', abort, { once: true });
     const timeout = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng), lang: locale });
-      if (via) { params.set('viaLat', String(via.lat)); params.set('viaLon', String(via.lng)); params.set('viaName', via.name); }
+      appendJourneyVias(params, vias);
       params.set('timeMode', time.mode);
       params.set('operators', Object.entries(applied.companies).filter(([, level]) => level !== 'ban').map(([id]) => id).join(','));
       params.set('requiredOperators', Object.entries(applied.companies).filter(([, level]) => level === 'must').map(([id]) => id).join(','));
@@ -137,8 +140,8 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     }
   }
 
-  const refreshKey = searched && time.mode === 'now' && endpoints ? JSON.stringify([endpoints.origin.id, endpoints.via?.id, endpoints.destination.id, companies, transport, comparisons, preferences, changeMinutes, weights, limits, locale]) : '';
-  const journeyRefresh = useAutoRefresh(refreshKey, signal => handleSearch(endpoints!.origin, endpoints!.destination, undefined, true, signal, endpoints!.via ?? null), 120_000, false);
+  const refreshKey = searched && time.mode === 'now' && endpoints ? JSON.stringify([endpoints.origin.id, endpoints.vias?.map(p => p.id), endpoints.destination.id, companies, transport, comparisons, preferences, changeMinutes, weights, limits, locale]) : '';
+  const journeyRefresh = useAutoRefresh(refreshKey, signal => handleSearch(endpoints!.origin, endpoints!.destination, undefined, true, signal, endpoints!.vias ?? []), 120_000, false);
   useAutoRefresh('source-version', async signal => {
     const response = await window.fetch('/api/sources', { signal, cache: 'no-store' });
     if (!response.ok) throw new Error('Source version unavailable');
@@ -148,15 +151,22 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
 
   function selectPlace(field: JourneyField, place: PlaceResult) {
     resetJourney();
-    const next = { ...places, [field]: place };
+    const index = field.startsWith('via:') ? Number(field.slice(4)) : -1;
+    const next: JourneyLocations = index >= 0
+      ? { ...places, vias: locationVias(places).map((value, i) => i === index ? place : value) }
+      : { ...places, [field]: place };
     setPlaces(next);
-    if (field === 'origin') setActiveField(next.via === null ? 'via' : 'destination');
-    else if (field === 'via') setActiveField('destination');
-    if (next.origin && next.destination && next.via !== null) void handleSearch(next.origin, next.destination, undefined, false, undefined, next.via ?? null);
+    const pending = locationVias(next).findIndex(value => !value);
+    setActiveField(pending >= 0 ? `via:${pending}` : 'destination');
+    if (next.origin && next.destination && readyJourney(next)) void handleSearch(next.origin, next.destination, undefined, false, undefined, next.vias as PlaceResult[]);
   }
 
   function editPlace(field: JourneyField) {
-    resetJourney(); setPlaces(current => ({ ...current, [field]: null })); setActiveField(field);
+    resetJourney();
+    setPlaces(current => field.startsWith('via:')
+      ? { ...current, vias: locationVias(current).map((value, i) => i === Number(field.slice(4)) ? null : value) }
+      : { ...current, [field]: null });
+    setActiveField(field);
   }
 
   async function resolveMapLabel(place: PlaceResult) {
@@ -167,28 +177,39 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       const data = await response.json() as { name: string; address: string };
       if (!data.name || controller.signal.aborted) return;
       const rename = (value: PlaceResult | null | undefined) => value?.id === place.id ? { ...value, name: data.name, address: data.address } : value;
-      setPlaces(current => ({ ...current, origin: rename(current.origin)!, destination: rename(current.destination)!, via: rename(current.via) }));
-      setEndpoints(current => current ? { origin: rename(current.origin)!, destination: rename(current.destination)!, via: rename(current.via) ?? undefined } : current);
+      setPlaces(current => ({ ...current, origin: rename(current.origin)!, destination: rename(current.destination)!, vias: current.vias?.map(value => rename(value) ?? null) }));
+      setEndpoints(current => current ? { origin: rename(current.origin)!, destination: rename(current.destination)!, vias: current.vias?.map(value => rename(value)!) } : current);
     } catch { /* Keep readable map-point labels when reverse lookup is offline. */ }
     finally { labelLookups.current.delete(place.id); }
   }
 
-  function swap() {
-    resetJourney();
-    const next = { ...places, origin: places.destination, destination: places.origin };
-    setPlaces(next);
-    if (next.origin && next.destination && next.via !== null) void handleSearch(next.origin, next.destination, undefined, false, undefined, next.via ?? null);
+  function setWaypoints(vias: (PlaceResult | null)[], keys: string[], active: JourneyField) {
+    resetJourney(); setViaKeys(keys);
+    const next = { ...places, vias }; setPlaces(next); setActiveField(active);
+    if (next.origin && next.destination && readyJourney(next)) void handleSearch(next.origin, next.destination, undefined, false, undefined, vias as PlaceResult[]);
   }
 
-  function toggleVia(enabled: boolean) {
+  function swap() {
     resetJourney();
-    const next = { ...places, via: enabled ? null : undefined };
-    setPlaces(next); setActiveField(enabled ? 'via' : !next.origin ? 'origin' : 'destination');
-    if (!enabled && next.origin && next.destination) void handleSearch(next.origin, next.destination, undefined, false, undefined, null);
+    const next = { ...places, origin: places.destination, destination: places.origin, vias: [...locationVias(places)].reverse() };
+    setPlaces(next); setViaKeys([...viaKeys].reverse());
+    if (next.origin && next.destination && readyJourney(next)) void handleSearch(next.origin, next.destination, undefined, false, undefined, next.vias as PlaceResult[]);
+  }
+
+  function addVia() { setWaypoints([...locationVias(places), null], [...viaKeys, 'via-' + nextViaKey.current++], `via:${locationVias(places).length}`); }
+  function removeVia(index: number) {
+    setWaypoints(locationVias(places).filter((_, i) => i !== index), viaKeys.filter((_, i) => i !== index), 'destination');
+  }
+  function moveVia(index: number, direction: number) {
+    const vias = [...locationVias(places)], keys = [...viaKeys], target = index + direction;
+    if (target < 0 || target >= vias.length) return;
+    [vias[index], vias[target]] = [vias[target], vias[index]];
+    [keys[index], keys[target]] = [keys[target], keys[index]];
+    setWaypoints(vias, keys, `via:${target}`);
   }
 
   function pickMapPoint(lat: number, lng: number) {
-    const name = activeField === 'via' ? copy(locale, '地圖所選途經點', 'Via selected on map') : activeField === 'origin' ? copy(locale, '地圖所選起點', 'Start selected on map') : copy(locale, '地圖所選目的地', 'Destination selected on map');
+    const name = activeField.startsWith('via:') ? copy(locale, '地圖所選途經點', 'Via selected on map') : activeField === 'origin' ? copy(locale, '地圖所選起點', 'Start selected on map') : copy(locale, '地圖所選目的地', 'Destination selected on map');
     const place: PlaceResult = { id: 'map-' + lat + ',' + lng + '-' + Date.now(), name,
       address: copy(locale, '正在查找街道及鄰近地標…', 'Finding the street and nearby landmarks…'), lat, lng, type: 'map', googleMapsUrl: '' };
     selectPlace(activeField, place); void resolveMapLabel(place);
@@ -203,7 +224,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
         : searched && routes.length === 0 ? copy(locale, '未找到符合設定的公共交通路線。請放寬篩選或更改時間。', 'No transit route matches these settings. Try changing the filters or time.') : null;
   const noTransitRoutes = searched && routes.length === 0 && !uncovered && !meta?.tooCloseToRide;
   const emptyHint = searching ? copy(locale, '正在搜尋…', 'Thinking…') : searched ? copy(locale, '未找到可規劃的公共交通路線', 'No supported transit journey found')
-    : activeField === 'via' ? copy(locale, '點選地圖設定途經點', 'Click the map to set Via') : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
+    : activeField.startsWith('via:') ? copy(locale, '點選地圖設定途經點', 'Click the map to set Via') : activeField === 'origin' ? copy(locale, '點選地圖設定起點', 'Click the map to set Start') : copy(locale, '點選地圖設定目的地', 'Click the map to set End');
 
   const filterSections: [SettingsSection, string, string, number | string][] = [
     ['companies', '交通方式', 'Transport', Object.values(companies).filter(level => level !== 'normal').length + Object.values(transport).filter(level => level !== 'normal').length + Object.values(comparisons).filter(value => !value).length],
@@ -218,8 +239,8 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
         <select defaultValue={activeCity.id} title={copy(locale, '目前提供香港；其他城市將在資料準備後加入。', 'Hong Kong is currently available. More cities can be added when their data is ready.')}>
           {supportedCities.map(city => <option key={city.id} value={city.id}>{copy(locale, city.nameTc, city.nameEn)}</option>)}
         </select></label><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} /></div>
-    <JourneyPlaceSearch places={places} onViaChange={toggleVia} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}
-      onSwap={swap} onSearch={() => { if (places.origin && places.destination && places.via !== null) void handleSearch(places.origin, places.destination); }}
+    <JourneyPlaceSearch places={places} viaKeys={viaKeys} onViaAdd={addVia} onViaRemove={removeVia} onViaMove={moveVia} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}
+      onSwap={swap} onSearch={() => { if (places.origin && places.destination && readyJourney(places)) void handleSearch(places.origin, places.destination); }}
       searching={searching} locale={locale} time={time} onTimeChange={value => { resetJourney(); setTime(value); }} />
     <div className="planner-filter-bar" role="group" aria-label={copy(locale, '行程篩選器', 'Journey filters')}>
       {filterSections.map(([id, zh, en, count]) => <button type="button" key={id} className={count ? 'filter-chip is-active' : 'filter-chip'}

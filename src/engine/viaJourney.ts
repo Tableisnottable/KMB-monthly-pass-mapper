@@ -12,8 +12,10 @@ export function joinViaJourney(before: Route, after: Route, via: Stop): Route | 
   // the waypoint connection visible to change/wait limits as one transfer.
   firstOnward.accessWalkMinutes = (before.destinationWalkMinutes ?? 0) + (firstOnward.accessWalkMinutes ?? after.originWalkMinutes ?? 0);
   firstOnward.scheduledWaitMinutes = (firstOnward.scheduledWaitMinutes ?? 0) + Math.max(0, gap);
+  const markers = [...(before.viaStops ?? []), { stop: via, legIndex: a.length },
+    ...(after.viaStops ?? []).map(marker => ({ ...marker, legIndex: marker.legIndex + a.length }))];
   return {
-    id: `via:${before.id}:${after.id}`, legs, via, viaLegIndex: a.length,
+    id: `via:${before.id}:${after.id}`, legs, viaStops: markers, via: markers[0].stop, viaLegIndex: markers[0].legIndex,
     originWalkMinutes: before.originWalkMinutes ?? 0, destinationWalkMinutes: after.destinationWalkMinutes ?? 0,
     walkTransferTimeMinutes: (before.walkTransferTimeMinutes ?? 0) + (after.walkTransferTimeMinutes ?? 0),
     transferCount: Math.max(0, legs.filter(leg => leg.mode !== 'WALK').length - 1),

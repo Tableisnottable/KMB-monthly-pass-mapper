@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { PlannerIcon } from './PlannerIcon';
-import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { copy, readyJourney, locationVias, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import type { PlaceResult } from './PlaceAutocomplete';
 import { hongKongInputValue, type JourneyTimeSelection } from '../../engine/journeyTime';
 
-export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus, onSearch, searching, locale, time, onTimeChange, onViaChange }: {
+export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus, onSearch, searching, locale, time, onTimeChange, viaKeys, onViaAdd, onViaRemove, onViaMove }: {
   places: JourneyLocations;
-  onViaChange: (enabled: boolean) => void;
+  viaKeys: string[];
+  onViaAdd: () => void;
+  onViaRemove: (index: number) => void;
+  onViaMove: (index: number, direction: number) => void;
   onInput: (field: JourneyField) => void;
   onSelect: (field: JourneyField, place: PlaceResult) => void;
   onSwap: () => void;
@@ -20,11 +23,6 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
   time: JourneyTimeSelection;
   onTimeChange: (time: JourneyTimeSelection) => void;
 }) {
-  const [via, setVia] = useState('');
-  const viaRef = useRef<HTMLInputElement>(null);
-  const viaEnabled = places.via !== undefined;
-  useEffect(() => { if (places.via) setVia(places.via.name); else if (places.via === undefined) setVia(''); }, [places.via]);
-  useEffect(() => { if (viaEnabled && !places.via) viaRef.current?.focus(); }, [viaEnabled]);
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const originRef = useRef<HTMLInputElement>(null), destinationRef = useRef<HTMLInputElement>(null);
@@ -50,7 +48,7 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
 
   return <form className="journey-search" onSubmit={event => {
     event.preventDefault();
-    if (places.origin && places.destination && places.via !== null && !searching) onSearch();
+    if (readyJourney(places) && !searching) onSearch();
   }}>
     <div className="search-fields">
       <PlaceAutocomplete label={copy(locale, '起點', 'Start')} colorClass="origin-label" locale={locale}
@@ -64,13 +62,9 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
         onFocus={() => onFocus('destination')} onChange={value => { setDestination(value); onInput('destination'); }}
         onSelect={place => onSelect('destination', place)} />
     </div>
-    {viaEnabled && <div className="via-place-row">
-      <PlaceAutocomplete label={copy(locale, '途經', 'Via')} colorClass="via-label" locale={locale}
-        value={via} selectedPlace={places.via ?? null} inputRef={viaRef}
-        onFocus={() => onFocus('via')} onChange={value => { setVia(value); onInput('via'); }}
-        onSelect={place => onSelect('via', place)} />
-      <button type="button" className="via-remove" aria-label={copy(locale, '移除途經點', 'Remove Via')} onClick={() => onViaChange(false)}>×</button>
-    </div>}
+    {locationVias(places).length > 0 && <div className="via-places">{locationVias(places).map((place, index, all) => <ViaPlaceField key={viaKeys[index] ?? index}
+      place={place} index={index} total={all.length} onInput={() => onInput(`via:${index}`)} onSelect={value => onSelect(`via:${index}`, value)}
+      onFocus={() => onFocus(`via:${index}`)} onRemove={() => onViaRemove(index)} onMove={direction => onViaMove(index, direction)} locale={locale} />)}</div>}
     <div className="journey-time-controls">
       <label className="sr-only" htmlFor="journey-time-mode">{copy(locale, '出發或抵達時間', 'Departure or arrival time')}</label>
       <select id="journey-time-mode" value={time.mode} onChange={event => onTimeChange({ mode: event.target.value as JourneyTimeSelection['mode'], value: time.value || hongKongInputValue(new Date(Date.now() + 3600000)) })}>
@@ -78,9 +72,29 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
       </select>
       {time.mode !== 'now' && <><label className="sr-only" htmlFor="journey-date-time">{copy(locale, '日期及時間（香港 UTC+8）', 'Date and time (Hong Kong UTC+8)')}</label><input id="journey-date-time" type="datetime-local" value={time.value} required onChange={event => onTimeChange({ ...time, value: event.target.value })} /></>}
       {searching && <span className="planner-spinner" aria-label={copy(locale, '正在搜尋', 'Searching')} />}
-      <button type="submit" className="time-apply" disabled={!places.origin || !places.destination || places.via === null || searching || (time.mode !== 'now' && !time.value)}>{copy(locale, '搜尋', 'Go')}</button>
+      <button type="submit" className="time-apply" disabled={!readyJourney(places) || searching || (time.mode !== 'now' && !time.value)}>{copy(locale, '搜尋', 'Go')}</button>
     </div>
-    <div className="search-place-actions"><button type="button" className="use-location-button" disabled={locating} aria-busy={locating} onClick={useLocation}><PlannerIcon name="locate" size={18} />{locating ? copy(locale, 'GPS 定位中…', 'Locating…') : copy(locale, 'GPS 定位起點', 'Use GPS as start')}</button>{!viaEnabled && <button type="button" className="add-via-button" onClick={() => onViaChange(true)}>+ {copy(locale, '途經點', 'Via')}</button>}<span>Hong Kong · UTC+8</span></div>
+    <div className="search-place-actions"><button type="button" className="use-location-button" disabled={locating} aria-busy={locating} onClick={useLocation}><PlannerIcon name="locate" size={18} />{locating ? copy(locale, 'GPS 定位中…', 'Locating…') : copy(locale, 'GPS 定位起點', 'Use GPS as start')}</button>{<button type="button" className="add-via-button" onClick={onViaAdd}>+ {copy(locale, '途經點', 'Via')}</button>}<span>Hong Kong · UTC+8</span></div>
     {locationError && <p className="location-error" role="status">{locationError}</p>}
   </form>;
+}
+
+function ViaPlaceField({ place, index, total, onInput, onSelect, onFocus, onRemove, onMove, locale }: {
+  place: PlaceResult | null; index: number; total: number; onInput: () => void; onSelect: (place: PlaceResult) => void;
+  onFocus: () => void; onRemove: () => void; onMove: (direction: number) => void; locale: PlannerLocale;
+}) {
+  const [value, setValue] = useState(place?.name ?? '');
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (place) setValue(place.name); }, [place]);
+  useEffect(() => { if (!place) input.current?.focus(); }, []);
+  const label = copy(locale, '\u9014\u7d93', 'Via') + ' ' + (index + 1);
+  return <div className="via-place-row">
+    <PlaceAutocomplete label={label} colorClass="via-label" locale={locale} value={value} selectedPlace={place} inputRef={input}
+      onFocus={onFocus} onChange={text => { setValue(text); onInput(); }} onSelect={onSelect} />
+    <div className="via-row-actions">
+      <button type="button" disabled={!index} aria-label={label + copy(locale, '\u4e0a\u79fb', ' move up')} onClick={() => onMove(-1)}>↑</button>
+      <button type="button" disabled={index === total - 1} aria-label={label + copy(locale, '\u4e0b\u79fb', ' move down')} onClick={() => onMove(1)}>↓</button>
+      <button type="button" className="via-remove" aria-label={copy(locale, '\u79fb\u9664', 'Remove ') + label} onClick={onRemove}>×</button>
+    </div>
+  </div>;
 }

@@ -552,7 +552,8 @@ button {
 .planner-toolbar .use-location-button:disabled { opacity: .65; cursor: progress; }
 .planner-toolbar .journey-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; margin: 0; padding: 0; border: 0; background: transparent; }
 .planner-toolbar .search-fields { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 7px; align-items: center; }
-.planner-toolbar .via-place-row { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 7px; margin-top: 8px; }
+.planner-toolbar .via-places { grid-column: 1; grid-row: 2; display: grid; gap: 8px; margin-top: 8px; }
+.planner-toolbar .via-place-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; margin-top: 8px; }
 .planner-toolbar .via-place-row .place-input { border-left: 4px solid #7851a9; }
 .planner-toolbar .via-label { color: #67428e; }
 .via-remove, .add-via-button { min-height: 44px; border: 1px solid #d1c4df; border-radius: 6px; background: #f6f1fb; color: #67428e; font: inherit; font-weight: 700; }
@@ -674,3 +675,8 @@ button {
 }
 .planner-toolbar .selected-place-description { display: block; margin-top: 4px; font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #718074; }
 .planner-toolbar .endpoint-coordinate { display: none; }
+
+.via-row-actions { display: flex; gap: 3px; }
+.via-row-actions button { min-width: 36px; min-height: 44px; border: 1px solid #d1c4df; border-radius: 6px; background: #f6f1fb; color: #67428e; font-size: 18px; }
+.via-row-actions button:disabled { opacity: .3; }
+.trip-via-endpoint > span { color: #ffffffe6; font-size: 20px; line-height: 23px; }

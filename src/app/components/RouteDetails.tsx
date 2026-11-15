@@ -18,6 +18,7 @@ import { JourneyNotificationControl } from './JourneyNotificationControl';
 export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile = 'adult', selectedFareLabel }: { route: ScoredRoute; locale: PlannerLocale; weights?: RouteWeights; profile?: FareProfile; selectedFareLabel?: string }) {
   const insight = getMonthlyPassInsight(route);
   const studentFares = studentLegFares(route);
+  const viaStops = route.viaStops ?? (route.via && route.viaLegIndex !== undefined ? [{ stop: route.via, legIndex: route.viaLegIndex }] : []);
   const walkOnly = route.legs.every(leg => leg.mode === 'WALK');
   const transferWalk = Math.max(0, route.walkTransferTimeMinutes - (route.originWalkMinutes ?? 0) - (route.destinationWalkMinutes ?? 0));
   const items = [
@@ -43,7 +44,7 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile
         const selectedPrice = profile === 'unverified' ? copy(locale, '票價未核實', 'Fare unverified') : profile === 'pass' ? passLabel : profile === 'student'
           ? studentFares[index].available ? (studentFares[index].upperBound ? copy(locale, '最多 ', 'Up to ') : '') + '$' + studentFares[index].maximum.toFixed(2) : copy(locale, '票價待查', 'Fare unavailable')
           : leg.fareStatus === 'UNAVAILABLE' || leg.fare === undefined ? copy(locale, '票價待查', 'Fare unavailable') : '$' + leg.fare.toFixed(2);
-        return <Fragment key={leg.id}>{route.via && route.viaLegIndex === index && <li className="via-journey-step"><span className="step-marker"><PlannerIcon name="pin" size={16} /></span><div><strong>{copy(locale, '途經', 'Via')} · {route.via.name}</strong></div></li>}<li>
+        return <Fragment key={leg.id}>{viaStops.filter(marker => marker.legIndex === index).map((marker, i) => <li key={i} className="via-journey-step"><span className="step-marker"><PlannerIcon name="pin" size={16} /></span><div><strong>{copy(locale, '途經', 'Via')} · {marker.stop.name}</strong></div></li>)}<li>
         <span className="step-marker step-operator-marker" style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
         <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行', 'Walk') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} {leg.mode !== 'WALK' && <DepartureBadge departure={leg.liveDepartures?.[0] ?? { status: leg.serviceStatus ?? 'UNVERIFIED' }} locale={locale} />}</strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>

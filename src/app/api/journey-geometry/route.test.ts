@@ -14,6 +14,14 @@ const request = (query: string) => GET(new NextRequest('http://localhost/api/jou
 
 describe('Journey map geometry', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('keeps two Via places in their requested order within the same transfer walk', async () => {
+    const pattern = networkPatterns.findIndex(p => p.p[0] === 0 && p.a.at(-1) === 0);
+    const token = `${pattern}:0:${networkPatterns[pattern].s.length - 1}`;
+    const query = endpointParams + '&viaLat=22.32&viaLon=114.12&viaIndex=1&viaLat=22.33&viaLon=114.13&viaIndex=1&legs=' + [token, token].join(',');
+    expect((await request(query)).status).toBe(200);
+    expect(vi.mocked(routeOnStreets).mock.calls[1][0].slice(1, 3)).toEqual([[22.32, 114.12], [22.33, 114.13]]);
+    expect((await request(query.replace('viaIndex=1&legs=', 'viaIndex=0&legs='))).status).toBe(400);
+  });
   it('draws the transfer walk through Via, keeping both transit stages', async () => {
     const pattern = networkPatterns.findIndex(p => p.p[0] === 0 && p.a.at(-1) === 0);
     const token = `${pattern}:0:${networkPatterns[pattern].s.length - 1}`;

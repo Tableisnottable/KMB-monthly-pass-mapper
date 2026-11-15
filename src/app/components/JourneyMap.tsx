@@ -6,11 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import type { PlaceResult } from './PlaceAutocomplete';
-import { copy, legOperator, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { copy, locationVias, legOperator, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { PlannerIcon } from './PlannerIcon';
 import type { TravelOption } from '../../domain/travelOptions';
 import { routeLineStyles } from './routeColours';
 import { useLiveLocation } from './useLiveLocation';
+import { appendJourneyVias } from '../../domain/journeyVia';
 import type { RoutePreferences } from '../../domain/routePreferences';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
@@ -19,7 +20,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
   const container = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const journeyBounds = useRef<Leaflet.LatLngBounds | null>(null);
-  const { origin, via, destination } = places;
+  const { origin, destination } = places;
   const onMapPick = useRef(onPick);
   useEffect(() => { onMapPick.current = onPick; }, [onPick]);
   const [ready, setReady] = useState(false);
@@ -93,7 +94,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
       });
     }
     if (origin) flag(origin, copy(locale, '起點', 'Start'));
-    if (via) flag(via, copy(locale, '途經', 'Via'));
+    locationVias(places).forEach((via, i) => { if (via) flag(via, copy(locale, '途經', 'Via') + ' ' + (i + 1)); });
     if (destination) flag(destination, copy(locale, '目的地', 'End'));
     function fit() {
       if (points.length) {
@@ -116,7 +117,9 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
     setGeometryStatus('loading');
     setEstimatedRoad(false);
     const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng) });
-    if (via) { params.set('viaLat', String(via.lat)); params.set('viaLon', String(via.lng)); if (route.viaLegIndex !== undefined) params.set('viaIndex', String(route.viaLegIndex)); }
+    const markers = route.viaStops ?? (route.via && route.viaLegIndex !== undefined ? [{ stop: route.via, legIndex: route.viaLegIndex }] : []);
+    appendJourneyVias(params, markers.map(m => ({ lat: m.stop.lat!, lng: m.stop.lng! })));
+    markers.forEach(m => params.append('viaIndex', String(m.legIndex)));
     if (route.legs.every(l => l.mode === 'WALK')) {
       params.set('walk', 'true');
       if (preferences) params.set('preferences', JSON.stringify(preferences));
@@ -146,7 +149,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
     }).catch(() => { if (!controller.signal.aborted) setGeometryStatus('error'); })
       .finally(() => window.clearTimeout(timeout));
     return () => { controller.abort(); window.clearTimeout(timeout); };
-  }, [ready, route, travel, origin, via, destination, locale, preferences]);
+  }, [ready, route, travel, origin, destination, places.vias, places.via, locale, preferences]);
 
   useEffect(() => {
     const current = state.current;
