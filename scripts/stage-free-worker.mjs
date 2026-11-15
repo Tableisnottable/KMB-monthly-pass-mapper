@@ -1,9 +1,11 @@
 import { build } from 'esbuild';
-import { cp, mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const assets = join(root, '.free-worker/assets');
+// Stage only this build. Removed pages must not survive from an older release.
+await rm(assets, { recursive: true, force: true });
 await mkdir(assets, { recursive: true });
 await cp(join(root, 'public'), assets, { recursive: true });
 await cp(join(root, '.next/static'), join(assets, '_next/static'), { recursive: true });

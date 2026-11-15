@@ -1,8 +1,10 @@
 import { build } from 'esbuild';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { copyFile, mkdir, readFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm } from 'node:fs/promises';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+// esbuild does not remove chunks belonging to deleted handlers or old builds.
+await rm(resolve(root, 'public/__planner'), { recursive: true, force: true });
 const manifest = JSON.parse(await readFile(resolve(root, 'src/data/alignments/manifest.json'), 'utf8'));
 await mkdir(resolve(root, 'public/__alignments'), { recursive: true });
 for (const file of [...manifest.files.roads, ...manifest.files.tracks]) {

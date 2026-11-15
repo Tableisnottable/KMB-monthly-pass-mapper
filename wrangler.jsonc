@@ -1,6 +1,6 @@
 ﻿{
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "kmb-monthly-pass-mapper",
+  "name": "kmb-monthly-pass-mapper-macau-v2-preview",
   "minify": true,
   "main": ".free-worker/worker.js",
   "compatibility_date": "2026-11-13",

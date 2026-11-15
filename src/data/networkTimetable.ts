@@ -13,7 +13,8 @@ export interface LiveDeparture extends TimetableComparison {
   operator?: string;
   scheduleMatch: ScheduleMatch;
   addedReason?: AddedReason;
-  changedReason?: 'PROVIDER' | 'OBSERVED_SPACING';
+  changedReason?: 'PROVIDER' | 'OBSERVED_SPACING' | 'POSSIBLE_SHIFT';
+  timetableEstimate?: boolean;
 }
 export interface CancellationNotice {
   departureType: 'CANCELLED';
@@ -79,6 +80,27 @@ export function nextPublishedDeparture(patternIndex: number, boardingIndex: numb
   return result;
 }
 
+/** A bounded three-hour preview; headway-derived times remain explicit estimates. */
+export function upcomingPublishedDepartures(patternIndex: number, boardingIndex: number, now: Date): LiveDeparture[] {
+  const start = now.getTime(), end = start + 180 * 60000, times = new Map<number, LiveDeparture>();
+  for (const shift of [-1, 0, 1]) {
+    const date = hongKongServiceDate(new Date(start + shift * 86400000));
+    for (const entry of patternTimetable(patternIndex, date, boardingIndex)) {
+      const first = Date.parse(entry.start), step = entry.headwayMinutes * 60000;
+      const last = step ? Math.min(end, Date.parse(entry.end) - 1) : first;
+      let time = step ? first + Math.max(0, Math.ceil((start - first) / step)) * step : first;
+      for (; time <= last && time <= end; time += step) {
+        if (time >= start) times.set(time, { time: new Date(time).toISOString(), minutes: Math.ceil((time - start) / 60000),
+          departureType: 'SCHEDULED', timingType: 'SCHEDULED', scheduleMatch: 'MATCHED', timetableEstimate: true,
+          timetableTime: new Date(time).toISOString(), deviationMinutes: 0,
+          comparisonBasis: entry.estimatedStopTime ? 'INTERPOLATED' : step ? 'FREQUENCY' : 'FIXED' });
+        if (!step) break;
+      }
+    }
+  }
+  return Array.from(times.values()).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)).slice(0, 200);
+}
+
 const routePatterns = new Map<number, number[]>();
 networkPatterns.forEach((pattern, index) => routePatterns.set(pattern.r, [...(routePatterns.get(pattern.r) ?? []), index]));
 
@@ -141,11 +163,11 @@ export function compareDepartureToTimetable(patternIndex: number, boarding: numb
 
 /** Sparse ETA feeds cannot prove cancellations: flag slower patterns as inferred. */
 export function classifyDepartureTypes(patternIndex: number, boarding: number, departures: LiveDeparture[]): LiveDeparture[] {
-  const classified = departures.map(row => ({ ...row, departureType: departureType(row) }));
+  const classified = departures.map(row => ({ ...row, ...compareDepartureToTimetable(patternIndex, boarding, row.time), departureType: departureType(row) }));
   if (boarding !== 0) return classified;
   const operators = new Set(classified.map(row => row.operator));
   for (const operator of Array.from(operators)) {
-    const rows = classified.filter(row => row.operator === operator && providerMarksScheduled(row.remark)
+    const rows = classified.filter(row => row.operator === operator && row.departureType !== 'CANCELLED' && !row.timetableEstimate && providerMarksScheduled(row.remark)
       && row.addedReason !== 'PROVIDER').sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
     const observed = new Set(rows.map(row => Date.parse(row.time)));
     if (observed.size < 3 || !rows.some(row => row.addedReason === 'NOT_IN_TIMETABLE')) continue;
@@ -162,6 +184,19 @@ export function classifyDepartureTypes(patternIndex: number, boarding: number, d
     for (const row of rows) if (row.addedReason === 'NOT_IN_TIMETABLE') {
       row.departureType = 'CHANGED'; row.changedReason = 'OBSERVED_SPACING';
     }
+  }
+  // An unoccupied nearby slot may have moved earlier OR later. Without trip IDs
+  // this is only a possibility: multiple rows may be candidates for the same slot.
+  // Never turn an explicitly added/cancelled service into a changed service.
+  const occupied = new Set(classified.filter(row => !row.timetableEstimate && row.departureType !== 'CANCELLED')
+    .map(row => Date.parse(row.time)));
+  for (const row of classified) {
+    if (row.departureType !== 'ADDITIONAL' || row.addedReason !== 'NOT_IN_TIMETABLE' || row.timetableEstimate
+      || !providerMarksScheduled(row.remark) || providerMarksAdditional(row.remark) || !row.timetableTime
+      || row.deviationMinutes === undefined || Math.abs(row.deviationMinutes) < .5 || Math.abs(row.deviationMinutes) > 10) continue;
+    const reference = Date.parse(row.timetableTime);
+    if (Array.from(occupied).some(time => Math.abs(time - reference) <= 30000)) continue;
+    row.departureType = 'CHANGED'; row.changedReason = 'POSSIBLE_SHIFT';
   }
   return classified;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PREFERENCES, corridorIds, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, type RoutePreferences } from './routePreferences';
+import { DEFAULT_PREFERENCES, corridorChoices, corridorIds, legCorridors, preferencePenalty, parseRoutePreferences, corridorLegAllowed, roadLevel, routeRoadsAllowed, type RoutePreferences } from './routePreferences';
 import intervals from '../data/corridorSegments.json';
 import { networkPatterns, networkRoutes } from '../data/transportNetwork';
 import { operatorAllowed, parseOperatorSelection } from './operatorSelection';
@@ -8,6 +8,13 @@ const leg = (number: string, operator?: string) => {
   return { operator: 'KMB', networkPatternId: p.id, boardingIndex: 0, alightingIndex: p.s.length - 1 };
 };
 describe('Company and road preferences', () => {
+  it('uses corrected tunnel names while retaining saved corridor IDs', () => {
+    expect(corridorChoices.shatin.find(([id]) => id === 'eaglesnest')?.slice(1)).toEqual(['香港尖山隧道', "Eagle's Nest Tunnel"]);
+    expect(corridorChoices.airport.find(([id]) => id === 'airporttunnel')?.slice(1)).toEqual(['南灣隧道', 'Nam Wan Tunnel']);
+    expect(corridorChoices.airport.find(([id]) => id === 'tsingkau')?.slice(1)).toEqual(['汀九橋', 'Ting Kau Bridge']);
+    expect(corridorIds).toContain('airporttunnel');
+    expect(corridorIds).toContain('tsingkau');
+  });
   it('excludes banned companies and joint services containing a banned company', () => {
     expect(operatorAllowed('KMB', ['KMB'])).toBe(true); expect(operatorAllowed('KMB+CTB', ['KMB'])).toBe(false);
     expect(operatorAllowed('MTR', [])).toBe(false); expect(operatorAllowed('KMB+CTB', ['KMB', 'CTB'])).toBe(true);
@@ -27,9 +34,9 @@ describe('Company and road preferences', () => {
       else expect(corridors).not.toContain('whc');
     }
   });
-  it('penalises other identified roads while retaining rail and unclassified paths', () => {
-    const preference = { ...DEFAULT_PREFERENCES, harbour: 'whc' };
-    expect(preferencePenalty({ id: 'a', legs: [leg('104')] }, preference)).toBe(15);
+  it('requires the selected road while retaining rail and unclassified paths', () => {
+    const preference = { ...DEFAULT_PREFERENCES, roads: { whc: 'must' as const } };
+    expect(routeRoadsAllowed({ id: 'a', legs: [leg('104')] }, preference)).toBe(false);
     expect(preferencePenalty({ id: 'b', legs: [leg('961')] }, preference)).toBe(0);
     expect(preferencePenalty({ id: 'c', legs: [{ operator: 'MTR', mode: 'SUBWAY' }] }, preference)).toBe(0);
     expect(() => parseRoutePreferences('{"harbour":"unknown"}')).toThrow();
@@ -42,9 +49,9 @@ describe('Company and road preferences', () => {
     expect(legCorridors(leg('619'))).not.toContain('tkolam');
     expect(legCorridors(leg('680'))).not.toContain('tkolam');
   });
-  it('offers 28 unique roads with actual travelled intervals and accepts their settings', () => {
-    expect(corridorIds).toHaveLength(28);
-    expect(new Set(corridorIds).size).toBe(28);
+  it('offers unique roads with actual travelled intervals and accepts their settings', () => {
+    expect(corridorIds.length).toBeGreaterThanOrEqual(38);
+    expect(new Set(corridorIds).size).toBe(corridorIds.length);
     for (const id of corridorIds) {
       const sample = intervals.find(row => row[2] === id)!;
       expect(sample, id).toBeDefined();
@@ -54,20 +61,43 @@ describe('Company and road preferences', () => {
       expect(corridorLegAllowed(pattern, start + 1, start + 1, preferences), id).toBe(true);
     }
   });
+  it('offers all current strategic route numbers and tags represented road segments', () => {
+    for (let number = 1; number <= 10; number += 1) {
+      const id = `route${number}`;
+      expect(corridorChoices.strategic.some(([corridor]) => corridor === id)).toBe(true);
+      expect(intervals.some(([, , corridor]) => corridor === id), id).toBe(true);
+    }
+  });
   it('bans only the travelled interval, including backwards-search intervals', () => {
     const full = leg('104'), preferences: RoutePreferences = { ...DEFAULT_PREFERENCES, roads: { cht: 'ban' } };
     expect(corridorLegAllowed(full.networkPatternId, 0, full.alightingIndex, preferences)).toBe(false);
     expect(corridorLegAllowed(full.networkPatternId, 0, 1, preferences)).toBe(true);
     expect(corridorLegAllowed(leg('961').networkPatternId, 0, leg('961').alightingIndex, preferences)).toBe(true);
   });
-  it('accepts multiple preferred roads and lets explicit neutral override a legacy preference', () => {
+  it('preserves saved soft preferences while explicit Must remains mandatory', () => {
     const preferences = parseRoutePreferences('{"harbour":"whc","roads":{"cht":"prefer","whc":"normal","ehc":"prefer"}}');
     expect(roadLevel(preferences, 'whc')).toBe('normal');
     expect(preferencePenalty({ id: 'a', legs: [leg('104')] }, preferences)).toBe(0);
     expect(preferencePenalty({ id: 'b', legs: [leg('619')] }, preferences)).toBe(0);
-    expect(preferencePenalty({ id: 'c', legs: [leg('961')] }, preferences)).toBe(15);
+    expect(roadLevel(preferences, 'cht')).toBe('prefer');
+    expect(roadLevel(preferences, 'ehc')).toBe('prefer');
+    expect(roadLevel(parseRoutePreferences('{"harbour":"cht"}'), 'cht')).toBe('prefer');
+    expect(routeRoadsAllowed({ id: 'c', legs: [leg('961')] }, preferences)).toBe(true);
+    const must = parseRoutePreferences('{"roads":{"cht":"must"}}');
+    expect(routeRoadsAllowed({ id: 'c', legs: [leg('961')] }, must)).toBe(false);
+    expect(routeRoadsAllowed({ id: 'd', legs: [leg('104')] }, must)).toBe(true);
   });
-  it.each(['{"roads":{"unknown":"ban"}}', '{"roads":{"cht":"must"}}', '{"roads":[]}', '{"roads":null}', '{"__proto__":"cht"}'])('rejects unsafe road states %s', raw => {
+  it('treats Must roads in one group as alternatives and separate groups as joint requirements', () => {
+    const harbour = parseRoutePreferences('{"roads":{"cht":"must","ehc":"must"}}');
+    expect(routeRoadsAllowed({ id: 'cht', legs: [leg('104')] }, harbour)).toBe(true);
+    expect(routeRoadsAllowed({ id: 'ehc', legs: [leg('619')] }, harbour)).toBe(true);
+    expect(routeRoadsAllowed({ id: 'whc', legs: [leg('961')] }, harbour)).toBe(false);
+
+    const harbourAndAirport = parseRoutePreferences('{"roads":{"cht":"must","ehc":"must","lantau":"must"}}');
+    expect(routeRoadsAllowed({ id: 'both', legs: [leg('104'), leg('A31')] }, harbourAndAirport)).toBe(true);
+    expect(routeRoadsAllowed({ id: 'harbour-only', legs: [leg('104')] }, harbourAndAirport)).toBe(false);
+  });
+  it.each(['{"roads":{"unknown":"ban"}}', '{"roads":{"cht":"invalid"}}', '{"roads":[]}', '{"roads":null}', '{"__proto__":"cht"}'])('rejects unsafe road states %s', raw => {
     expect(() => parseRoutePreferences(raw)).toThrow();
   });
 });

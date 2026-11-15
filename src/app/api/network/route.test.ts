@@ -59,8 +59,8 @@ describe('All-network catalogue', () => {
     const pattern = networkPatterns.find(pattern => pattern.s.length >= 4 && pattern.p[1] === 0)!;
     const params = new URLSearchParams({ resource: 'departures', pattern: pattern.id, board: '1', stop: networkStops[pattern.s[1]][0] });
     const { data } = await (await lookup(params.toString())).json();
-    expect(data).toHaveLength(1);
-    expect(data[0].patternId).toBe(pattern.id);
+    expect(data.length).toBeGreaterThan(0);
+    expect(data.every((row: { patternId: string }) => row.patternId === pattern.id)).toBe(true);
     const candidate = vi.mocked(enrichJourneyArrivals).mock.calls[0][0];
     expect(candidate).toHaveLength(1);
     expect(candidate[0].legs?.[0].boardingIndex).toBe(1);
@@ -170,9 +170,43 @@ describe('All-network catalogue', () => {
       }
     });
     const { data } = await (await lookup('resource=departures&stop=' + encodeURIComponent(networkStops[pattern.s[0]][0]))).json();
-    const rows = data.filter((row: { routeId: string }) => row.routeId === networkRoutes[pattern.r][0]);
+    const rows = data.filter((row: { routeId: string; timetableEstimate?: boolean }) => row.routeId === networkRoutes[pattern.r][0] && !row.timetableEstimate);
     expect(rows.map((row: { departureType: string; status: string }) => [row.departureType, row.status])).toEqual([
       ['LIVE', 'LIVE'], ['SCHEDULED', 'TIMETABLE'], ['ADDITIONAL', 'LIVE'], ['ADDITIONAL', 'TIMETABLE'],
     ]);
+  });
+  it('extends the provider preview beyond one hour with labelled three-hour timetable estimates', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T21:11:00+08:00'));
+    const pattern = networkPatterns.find(pattern => networkRoutes[pattern.r][2] === 'B10' && networkStops[pattern.s[0]][0] === '13393')!;
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      routes[0].legs![0].liveDepartures = ['21:20', '21:30'].map(clock => ({
+        time: '2026-11-13T' + clock + ':00+08:00', minutes: clock === '21:20' ? 9 : 19, remark: 'Scheduled Bus',
+        scheduleMatch: 'MATCHED', timingType: 'SCHEDULED', operator: 'KMB',
+      }));
+    });
+    const params = new URLSearchParams({ resource: 'departures', pattern: pattern.id, board: '0', stop: '13393' });
+    const { data } = await (await lookup(params.toString())).json();
+    expect(data.filter((row: { timetableEstimate?: boolean }) => !row.timetableEstimate)).toHaveLength(2);
+    const estimates = data.filter((row: { timetableEstimate?: boolean }) => row.timetableEstimate);
+    expect(estimates.length).toBeGreaterThan(3);
+    expect(estimates.every((row: { time: string; status: string; departureType: string }) => Date.parse(row.time) > Date.parse('2026-11-13T21:30:00+08:00') && row.status === 'TIMETABLE' && row.departureType === 'SCHEDULED')).toBe(true);
+    expect(estimates.some((row: { minutes: number }) => row.minutes > 60)).toBe(true);
+    expect(estimates.every((row: { minutes: number }) => row.minutes <= 180)).toBe(true);
+    expect(new Set(data.map((row: { time: string }) => Date.parse(row.time))).size).toBe(data.length);
+  });
+  it('does not append the original slot behind an early-shifted prediction or a confirmed cancellation', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T21:01:00+08:00'));
+    const pattern = networkPatterns.find(pattern => networkRoutes[pattern.r][2] === 'B10' && networkStops[pattern.s[0]][0] === '13393')!;
+    vi.mocked(enrichJourneyArrivals).mockImplementation(async routes => {
+      routes[0].legs![0].liveDepartures = [{ time: '2026-11-13T21:10:00+08:00', minutes: 9, remark: 'Scheduled Bus',
+        scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE', departureType: 'CHANGED', changedReason: 'POSSIBLE_SHIFT',
+        timetableTime: '2026-11-13T21:15:00+08:00' }];
+      routes[0].legs![0].departureNotices = [{ departureType: 'CANCELLED', operator: 'KMB', remark: 'Cancelled', time: '2026-11-13T21:45:00+08:00' }];
+    });
+    const params = new URLSearchParams({ resource: 'departures', pattern: pattern.id, board: '0', stop: '13393' });
+    const { data } = await (await lookup(params.toString())).json();
+    const estimates = data.filter((row: { timetableEstimate?: boolean }) => row.timetableEstimate);
+    expect(estimates.every((row: { time: string }) => !['21:15', '21:45'].some(clock => Date.parse(row.time) === Date.parse('2026-11-13T' + clock + ':00+08:00')))).toBe(true);
+    expect(data.some((row: { departureType: string }) => row.departureType === 'CANCELLED')).toBe(true);
   });
 });

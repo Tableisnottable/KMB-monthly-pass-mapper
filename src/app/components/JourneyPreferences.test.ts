@@ -14,11 +14,22 @@ function render(section: SettingsSection, changeMinutes = 3, locale: 'en' | 'zh'
   }));
 }
 describe('Journey settings controls', () => {
-  it.each([0, 3, 31, 60])('renders every minute and preserves the selected value %i', minutes => {
+  it.each([0, 3, 31, 60])('renders the minute controls and preserves the selected value %i', minutes => {
     const html = render('changes', minutes);
-    expect(html.match(/<option /g)).toHaveLength(61);
-    expect(html).toContain(`<option value="${minutes}" selected="">`);
+    expect(html).toContain('type="range" min="0" max="60" step="1"');
+    expect(html).toContain(`id="minimum-change-time" type="number" inputMode="numeric" min="0" max="60" step="1" aria-label="Minimum change time in minutes" value="${minutes}"`);
+    expect(html).not.toContain('<select');
+    for (const shortcut of [0, 5, 10, 15, 30, 60]) expect(html).toContain(`aria-label="${shortcut} minutes"`);
     expect(html).toContain('actual transfer walking stays unchanged');
+  });
+  it('shows coloured strategic routes with their corridor summaries', () => {
+    const html = render('roads');
+    expect(html).toContain('Cross-Harbour Tunnel');
+    expect(html).toContain('Ting Kau Bridge');
+    expect(html).toContain('Aberdeen to Sha Tin');
+    expect(html).toContain('Shenzhen Bay Port to Lam Tei');
+    expect(html).toContain('Eagle&#x27;s Nest Tunnel');
+    expect(html).toContain('background-color:#e5322b');
   });
   it.each(['en', 'zh'] as const)('lists all supported types, companies and comparison controls in %s', locale => {
     const html = render('companies', 3, locale);

@@ -2,8 +2,10 @@ import type { ScoredRoute, Segment } from '../../engine/UpgradedScoringEngine';
 export { routeColor, routeIconColor, routeBadgeStyle, routeSignColours } from './routeColours';
 
 export type PlannerLocale = 'zh' | 'en';
-export type JourneyField = 'origin' | 'destination';
-export type JourneyLocations = Record<JourneyField, import('./PlaceAutocomplete').PlaceResult | null>;
+export type JourneyField = 'origin' | 'destination' | `via:${number}`;
+export type JourneyLocations = Record<'origin' | 'destination', import('./PlaceAutocomplete').PlaceResult | null> & { vias?: (import('./PlaceAutocomplete').PlaceResult | null)[]; via?: import('./PlaceAutocomplete').PlaceResult | null };
+export const locationVias = (places: JourneyLocations) => places.vias ?? (places.via !== undefined ? [places.via] : []);
+export const readyJourney = (places: JourneyLocations) => Boolean(places.origin && places.destination && locationVias(places).every(Boolean));
 export const copy = (locale: PlannerLocale, zh: string, en: string) => locale === 'en' ? en : zh;
 export const totalWalkMinutes = (route: ScoredRoute) => Math.ceil(route.walkTransferTimeMinutes
   + route.legs.filter(leg => leg.mode === 'WALK').reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), 0));

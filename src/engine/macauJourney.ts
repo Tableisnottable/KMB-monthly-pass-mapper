@@ -80,7 +80,10 @@ export function findMacauJourneys(from: Point, to: Point, anchor: Date, locale: 
     const walk = walkTime(beginning, stop); return { stop, elapsed: walk, walk, access: walk, endpointWalk: walk, buffer: 0, legs: [], used: [], cost: walk * weights.walk };
   });
   const results: Route[] = [];
-  for (let round = 0; round <= Math.min(limits.transfers ?? 3, 3) && frontier.length; round++) {
+  // With no user-selected cap, explore the finite route-family graph fully.
+  // A used-family guard below prevents cycling back onto the same service.
+  const maxTransfers = limits.transfers ?? patterns.length;
+  for (let round = 0; round <= maxTransfers && frontier.length; round++) {
     const arrivals = new Map<string, Label[]>();
     for (const label of frontier) for (const { pattern, position } of serving.get(label.stop[0]) ?? []) {
       const family = pattern.operator + ':' + pattern.number;
@@ -92,7 +95,7 @@ export function findMacauJourneys(from: Point, to: Point, anchor: Date, locale: 
         const ready = anchor.getTime() + (reverse ? -1 : 1) * label.elapsed * 60_000;
         const wait = boardingWait(pattern, board, ready, reverse, ride, label.legs.length === 0, Math.max(0, label.buffer - label.access));
         if (wait === undefined || wait > (limits.wait ?? 90)) continue;
-        const elapsed = label.elapsed + wait + ride; if (elapsed > 240) continue;
+        const elapsed = label.elapsed + wait + ride;
         const departure = reverse ? ready - (ride + wait) * 60_000 : ready + wait * 60_000;
         const leg: Segment = { id: `${pattern.id}:${board}:${alight}`, operator: pattern.operator, networkOperator: pattern.operator,
           networkPatternId: pattern.id, mode: pattern.mode, routeNumber: pattern.number,
@@ -114,7 +117,7 @@ export function findMacauJourneys(from: Point, to: Point, anchor: Date, locale: 
             destinationWalkMinutes: reverse ? label.endpointWalk : exit, departureTime: new Date(start).toISOString(),
             arrivalTime: reverse ? new Date(Date.parse(legs.at(-1)!.arrivalTime!) + label.endpointWalk * 60_000).toISOString() : new Date(start + total * 60_000).toISOString(), timeMode: reverse ? 'arrive' : 'depart' });
         }
-        if (round === Math.min(limits.transfers ?? 3, 3)) continue;
+        if (round === maxTransfers) continue;
         const cost = label.cost + ride * weights.ride + wait * weights.wait + (round ? weights.transfer : 0) + (pattern.mode === 'BUS' ? weights.unverified : 0);
         const next: Label = { stop, elapsed, walk: label.walk, access: 0, endpointWalk: label.endpointWalk, buffer: 0, legs, used: [...label.used, family], cost };
         const key = stop[0] + ':' + family, entries = arrivals.get(key) ?? [];

@@ -124,6 +124,7 @@ button {
 .planner-notice { margin: 16px 12px 0; padding: 12px; background: #fff; border-radius: 5px; font-size: 13px; line-height: 1.6; }
 .notice-error { color: #b53936; }
 .notice-warning { color: #966a20; background: #fffbea; }
+.notice-action { margin-left: 8px; color: #246d2c; font-weight: 700; text-decoration: underline; white-space: nowrap; }
 .results-pane { padding: 0 12px 20px; }
 .map-instruction { color: #fff; font-size: 20px; font-weight: 800; text-align: center; line-height: 1.4; margin: 23px 4px; }
 .quick-modes { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; height: 84px; }
@@ -180,11 +181,11 @@ button {
 .fare-comparison { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 10px 0; text-align: left; }
 .fare-comparison > span { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-width: 0; padding: 4px 7px; border-radius: 4px; }
 .fare-comparison > span + span { border-top: 1px solid #e9eee6; }
-.fare-comparison > span > span { font-size: 11px; line-height: 16px; color: #647165; font-weight: 400; }
-.fare-comparison strong { font-size: 14px; line-height: 20px; color: #485349; font-weight: 800; overflow-wrap: anywhere; }
-.fare-comparison > .fare-selected { background: #e6f3e0; box-shadow: inset 3px 0 #277f22; }
-.fare-comparison > .fare-selected strong { color: #277f22; }
-.fare-comparison > small { grid-column: 1 / -1; font-size: 10px; line-height: 15px; color: #766333; font-weight: 400; }
+.fare-comparison > span > span { font-size: 12px; line-height: 17px; color: #46535b; font-weight: 500; }
+.fare-comparison strong { font-size: 15px; line-height: 20px; color: #25343c; font-weight: 800; overflow-wrap: anywhere; }
+.fare-comparison > .fare-selected { background: #d8efce; box-shadow: inset 4px 0 #176b20; outline: 1px solid #a5ce96; }
+.fare-comparison > .fare-selected strong { color: #14571b; }
+.fare-comparison > small { grid-column: 1 / -1; font-size: 11px; line-height: 16px; color: #594b27; font-weight: 500; }
 .combined-journey-summary .fare-comparison > span + span { border-color: #a7c2e6; }
 .combined-journey-summary .fare-comparison > .fare-selected { background: #edf4ff; box-shadow: inset 3px 0 #245b9a; }
 .combined-journey-summary .fare-comparison strong, .combined-journey-summary .fare-comparison > span > span,
@@ -197,7 +198,7 @@ button {
 .route-symbols { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; flex: 1; color: #999; }
 .leg-symbol-group { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
 .leg-separator { color: #999; font-size: 20px; font-weight: 700; line-height: 1; }
-.route-badge { display: inline-flex; align-items: center; border: 1px solid #e3e3e3; border-radius: 3px; overflow: hidden; line-height: 22px; min-height: 24px; }
+.route-badge { display: inline-flex; align-items: center; border: 1px solid #69757c; border-radius: 3px; overflow: hidden; line-height: 22px; min-height: 26px; box-shadow: 0 1px 2px #0002; }
 .route-badge-icon { display: grid; place-items: center; color: #fff; width: 24px; height: 24px; flex-shrink: 0; }
 .route-badge strong { font-size: 14px; font-weight: 800; padding: 0 5px; color: #696969; white-space: nowrap; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
 .route-stop-plate { border-color: #0003; }
@@ -207,7 +208,7 @@ button {
 .route-duration { position: relative; min-width: 38px; text-align: right; color: var(--text); font-size: 23px; font-weight: 800; line-height: 23px; }
 .route-duration > svg { position: absolute; top: 0; left: -13px; color: #e6d443; }
 .route-duration > small { display: block; font-size: 13px; line-height: 15px; font-weight: 400; }
-.route-service-line { display: flex; align-items: flex-start; gap: 3px; margin-top: 9px; color: #999; font-size: 13px; line-height: 18px; font-weight: 400; }
+.route-service-line { display: flex; align-items: flex-start; gap: 4px; margin-top: 9px; color: #4c5961; font-size: 13px; line-height: 19px; font-weight: 500; }
 .route-service-line > svg { color: #dfd43c; flex-shrink: 0; margin-top: 2px; }
 .service-ended { color: #a76f56; }
 .route-option.ended { background: #fafafa; }
@@ -280,7 +281,6 @@ button {
 .add-pass button { min-height: 38px; border-radius: 4px; padding: 7px 10px; background: #277f22; color: white; }
 .payment-pass-panel p { color: #687469; line-height: 1.7; }
 .directions-list > li > div { min-width: 0; flex: 1; }
-.leg-headway { display: inline-block; margin-top: 12px; padding: 4px 7px; border-radius: 4px; background: #edf2f8; color: #42607d; font-size: 12px; }
 .leg-stop-timeline { margin: 14px 0; padding-left: 13px; border-left: 4px solid var(--timeline-colour); }
 .timeline-endpoint { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.6; }
 .timeline-endpoint::before { content: ''; position: absolute; left: -21px; top: 5px; width: 10px; height: 10px; border: 2px solid var(--timeline-colour); border-radius: 50%; background: #fff; }
@@ -308,7 +308,14 @@ button {
 .joint-arrival-board td:first-child { width: 54px; color: #dce9ff; white-space: nowrap; }
 .joint-arrival-board td:nth-child(2) { width: 76px; white-space: nowrap; }
 .joint-arrival-board td:nth-child(2) strong { color: #ffd52a; font-size: 15px; }
-.joint-arrival-board td:nth-child(3) { width: 14px; color: #bcc6d3; }
+.joint-arrival-board td:nth-child(3) { min-width: 0; }
+.joint-arrival-board td:nth-child(3) > .departure-badges { display: inline-flex; margin-left: 6px; }
+.joint-arrival-board .timetable-difference { margin-top: 2px; }
+.arrival-board-scroll { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.joint-arrival-board .arrival-more-button { width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid #4b5866; border-radius: 4px; color: #dce9ff; font-size: 12px; }
+.arrival-help { margin-top: 8px; color: #b9c4d2; font-size: 11px; }
+.arrival-help summary { width: fit-content; min-height: 32px; padding: 6px 0; cursor: pointer; }
+.arrival-help p { margin: 6px 0 0; }
 .joint-arrival-board .joint-arrival-remark { display: block; font-size: 11px; color: #b9c4d2; overflow-wrap: anywhere; }
 .joint-arrival-board .joint-arrival-note { margin: 8px 0 0; color: #c2cbd7; font-size: 12px; }
 .timetables-page { max-width: 1180px; margin: 0 auto; padding: 24px; color: var(--text); }
@@ -494,9 +501,19 @@ button {
 .journey-preferences p { margin: 8px 0; font-size: 11px; line-height: 1.6; color: #667263; }
 .company-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .company-shortcuts button { border: 1px solid #c9d7c4; color: #277f22; border-radius: 4px; min-height: 44px; padding: 6px 9px; font-size: 12px; }
-.company-preferences > label, .corridor-select { display: grid; grid-template-columns: minmax(0, 1fr) minmax(85px, 40%); gap: 8px; align-items: center; padding: 6px 0; font-size: 12px; }
-.company-preferences select, .corridor-select select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #c8d4c3; border-radius: 4px; background: #fff; color: #344036; padding: 5px; font: inherit; }
-.corridor-select { grid-template-columns: minmax(0, 1fr); margin-top: 8px; }
+.company-preferences > label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(85px, 40%); gap: 8px; align-items: center; padding: 6px 0; font-size: 12px; }
+.company-preferences select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #c8d4c3; border-radius: 4px; background: #fff; color: #344036; padding: 5px; font: inherit; }
+.change-time-control { margin: 10px 0 14px; padding: 14px; border: 1px solid #e0e8dc; border-radius: 8px; background: #f8faf7; }
+.change-time-value { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #536154; font-size: 13px; font-weight: 700; }
+.change-time-number { display: flex; align-items: baseline; gap: 6px; color: #647263; font-size: 12px; }
+.change-time-number input { width: 78px; min-height: 48px; border: 1px solid #cbd8c7; border-radius: 6px; background: #fff; color: #246b2d; font-size: 23px; font-weight: 800; text-align: center; }
+.change-time-number input:focus-visible { outline: 2px solid #347eaa; outline-offset: 2px; }
+.change-time-slider { display: block; width: 100%; height: 36px; margin: 8px 0 4px; accent-color: #287e2d; cursor: pointer; }
+.change-time-slider:focus-visible { outline: 2px solid #347eaa; outline-offset: 2px; border-radius: 4px; }
+.change-time-shortcuts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)) auto; align-items: center; gap: 5px; color: #748073; font-size: 11px; }
+.change-time-shortcuts button { min-width: 0; min-height: 38px; border: 1px solid #d8e1d4; border-radius: 5px; background: #fff; color: #506052; font-size: 12px; font-weight: 700; }
+.change-time-shortcuts button[aria-pressed=true] { border-color: #287e2d; background: #e8f4e5; color: #216b29; }
+.change-time-shortcuts button:focus-visible { outline: 2px solid #347eaa; outline-offset: 1px; }
 .quick-modes { height: auto; min-height: 104px; margin-top: 15px; }
 .quick-modes[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 .quick-modes[data-count="4"] button { border-bottom: 1px solid #eee; }
@@ -535,6 +552,14 @@ button {
 .planner-toolbar .use-location-button:disabled { opacity: .65; cursor: progress; }
 .planner-toolbar .journey-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; margin: 0; padding: 0; border: 0; background: transparent; }
 .planner-toolbar .search-fields { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 7px; align-items: center; }
+.planner-toolbar .via-places { grid-column: 1; grid-row: 2; display: grid; gap: 8px; margin-top: 8px; }
+.planner-toolbar .via-place-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; margin-top: 8px; }
+.planner-toolbar .via-place-row .place-input { border-left: 4px solid #7851a9; }
+.planner-toolbar .via-label { color: #67428e; }
+.via-remove, .add-via-button { min-height: 44px; border: 1px solid #d1c4df; border-radius: 6px; background: #f6f1fb; color: #67428e; font: inherit; font-weight: 700; }
+.via-remove { font-size: 25px; }
+.add-via-button { padding: 8px 12px; font-size: 12px; margin-right: auto; }
+.via-journey-step { color: #67428e; }
 .planner-toolbar .place-input { height: 52px; border-radius: 6px; border-color: #c4cec6; background: #fafcf9; }
 .planner-toolbar .place-input:focus-within { border-color: #298333; outline: 2px solid #29833320; }
 .planner-toolbar .field-label { font-size: 13px; width: auto; padding: 0 8px 0 12px; color: #69796e; font-weight: 600; }
@@ -583,6 +608,13 @@ button {
 .preference-toggle button[aria-pressed=true][data-level=must], .preference-toggle button[aria-pressed=true][data-level=prefer] { color: #fff; background: #2b8134; }
 .road-preferences-group { min-width: 0; margin: 24px 0; padding: 0; border: 0; }
 .road-preferences-group legend { font-size: 13px; font-weight: 800; color: #78836f; margin-bottom: 6px; }
+.strategic-route-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.strategic-route-item { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--line, #e2e6e4); }
+.strategic-route-title { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.strategic-route-number { display: inline-grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; color: #fff; font-size: 16px; font-weight: 800; border-radius: 7px 7px 9px 9px; }
+.strategic-route-item > p { min-height: 3em; margin: 8px 0; color: var(--muted, #626d69); font-size: 12px; line-height: 1.55; }
+.strategic-route-item .preference-row { padding-left: 0; }
+@media (max-width: 600px) { .strategic-route-grid { grid-template-columns: 1fr; gap: 4px; } .strategic-route-item > p { min-height: 0; } }
 .transport-settings-group { margin: 14px 0; border: 1px solid #dce4d8; border-radius: 8px; padding: 0 12px; }
 .settings-content .transport-settings-group summary { display: list-item; padding: 14px 0; min-height: 44px; font-size: 14px; font-weight: 700; color: #35553b; }
 .transport-settings-group[open] { padding-bottom: 10px; }
@@ -643,3 +675,8 @@ button {
 }
 .planner-toolbar .selected-place-description { display: block; margin-top: 4px; font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #718074; }
 .planner-toolbar .endpoint-coordinate { display: none; }
+
+.via-row-actions { display: flex; gap: 3px; }
+.via-row-actions button { min-width: 36px; min-height: 44px; border: 1px solid #d1c4df; border-radius: 6px; background: #f6f1fb; color: #67428e; font-size: 18px; }
+.via-row-actions button:disabled { opacity: .3; }
+.trip-via-endpoint > span { color: #ffffffe6; font-size: 20px; line-height: 23px; }

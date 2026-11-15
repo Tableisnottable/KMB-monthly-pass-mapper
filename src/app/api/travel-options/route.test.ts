@@ -7,6 +7,13 @@ vi.mock('../../../data/routeGeometry', () => ({ routeOnStreets: vi.fn(async (_po
   ? { paths: [], source: 'UNAVAILABLE' } : { paths: [[[22.3, 114.1], [22.31, 114.11]]], source: 'OSM_ROAD', distanceMetres: 2000, durationSeconds: 601 }) }));
 describe('Walking, cycling, taxi and driving API', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('routes all enabled profiles through the same Via place', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&viaLat=22.32&viaLon=114.12'));
+    expect(response.status).toBe(200);
+    expect(vi.mocked(routeOnStreets).mock.calls).toHaveLength(3);
+    for (const call of vi.mocked(routeOnStreets).mock.calls) expect(call[0]).toEqual([[22.3, 114.1], [22.32, 114.12], [22.31, 114.11]]);
+    expect((await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&viaLon=114.12'))).status).toBe(400);
+  });
   it('uses a distinct real routing profile for each mode and preserves no-route results', async () => {
     const response = await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11'));
     const { data } = await response.json();
@@ -14,8 +21,12 @@ describe('Walking, cycling, taxi and driving API', () => {
     expect(data.map((o: { available: boolean }) => o.available)).toEqual([true, false, true, true]); expect(data[0].minutes).toBe(11);
     expect(data.map((o: { mode: string }) => o.mode)).toEqual(['walk', 'cycle', 'taxi', 'drive']);
   });
-  it('rejects missing and out-of-area coordinates', async () => {
+  it('accepts cross-border Hong Kong–Shenzhen endpoints and rejects coordinates outside the routing area', async () => {
     expect((await GET(new NextRequest('http://localhost/api/travel-options?fromLat=0'))).status).toBe(400);
+    const crossBorder = 'http://localhost/api/travel-options?fromLat=22.534&fromLon=114.057&toLat=22.244&toLon=114.156&modes=drive';
+    expect((await GET(new NextRequest(crossBorder))).status).toBe(200);
+    const outside = 'http://localhost/api/travel-options?fromLat=23&fromLon=114&toLat=22.244&toLon=114.156';
+    expect((await GET(new NextRequest(outside))).status).toBe(400);
   });
   it('only calculates enabled estimates, and supports switching all of them off', async () => {
     const url = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=';
@@ -37,5 +48,12 @@ describe('Walking, cycling, taxi and driving API', () => {
     vi.clearAllMocks();
     expect((await (await GET(new NextRequest(url + 'drive'))).json()).data[0].mode).toBe('drive');
     expect(vi.mocked(routeOnStreets).mock.calls.map(call => call[1])).toEqual(['car']);
+  });
+  it('validates and passes road preferences to all routed modes', async () => {
+    const url = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=walk,cycle,taxi,drive&preferences=' + encodeURIComponent(JSON.stringify({ roads: { cht: 'ban' } }));
+    await GET(new NextRequest(url));
+    expect(vi.mocked(routeOnStreets).mock.calls.map(call => call[2]?.roads?.cht)).toEqual(['ban', 'ban', 'ban']);
+    const invalid = 'http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&preferences=' + encodeURIComponent(JSON.stringify({ roads: { unknown: 'ban' } }));
+    expect((await GET(new NextRequest(invalid))).status).toBe(400);
   });
 });

@@ -6,9 +6,12 @@ import { GET } from './route';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { DEFAULT_WEIGHTS } from '../../../engine/routeWeights';
 import { routeCorridors } from '../../../domain/routePreferences';
+import { journeyMatchesEndpoints } from '../../../domain/journeyEndpointMatch';
+import { routeOnStreets } from '../../../data/routeGeometry';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
 vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
+vi.mock('../../../data/routeGeometry', () => ({ routeOnStreets: vi.fn() }));
 const now = new Date('2026-11-13T04:00:00Z');
 const cheungShaWan = { lat: 22.33882, lng: 114.15387 };
 const airport = { lat: 22.31367, lng: 113.93763 };
@@ -22,8 +25,107 @@ async function journey(from = cheungShaWan, to = airport, extra: Record<string, 
 }
 
 describe('Multimodal journey API', () => {
-  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); vi.setSystemTime(now); });
+  beforeEach(() => {
+    vi.clearAllMocks(); vi.useFakeTimers(); vi.setSystemTime(now);
+    vi.mocked(routeOnStreets).mockResolvedValue({ paths: [], source: 'UNAVAILABLE' });
+  });
   afterEach(() => { vi.useRealTimers(); });
+
+  it.each(['depart', 'arrive'])('retains repeated start, middle and end Via places during %s searches', async timeMode => {
+    vi.mocked(routeOnStreets).mockImplementation(async points => ({ paths: [points], source: 'OSM_FOOT', durationSeconds: 600, distanceMetres: 700 }));
+    const query = new URLSearchParams({ fromLat: '22.3', fromLon: '114.17', toLat: '22.32', toLon: '114.17',
+      modes: '', timeMode, time: '2026-11-14T12:00:00+08:00' });
+    for (const [lat, name] of [['22.3', 'Start visit'], ['22.31', 'First visit'], ['22.31', 'Second visit'], ['22.32', 'End visit']]) {
+      query.append('viaLat', lat); query.append('viaLon', '114.17'); query.append('viaName', name);
+    }
+    const response = await GET(new NextRequest('http://localhost/api/journey?' + query));
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data).toHaveLength(1);
+    expect(data[0].viaStops.map((m: { stop: { name: string }; legIndex: number }) => [m.stop.name, m.legIndex]))
+      .toEqual([['Start visit', 0], ['First visit', 1], ['Second visit', 1], ['End visit', 2]]);
+    expect(data[0].legs).toHaveLength(2);
+    expect(data[0].discountedFare).toBe(0);
+    expect(Date.parse(data[0].arrivalTime) - Date.parse(data[0].departureTime)).toBe(20 * 60000);
+  });
+
+  it.each(['depart', 'arrive'])('visits two Via places in order with connected %s times', async timeMode => {
+    const query = new URLSearchParams({ fromLat: String(cheungShaWan.lat), fromLon: String(cheungShaWan.lng), toLat: '22.279', toLon: '114.165',
+      modes: 'SUBWAY', operators: 'MTR', timeMode, time: '2026-11-14T12:00:00+08:00', walkComparison: 'false' });
+    for (const [lat, lon, name] of [['22.3192', '114.1693', 'Mong Kok'], ['22.297', '114.172', 'Tsim Sha Tsui']]) {
+      query.append('viaLat', lat); query.append('viaLon', lon); query.append('viaName', name);
+    }
+    const response = await GET(new NextRequest('http://localhost/api/journey?' + query));
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.length).toBeGreaterThan(0);
+    for (const route of data) {
+      expect(route.viaStops.map((marker: { stop: { name: string } }) => marker.stop.name)).toEqual(['Mong Kok', 'Tsim Sha Tsui']);
+      expect(route.viaStops[0].legIndex).toBeLessThan(route.viaStops[1].legIndex);
+      for (let i = 1; i < route.legs.length; i++) expect(Date.parse(route.legs[i].departureTime)).toBeGreaterThanOrEqual(Date.parse(route.legs[i - 1].arrivalTime));
+      expect(route.discountedFare).toBeCloseTo(route.legs.reduce((sum: number, leg: { fare: number }) => sum + leg.fare, 0), 2);
+      if (timeMode === 'arrive') expect(Date.parse(route.arrivalTime)).toBeLessThanOrEqual(Date.parse(query.get('time')!));
+      else expect(route.departureTime).toBe(new Date(query.get('time')!).toISOString());
+    }
+  }, 30000);
+
+  it.each(['depart', 'arrive'])('plans through Mong Kok with connected %s times and complete fares', async timeMode => {
+    const time = '2026-11-14T12:00:00+08:00';
+    const { data, meta } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {
+      viaLat: '22.3192', viaLon: '114.1693', viaName: 'Mong Kok', timeMode, time,
+      modes: 'SUBWAY', operators: 'MTR', requiredModes: 'SUBWAY', walkComparison: 'false', changeMinutes: '5',
+    });
+    expect(data.length).toBeGreaterThan(0);
+    expect(meta.via.name).toBe('Mong Kok');
+    for (const route of data) {
+      expect(route.via).toMatchObject({ lat: 22.3192, lng: 114.1693 });
+      expect(route.viaLegIndex).toBeGreaterThan(0);
+      const first = route.legs[route.viaLegIndex - 1], next = route.legs[route.viaLegIndex];
+      expect(Date.parse(next.departureTime) - Date.parse(first.arrivalTime)).toBeGreaterThanOrEqual(5 * 60_000);
+      expect(route.discountedFare).toBeCloseTo(route.legs.reduce((sum: number, l: { fare: number }) => sum + l.fare, 0), 2);
+      expect(route.transferCount).toBe(route.legs.length - 1);
+      expect(route.finalScore).toBe(scoreRoutes([route], weightingDate(new Date(time)))[0].finalScore);
+      expect(journeyMatchesEndpoints(route, cheungShaWan, { lat: 22.2819, lng: 114.1582 })).toBe(true);
+      if (timeMode === 'arrive') expect(Date.parse(route.arrivalTime)).toBeLessThanOrEqual(Date.parse(time));
+      else expect(route.departureTime).toBe(new Date(time).toISOString());
+    }
+  }, 30000);
+
+  it('applies transfer limits to the whole Via journey, not to each half', async () => {
+    const { data } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {
+      viaLat: '22.3192', viaLon: '114.1693', timeMode: 'depart', time: '2026-11-14T12:00:00+08:00',
+      modes: 'SUBWAY', operators: 'MTR', walkComparison: 'false', limits: '{"transfers":0}',
+    });
+    expect(data).toEqual([]);
+  }, 30000);
+
+  it('rejects an incomplete Via rather than returning a direct journey', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&viaLat=22.32'));
+    expect(response.status).toBe(400);
+  });
+
+  it('can satisfy required companies on different sides of Via while keeping banned companies out', async () => {
+    const { data } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {
+      viaLat: '22.3192', viaLon: '114.1693', timeMode: 'depart', time: '2026-11-14T12:00:00+08:00',
+      modes: 'BUS,SUBWAY', operators: 'KMB,MTR', requiredOperators: 'KMB,MTR', walkComparison: 'false',
+    });
+    expect(data.length).toBeGreaterThan(0);
+    for (const route of data) {
+      expect(route.legs.some((leg: { operator: string }) => leg.operator === 'KMB')).toBe(true);
+      expect(route.legs.some((leg: { operator: string }) => leg.operator === 'MTR')).toBe(true);
+      expect(route.legs.every((leg: { operator: string }) => ['KMB', 'MTR'].includes(leg.operator))).toBe(true);
+    }
+  }, 30000);
+
+  it('does not add another boarding or fare when Via equals the start', async () => {
+    const options = { timeMode: 'depart', time: '2026-11-14T12:00:00+08:00', modes: 'SUBWAY', operators: 'MTR', walkComparison: 'false' };
+    const to = { lat: 22.2819, lng: 114.1582 };
+    const direct = await journey(cheungShaWan, to, options);
+    const same = await journey(cheungShaWan, to, { ...options, viaLat: String(cheungShaWan.lat), viaLon: String(cheungShaWan.lng) });
+    expect(same.data.length).toBeGreaterThan(0);
+    expect(same.data.map((r: { discountedFare: number }) => r.discountedFare)).toEqual(direct.data.map((r: { discountedFare: number }) => r.discountedFare));
+    expect(same.data.every((r: { viaLegIndex: number }) => r.viaLegIndex === 0)).toBe(true);
+  }, 30000);
 
   it('includes adult-priced direct airport buses and useful Cheung On feeder alternatives', async () => {
     const { data, meta } = await journey();
@@ -96,6 +198,15 @@ describe('Multimodal journey API', () => {
     expect(data.some((r: { legs: { mode: string }[] }) => r.legs.some(l => l.mode === 'BUS' || l.mode === 'SUBWAY'))).toBe(true);
   }, 20000);
 
+  it('keeps cross-harbour routes when the selected tunnel is a hard requirement', async () => {
+    const { data } = await journey({ lat: 22.28231, lng: 114.12335 }, { lat: 22.33604, lng: 114.16581 }, {
+      preferences: JSON.stringify({ roads: { cht: 'must' } }),
+    });
+    expect(data.length).toBeGreaterThan(0);
+    expect(data.some((route: Parameters<typeof routeCorridors>[0]) => routeCorridors(route).includes('cht'))).toBe(true);
+    expect(data.every((route: Parameters<typeof routeCorridors>[0]) => routeCorridors(route).includes('cht'))).toBe(true);
+  }, 30000);
+
   it('reports uncovered endpoints separately from unavailable connections', async () => {
     const { data, meta } = await journey({ lat: 0, lng: 0 }, airport);
     expect(data).toEqual([]); expect(meta.originUncovered).toBe(true);
@@ -107,9 +218,29 @@ describe('Multimodal journey API', () => {
   });
 
   it('returns a walking comparison for nearby places', async () => {
+    vi.mocked(routeOnStreets).mockResolvedValue({ paths: [[[22.33882, 114.15387], [22.3395, 114.1545]]],
+      source: 'OSM_FOOT', durationSeconds: 601, distanceMetres: 800 });
     const { data } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 });
-    expect(data.some((r: { legs: { mode: string }[] }) => r.legs.every(l => l.mode === 'WALK'))).toBe(true);
+    const walk = data.find((r: { id: string }) => r.id === 'walk-only');
+    expect(walk.legs[0].journeyTimeMinutes).toBe(11);
+    expect(Date.parse(walk.arrivalTime) - Date.parse(walk.departureTime)).toBe(11 * 60000);
   }, 20000);
+
+  it('does not invent a walk or recommend walking when no walkable path exists', async () => {
+    const { data, meta } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 }, { modes: '' });
+    expect(data).toEqual([]); expect(meta.tooCloseToRide).toBe(false);
+    expect(routeOnStreets).toHaveBeenCalled();
+  });
+
+  it('uses real walking times beyond 45 minutes and enforces the selected walking limit', async () => {
+    vi.mocked(routeOnStreets).mockResolvedValue({ paths: [[[22.33882, 114.15387], [22.3395, 114.1545]]],
+      source: 'OSM_FOOT', durationSeconds: 7200, distanceMetres: 9000 });
+    const to = { lat: 22.3395, lng: 114.1545 };
+    const { data } = await journey(cheungShaWan, to, { modes: '' });
+    expect(data[0].legs[0].journeyTimeMinutes).toBe(120);
+    const limited = await journey(cheungShaWan, to, { modes: '', limits: '{"walk":60}' });
+    expect(limited.data).toEqual([]);
+  });
 
   it('enforces company Must/Ban rules and a 15-minute change buffer after live retiming, using custom importance', async () => {
     const weights = { ...DEFAULT_WEIGHTS, fare: .9 };
@@ -127,11 +258,19 @@ describe('Multimodal journey API', () => {
   }, 30000);
 
   it('rejects inconsistent Must/Ban choices and invalid change times', async () => {
-    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D', 'limits=%7B%22walk%22%3A-1%7D', 'limits=%7B%22transfers%22%3A4%7D', 'changeMinutes=15&limits=%7B%22change%22%3A10%7D']) {
+    for (const query of ['operators=CTB&requiredOperators=KMB', 'changeMinutes=-1', 'changeMinutes=61', 'changeMinutes=1.5', 'changeMinutes=', 'modes=BUS&requiredModes=SUBWAY', 'modes=INVALID', 'weights=%7B%22fare%22%3A-1%7D', 'limits=%7B%22walk%22%3A-1%7D', 'limits=%7B%22transfers%22%3A1.5%7D', 'changeMinutes=15&limits=%7B%22change%22%3A10%7D']) {
       const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.33882&fromLon=114.15387&toLat=22.31367&toLon=113.93763&' + query));
       expect(response.status).toBe(400);
     }
   });
+  it('returns visible cross-border journeys for sparse stop coverage without a transfer cap', async () => {
+    const from = { lat: 22.534, lng: 114.057 }, to = { lat: 22.244, lng: 114.156 };
+    const { data, meta } = await journey(from, to, { timeMode: 'depart', time: '2026-11-15T12:00:00+08:00' });
+    expect(data.length).toBeGreaterThan(0);
+    expect(data.every((route: Parameters<typeof journeyMatchesEndpoints>[0]) => journeyMatchesEndpoints(route, from, to))).toBe(true);
+    expect(meta.originUncovered).toBe(false); expect(meta.destinationUncovered).toBe(false);
+    expect(meta.maxTransfers).toBeNull();
+  }, 30000);
   it.each([0, 31, 60])('accepts a %i-minute transfer minimum and keeps physical walking time', async minutes => {
     const { data, meta } = await journey(cheungShaWan, airport, { timeMode: 'depart', time: '2026-11-14T10:00:00+08:00',
       changeMinutes: String(minutes), operators: 'KMB,LWB', requiredOperators: 'KMB', modes: 'BUS', requiredModes: 'BUS' });

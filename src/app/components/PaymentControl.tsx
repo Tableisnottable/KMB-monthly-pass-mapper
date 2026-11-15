@@ -6,11 +6,20 @@ import { copy, type PlannerLocale } from './plannerUi';
 export function PaymentControl({ value, onChange, passes, onPasses, locale }: { value: PaymentChoice; onChange: (value: PaymentChoice) => void; passes: OwnedPass[]; onPasses: (value: OwnedPass[]) => void; locale: PlannerLocale }) {
   const [name, setName] = useState('');
   const details = useRef<HTMLDetailsElement>(null);
+  const fareChoice = useRef<HTMLDetailsElement>(null);
   const [panelTop, setPanelTop] = useState(80);
   const hasKmb = passes.some(pass => pass.id === 'kmb' && passActive(pass));
-  return <div className="payment-controls"><label className="fare-profile-control"><span className="sr-only">{copy(locale, '付款方式及票價', 'Payment and fare')}</span><select value={value} onChange={event => onChange(event.target.value as PaymentChoice)}>
-    {paymentChoices.map(([id, zh, en]) => <option value={id} key={id} disabled={id === 'kmb-pass' && !hasKmb}>{copy(locale, zh, en)}{id === 'kmb-pass' && !hasKmb ? copy(locale, '（先加入月票）', ' (add your pass first)') : ''}</option>)}
-  </select></label>
+  const selectedChoice = paymentChoices.find(([id]) => id === value) ?? paymentChoices[0];
+  return <div className="payment-controls"><details className="fare-profile-control fare-choice" ref={fareChoice}>
+    <summary aria-label={copy(locale, '付款方式及票價', 'Payment and fare')}><span>{copy(locale, selectedChoice[1], selectedChoice[2])}</span><span aria-hidden="true">⌄</span></summary>
+    <div className="fare-choice-list" role="group" aria-label={copy(locale, '選擇付款方式', 'Choose payment method')}>
+      {paymentChoices.map(([id, zh, en]) => <button type="button" key={id} disabled={id === 'kmb-pass' && !hasKmb}
+        aria-pressed={value === id} onClick={() => { onChange(id); if (fareChoice.current) fareChoice.current.open = false; }}>
+        <span>{copy(locale, zh, en)}</span>{value === id && <span aria-hidden="true">✓</span>}
+        {id === 'kmb-pass' && !hasKmb && <small>{copy(locale, '先加入月票', 'Add your pass first')}</small>}
+      </button>)}
+    </div>
+  </details>
   <details className="my-passes" ref={details} onToggle={event => { if (event.currentTarget.open) setPanelTop(Math.min(event.currentTarget.querySelector('summary')!.getBoundingClientRect().bottom + 8, window.innerHeight - 240)); }}><summary>{copy(locale, '我的月票／通行證', 'My passes')} ({passes.length})</summary><div className="payment-pass-panel" style={{ top: panelTop }}>
     <div className="payment-pass-heading"><h3>{copy(locale, '我擁有的月票及通行證', 'Passes I own')}</h3><button type="button" onClick={() => { if (details.current) details.current.open = false; }}>{copy(locale, '完成', 'Done')}</button></div>
     <label className="owned-kmb-pass"><input type="checkbox" checked={passes.some(pass => pass.id === 'kmb')} onChange={event => {

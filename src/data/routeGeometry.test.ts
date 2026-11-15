@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { decodePolyline, followTrack, sliceAlignment, transitGeometry, routeOnStreets } from './routeGeometry';
+import { decodePolyline, evaluateStreetPath, followTrack, hasWalkableGeometry, sliceAlignment, transitGeometry, routeOnStreets } from './routeGeometry';
 import { networkPatterns, networkRoutes, networkStopIndex, railFare } from './transportNetwork';
+import { DEFAULT_PREFERENCES } from '../domain/routePreferences';
 import manifest from './alignments/manifest.json';
 afterEach(() => vi.unstubAllGlobals());
 describe('Physical route geometry', () => {
@@ -17,6 +18,62 @@ describe('Physical route geometry', () => {
   it('does not bridge disconnected railway tracks with a straight segment', () => {
     const graph = { points: [[22.3,114.1],[22.301,114.1],[22.32,114.1],[22.321,114.1]] as [number, number][], adjacent: [[[1,.1]],[[0,.1]],[[3,.1]],[[2,.1]]] as [number, number][][] };
     expect(followTrack(graph, [22.3,114.1], [22.321,114.1], .1)).toBeNull();
+  });
+  it('rejects a walking path with a long straight segment across water', () => {
+    expect(hasWalkableGeometry([[22.24, 114.12], [22.24, 114.126]])).toBe(false);
+    expect(hasWalkableGeometry([[22.24, 114.12], [22.2405, 114.121], [22.241, 114.122]])).toBe(true);
+  });
+  it('chooses a continuous walking alternative over a direct water-crossing chord', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'Ok', waypoints: [{ distance: 0 }, { distance: 0 }], routes: [
+      { distance: 620, duration: 400, geometry: { coordinates: [[114.12, 22.24], [114.126, 22.24]] } },
+      { distance: 900, duration: 700, geometry: { coordinates: [[114.12, 22.24], [114.121, 22.241], [114.122, 22.242], [114.123, 22.242], [114.124, 22.242], [114.125, 22.241], [114.126, 22.24]] } },
+    ] }));
+    vi.stubGlobal('fetch', fetcher);
+    const result = await routeOnStreets([[22.24, 114.12], [22.24, 114.126]], 'foot');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('alternatives=3');
+    expect(result).toMatchObject({ source: 'OSM_FOOT', distanceMetres: 900 });
+  });
+  it('rejects even a densely drawn ferry in a walking response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'Ok', routes: [{ distance: 120, duration: 80,
+      geometry: { coordinates: [[114.18, 22.3], [114.1805, 22.3005], [114.181, 22.301]] },
+      legs: [{ steps: [{ mode: 'walking', distance: 20 }, { mode: 'ferry', distance: 100 }] }],
+    }] })));
+    expect(await routeOnStreets([[22.3, 114.18], [22.301, 114.181]], 'foot')).toEqual({ paths: [], source: 'UNAVAILABLE' });
+  });
+  it('accepts a long straight footpath with complete walking instructions', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'Ok', routes: [{ distance: 700, duration: 560,
+      geometry: { coordinates: [[114.23, 22.42], [114.235, 22.424]] },
+      legs: [{ steps: [{ mode: 'walking', distance: 700 }, { mode: 'walking', distance: 0 }] }],
+    }] }));
+    vi.stubGlobal('fetch', fetcher);
+    const result = await routeOnStreets([[22.42, 114.23], [22.424, 114.235]], 'foot');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('steps=true');
+    expect(result).toMatchObject({ source: 'OSM_FOOT', durationSeconds: 560, distanceMetres: 700 });
+  });
+  it('does not use partial walking instructions to approve an unexplained gap', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'Ok', routes: [{ distance: 700, duration: 560,
+      geometry: { coordinates: [[114.24, 22.42], [114.245, 22.424]] },
+      legs: [{ steps: [{ mode: 'walking', distance: 10 }] }],
+    }] })));
+    expect((await routeOnStreets([[22.42, 114.24], [22.424, 114.245]], 'foot')).source).toBe('UNAVAILABLE');
+  });
+  it('keeps verified long walking detours instead of imposing a distance-ratio cap', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'Ok', routes: [{ distance: 9000, duration: 7200,
+      geometry: { coordinates: [[114.25, 22.42], [114.255, 22.424]] },
+      legs: [{ steps: [{ mode: 'walking', distance: 9000 }] }],
+    }] })));
+    expect(await routeOnStreets([[22.42, 114.25], [22.424, 114.255]], 'foot'))
+      .toMatchObject({ source: 'OSM_FOOT', distanceMetres: 9000, durationSeconds: 7200 });
+  });
+  it('enforces Must and Ban road rules and gives preferred road matches a ranking bonus', () => {
+    const route = [[[22.3, 114.1], [22.3, 114.101]]] as [number, number][][];
+    const otherRoute = [[[22.31, 114.11], [22.31, 114.111]]] as [number, number][][];
+    const geometry = new Map([['cht', route], ['ehc', otherRoute]]);
+    expect(evaluateStreetPath(route, { ...DEFAULT_PREFERENCES, roads: { cht: 'must' } }, geometry).allowed).toBe(true);
+    expect(evaluateStreetPath(otherRoute, { ...DEFAULT_PREFERENCES, roads: { cht: 'must' } }, geometry).allowed).toBe(false);
+    expect(evaluateStreetPath(route, { ...DEFAULT_PREFERENCES, roads: { cht: 'ban' } }, geometry).allowed).toBe(false);
+    expect(evaluateStreetPath(route, { ...DEFAULT_PREFERENCES, roads: { cht: 'prefer' } }, geometry).preferenceCost).toBe(-120);
+    expect(evaluateStreetPath(otherRoute, { ...DEFAULT_PREFERENCES, roads: { cht: 'prefer' } }, geometry).preferenceCost).toBe(0);
   });
   it.each(['td:1671','td:609','td:285'])('uses detailed official road alignments for %s', async id => {
     const i = networkPatterns.findIndex(p => p.id === id), p = networkPatterns[i];

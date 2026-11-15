@@ -110,7 +110,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
         <span className={'field-label ' + colorClass}>{label}</span>
         <span className="place-text">
           <input ref={inputRef} id={id} aria-label={label} role="combobox" aria-autocomplete="list" aria-expanded={expanded}
-            placeholder={colorClass === 'origin-label' ? copy(locale, '由哪裏出發？', 'Where from?') : copy(locale, '想去哪裏？', 'Where to?')}
+            placeholder={colorClass === 'via-label' ? copy(locale, '途經哪裏？', 'Via where?') : colorClass === 'origin-label' ? copy(locale, '由哪裏出發？', 'Where from?') : copy(locale, '想去哪裏？', 'Where to?')}
             enterKeyHint="search" aria-controls={expanded ? id + '-list' : undefined} aria-activedescendant={expanded && suggestions[active] ? id + '-' + active : undefined}
             autoComplete="off" value={value}
             onChange={event => { selected.current = null; onChange(event.target.value); setOpen(true); }}

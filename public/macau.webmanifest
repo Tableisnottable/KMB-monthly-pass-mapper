@@ -1,0 +1,18 @@
+{
+  "id": "/macau",
+  "name": "Transit Compass Macao",
+  "short_name": "Transit Macao",
+  "description": "Macau bus and light rail route planning preview.",
+  "lang": "zh-MO",
+  "start_url": "/macau",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f5f2",
+  "theme_color": "#2e9127",
+  "categories": ["navigation", "travel"],
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

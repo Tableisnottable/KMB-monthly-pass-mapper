@@ -7,14 +7,13 @@ export interface JourneyLimits {
   ride: number | null;
 }
 export const DEFAULT_LIMITS: JourneyLimits = { transfers: null, change: null, walk: null, wait: null, ride: null };
-export const LIMIT_MAX = { transfers: 3, change: 240, walk: 240, wait: 240, ride: 240 };
 export function parseJourneyLimits(raw: string | null): JourneyLimits {
   if (!raw) return { ...DEFAULT_LIMITS };
   const input: unknown = JSON.parse(raw);
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid journey limits.');
   const limits = { ...DEFAULT_LIMITS };
   for (const [key, value] of Object.entries(input)) {
-    if (!Object.hasOwn(LIMIT_MAX, key) || value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > LIMIT_MAX[key as keyof JourneyLimits])) throw new Error('Journey limit outside its allowed range.');
+    if (!Object.hasOwn(DEFAULT_LIMITS, key) || value !== null && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)) throw new Error('Journey limit outside its allowed range.');
     limits[key as keyof JourneyLimits] = value as number | null;
   }
   return limits;

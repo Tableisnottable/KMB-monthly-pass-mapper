@@ -16,7 +16,7 @@ export default function CoveragePage() {
     <section className="mt-5 rounded-2xl bg-white p-5 shadow-card">
       <h1 className="text-3xl font-extrabold">交通資料 Transport coverage</h1>
       <p className="mt-3">{coverage.counts.routes.toLocaleString()} 條路線及變體 routes / variants · {coverage.counts.stops.toLocaleString()} 個站點 stops · 匯入日期 imported {coverage.importedOn}</p>
-      <p className="mt-3 text-sm text-cm-muted">最多三次轉乘，支援現在、指定出發及最遲抵達時間（香港時間）。改良權重包括車程、候車、步行、轉乘及成人票價。Up to three transfers, with Now, Leave at and Arrive by in Hong Kong time. Enhanced weighting includes time, walking, transfers and adult fare.</p>
+      <p className="mt-3 text-sm text-cm-muted">轉乘次數及行程時長不設固定上限；可在設定中自行限制。支援現在、指定出發及最遲抵達時間（香港時間）。Unlimited transfers and journey duration by default; optional limits are available in settings. Supports Now, Leave at and Arrive by in Hong Kong time.</p>
       <p className="mt-3"><Link className="font-bold text-cm-greenDark underline" href="/timetables">營辦商及完整班次時間表 Companies & full timetables →</Link></p>
       <p className="mt-3 text-sm text-cm-muted">營辦商名稱取自政府雙語 agency.txt；部分小巴、渡輪及居民服務以服務組別列出。Operator names come from bilingual government agency records; some minibus, ferry and residents’ services are grouped by network.</p>
       <table className="mt-5 w-full text-left text-sm"><thead><tr className="border-b"><th className="py-2">營辦商 Network</th><th>路線／變體 Routes</th><th>資料 Data</th></tr></thead>

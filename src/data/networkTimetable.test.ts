@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { networkPatterns, networkRoutes, networkStops, serviceCalendarStatus, type NetworkPattern } from './transportNetwork';
 import { exceptions } from './transport/snapshot';
-import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, routeTimetable } from './networkTimetable';
+import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, routeTimetable, upcomingPublishedDepartures } from './networkTimetable';
 import { operatorInfo, transportOperators } from './transportOperators';
 
 const day = '2026-11-13';
@@ -39,6 +39,25 @@ describe('Published service timetables', () => {
   it('respects the exclusive end of a frequency window', () => {
     const next = nextPublishedDeparture(index, 0, new Date(day + 'T11:00:00+08:00'))!;
     expect(next.minutes).toBe(240);
+  });
+  it('previews three hours of departures, explicitly marked as timetable estimates', () => {
+    networkPatterns[index].w = [[127, 600, 840, 15, 20]];
+    const rows = upcomingPublishedDepartures(index, 0, new Date(day + 'T10:00:00+08:00'));
+    expect(rows).toHaveLength(13);
+    expect(rows.at(-1)?.minutes).toBe(180);
+    expect(rows.every(row => row.timetableEstimate && row.departureType === 'SCHEDULED' && row.timingType === 'SCHEDULED')).toBe(true);
+    expect(rows[0].comparisonBasis).toBe('FREQUENCY');
+  });
+  it('deduplicates overlapping windows and respects exclusive ends in the preview', () => {
+    networkPatterns[index].w = [[127, 600, 660, 15, 20], [127, 630, 660, 15, 20]];
+    expect(upcomingPublishedDepartures(index, 0, new Date(day + 'T10:00:00+08:00')).map(row => row.minutes)).toEqual([0, 15, 30, 45]);
+  });
+  it('previews after-midnight shifts and keeps missing/out-of-calendar timetables empty', () => {
+    networkPatterns[index].w = [[127, 1410, 1470, 20, 20]];
+    expect(upcomingPublishedDepartures(index, 0, new Date(day + 'T23:45:00+08:00')).map(row => row.minutes)).toEqual([5, 25]);
+    expect(upcomingPublishedDepartures(index, 0, new Date('2100-01-01T23:45:00+08:00'))).toEqual([]);
+    networkPatterns[index].w = [];
+    expect(upcomingPublishedDepartures(index, 0, new Date(day + 'T10:00:00+08:00'))).toEqual([]);
   });
   it('retains calendar additions and removes cancelled service days', () => {
     const addition = exceptions.find(row => Number(row[2]) === 1)!;
@@ -118,12 +137,12 @@ describe('Observed timetable changes', () => {
     const result = classifyDepartureTypes(index, 0, rows(['07:00', '07:05', '07:10', '07:15']));
     expect(result.map(row => row.departureType)).toEqual(['SCHEDULED', 'ADDITIONAL', 'ADDITIONAL', 'SCHEDULED']);
   });
-  it('requires three distinct departures from the same operator and does not mutate its input', () => {
+  it('requires three distinct departures from the same operator for spacing inference and does not mutate its input', () => {
     baseline();
     const input = rows(['07:00', '07:15']);
     const mixed = [...input, ...rows(['07:40'], 0, 'CTB')];
-    expect(classifyDepartureTypes(index, 0, mixed).some(row => row.departureType === 'CHANGED')).toBe(false);
-    expect(classifyDepartureTypes(index, 0, [...input, input[0]]).some(row => row.departureType === 'CHANGED')).toBe(false);
+    expect(classifyDepartureTypes(index, 0, mixed).some(row => row.changedReason === 'OBSERVED_SPACING')).toBe(false);
+    expect(classifyDepartureTypes(index, 0, [...input, input[0]]).some(row => row.changedReason === 'OBSERVED_SPACING')).toBe(false);
     expect(input[1]).not.toHaveProperty('changedReason');
   });
   it('does not infer changes from intermediate stop interpolation or absent calendars', () => {
@@ -137,6 +156,32 @@ describe('Observed timetable changes', () => {
     const input = rows(['07:00', '07:15', '07:30', '07:45', '08:00']);
     input[1] = { ...input[1], remark: 'Extra Scheduled Bus', scheduleMatch: 'ADDED', addedReason: 'PROVIDER' };
     expect(classifyDepartureTypes(index, 0, input)[1].departureType).toBe('ADDITIONAL');
+  });
+  it.each([['21:10', -5], ['21:20', 5]] as const)('shows %s as a possible earlier/later move of 21:15 without needing three rows', (clock, delta) => {
+    networkPatterns[index].w = [[127, 1260, 1320, 15, 20]];
+    const result = classifyDepartureTypes(index, 0, rows([clock, '21:30']));
+    expect(result[0]).toMatchObject({ departureType: 'CHANGED', changedReason: 'POSSIBLE_SHIFT',
+      timetableTime: '2026-11-13T13:15:00.000Z', deviationMinutes: delta });
+    expect(result[1].departureType).toBe('SCHEDULED');
+  });
+  it('keeps two competing shifted times uncertain rather than claiming either is a confirmed trip match', () => {
+    networkPatterns[index].w = [[127, 1260, 1320, 15, 20]];
+    const result = classifyDepartureTypes(index, 0, rows(['21:10', '21:20', '21:30']));
+    expect(result.slice(0, 2).every(row => row.changedReason === 'POSSIBLE_SHIFT')).toBe(true);
+    expect(result[0].timetableTime).toBe(result[1].timetableTime);
+  });
+  it('does not infer a moved slot when the original slot is still in the feed, including joint services', () => {
+    networkPatterns[index].w = [[127, 1260, 1320, 15, 20]];
+    const result = classifyDepartureTypes(index, 0, [...rows(['21:10']), ...rows(['21:15'], 0, 'CTB')]);
+    expect(result[0].departureType).toBe('ADDITIONAL');
+    expect(result[0].changedReason).toBeUndefined();
+  });
+  it('preserves explicit cancellations and extras when checking possible shifts', () => {
+    networkPatterns[index].w = [[127, 1260, 1320, 15, 20]];
+    const input = rows(['21:10', '21:20', '21:30']);
+    input[0].remark = 'Cancelled Scheduled Bus';
+    input[1].remark = 'Additional Scheduled Bus';
+    expect(classifyDepartureTypes(index, 0, input).map(row => row.departureType)).toEqual(['CANCELLED', 'ADDITIONAL', 'SCHEDULED']);
   });
 });
 
