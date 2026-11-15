@@ -7,13 +7,14 @@ interface InstallPrompt extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-export function AppInstallPanel() {
+export function AppInstallPanel({ city = 'hong-kong' }: { city?: 'hong-kong' | 'macau' }) {
   const [english, setEnglish] = useState(true);
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
   const [installed, setInstalled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const text = (zh: string, en: string) => english ? en : zh;
+  const macau = city === 'macau', home = macau ? '/macau' : english ? '/en' : '/';
 
   useEffect(() => {
     setEnglish(new URLSearchParams(window.location.search).get('lang') !== 'zh');
@@ -44,14 +45,16 @@ export function AppInstallPanel() {
     } finally { setPrompt(null); setBusy(false); }
   }
 
-  return <main className="install-page" lang={english ? 'en' : 'zh-HK'}>
-    <header><a href={english ? '/en' : '/'}>← {text('返回行程規劃', 'Back to planner')}</a>
-      <a href={'/install?lang=' + (english ? 'zh' : 'en')}>{english ? '繁體中文' : 'English'}</a></header>
+  return <main className="install-page" lang={english ? 'en' : macau ? 'zh-MO' : 'zh-HK'}>
+    <header><a href={home}>← {text('返回行程規劃', 'Back to planner')}</a>
+      <a href={(macau ? '/macau/install' : '/install') + '?lang=' + (english ? 'zh' : 'en')}>{english ? '繁體中文' : 'English'}</a></header>
     <section className="install-card">
       <img src="/icons/app-192.png" width="80" height="80" alt="" />
-      <p className="install-eyebrow">TRANSIT COMPASS HK</p>
+      <p className="install-eyebrow">{macau ? 'TRANSIT COMPASS MACAO' : 'TRANSIT COMPASS HK'}</p>
       <h1>{text('在 iPhone、iPad 或 Android 安裝', 'Install on iPhone, iPad or Android')}</h1>
-      <p>{text('將交通規劃器加入主畫面，以獨立 App 視窗開啟。使用相同的路線權重、普通成人車費、班次及地圖。', 'Add the planner to your home screen and open it in its own app window. Use the same route scoring, adult fares, timetables and maps.')}</p>
+      <p>{macau
+        ? text('將澳門巴士及輕軌預覽加入主畫面，以獨立 App 視窗開啟。', 'Add the Macao bus and light rail preview to your home screen and open it in its own app window.')
+        : text('將交通規劃器加入主畫面，以獨立 App 視窗開啟。使用相同的路線權重、普通成人車費、班次及地圖。', 'Add the planner to your home screen and open it in its own app window. Use the same route scoring, adult fares, timetables and maps.')}</p>
       {installed ? <p className="install-status" role="status">{text('已在 App 視窗開啟。', 'You are using the installed app.')}</p>
         : prompt && <button className="install-primary" type="button" disabled={busy} onClick={() => void install()}>{busy ? text('正在開啟安裝…', 'Opening installer…') : text('安裝 App', 'Install app')}</button>}
       {message && <p className="install-status" role="status">{message}</p>}
@@ -72,8 +75,10 @@ export function AppInstallPanel() {
         </ol>
         <p className="install-note">{text('其他 Android 瀏覽器可在選單尋找「安裝應用程式」或「加入主畫面」。安裝功能及 App／捷徑形式視乎瀏覽器；請直接使用瀏覽器開啟，避免使用通訊 App 內置瀏覽器。', 'In other Android browsers, look in the menu for Install app or Add to home screen. Availability and whether it opens as an app or shortcut depend on the browser. Open this page directly in your browser, rather than inside a messaging app.')}</p>
       </>}
-      <a className="install-primary" href={english ? '/en' : '/'}>{text('開啟交通規劃器', 'Open the planner')}</a>
-      <p className="install-note">{text('免費安裝的網頁 App，毋須 App Store 或 Play 商店。網站及 App 使用相同版本；更新後重新開啟即可。仍需網絡載入資料、地圖及即時到站；並非完整離線 App。首次搜尋可能較慢。', 'Free installable web app; no App Store or Play Store needed. The website and app share updates; reopen after deployment to use them. An internet connection is still needed for data, maps and live arrivals. Full offline routing is not included. The first search may take longer.')}</p>
+      <a className="install-primary" href={home}>{text('開啟交通規劃器', 'Open the planner')}</a>
+      <p className="install-note">{macau
+        ? text('免費網頁 App，毋須 App Store 或 Play 商店。需要網絡載入澳門路線及地圖；巴士時間仍未核實。', 'Free installable web app; no App Store or Play Store needed. Internet is needed for Macao routes and maps; bus timings are not verified.')
+        : text('免費安裝的網頁 App，毋須 App Store 或 Play 商店。網站及 App 使用相同版本；更新後重新開啟即可。仍需網絡載入資料、地圖及即時到站；並非完整離線 App。首次搜尋可能較慢。', 'Free installable web app; no App Store or Play Store needed. The website and app share updates; reopen after deployment to use them. An internet connection is still needed for data, maps and live arrivals. Full offline routing is not included. The first search may take longer.')}</p>
     </section>
   </main>;
 }

@@ -6,8 +6,9 @@ Macau bus timetable adapter is incomplete.
 
 ## Run
 
-Use Node 22.12 or later. `npm run dev` opens the Chinese preview at `/macau`
-and English at `/macau/en`. The Hong Kong planner remains at `/` and `/en`.
+Use Node 22.12 or later. `npm run dev` opens the Chinese preview at `/macau`,
+English at `/macau/en`, and Macao-specific app installation instructions at
+`/macau/install`. The Hong Kong planner remains at `/` and `/en`.
 `npm run cf:build` stages both cities for the existing free hosting architecture;
 route calculation stays in browser background workers. Staging is not deployment.
 

@@ -116,7 +116,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   return <main className="compass-app macau-app" lang={locale === 'en' ? 'en' : 'zh-MO'}>
     <a href="#macau-search" className="planner-skip-link">{t('跳至行程規劃', 'Skip to journey planner')}</a>
     <header className="app-header"><a className="app-brand" href={locale === 'en' ? '/macau/en' : '/macau'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a>
-      <nav className="header-actions"><a href="/install">{t('安裝 App', 'Install app')}</a><a href={locale === 'en' ? '/macau' : '/macau/en'}>{locale === 'en' ? '中' : 'EN'}</a></nav></header>
+      <nav className="header-actions"><a href={'/macau/install?lang=' + locale}>{t('安裝 App', 'Install app')}</a><a href={locale === 'en' ? '/macau' : '/macau/en'}>{locale === 'en' ? '中' : 'EN'}</a></nav></header>
     <div className="mo-layout"><aside className="mo-sidebar">
       <section className="mo-controls"><div className="mo-title"><label><span className="sr-only">{t('選擇城市', 'Choose city')}</span><select aria-label={t('選擇城市', 'Choose city')} value="macau" onChange={e => { if (e.target.value === 'hong-kong') window.location.assign(locale === 'en' ? '/en' : '/'); }}>{supportedCities.map(city => <option key={city.id} value={city.id}>{city[locale === 'en' ? 'nameEn' : 'nameTc']}</option>)}</select></label><span className="mo-preview">{t('下一版本預覽', 'NEXT VERSION')}</span></div>
         <div className="mo-tabs" role="tablist" aria-label={t('澳門工具', 'Macao tools')}>{(['plan', 'directory'] as const).map(id => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{id === 'plan' ? t('規劃行程', 'Plan a journey') : t('巴士及輕軌路線', 'Bus & LRT routes')}</button>)}</div>

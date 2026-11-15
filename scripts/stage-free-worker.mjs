@@ -9,7 +9,7 @@ await rm(assets, { recursive: true, force: true });
 await mkdir(assets, { recursive: true });
 await cp(join(root, 'public'), assets, { recursive: true });
 await cp(join(root, '.next/static'), join(assets, '_next/static'), { recursive: true });
-const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install', 'macau', 'macau/en'];
+const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install', 'macau', 'macau/en', 'macau/install'];
 for (const page of pages) {
   await mkdir(dirname(join(assets, page + '.html')), { recursive: true });
   await copyFile(join(root, '.next/server/app', page + '.html'), join(assets, page + '.html'));
