@@ -24,5 +24,11 @@ export function macauColour(pattern: Pick<MacauPattern, 'operator' | 'number'>) 
   if (pattern.operator === 'MO_LRT') return ({ TAIPA: '#65a000', SPV: '#8a66c3', HENGQIN: '#bd273a' } as Record<string, string>)[pattern.number] ?? '#008ed0';
   return macauOperators.find(row => row.id === pattern.operator)?.colour ?? '#596b75';
 }
+/** Official source pages stay current without shipping poster images in Git. */
+export function macauTimetableUrl(pattern: Pick<MacauPattern, 'mode' | 'number'>) {
+  return pattern.mode === 'BUS'
+    ? 'https://www.dsat.gov.mo/dsat/route_display.aspx?route=busroute_' + encodeURIComponent(pattern.number)
+    : 'https://www.mlm.com.mo/en/route.html';
+}
 export const macauTime = (time: string) => new Date(time).toLocaleTimeString('en-GB', { timeZone: 'Asia/Macau', hour: '2-digit', minute: '2-digit' });
 export const macauMoney = (value: number | null) => value === null ? '—' : 'MOP$' + value.toFixed(2);

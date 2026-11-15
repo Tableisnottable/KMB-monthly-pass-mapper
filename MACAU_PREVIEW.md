@@ -19,6 +19,8 @@ route calculation stays in browser background workers. Staging is not deployment
 - 3,376 OSM named place suggestions plus bilingual official transport stops;
   bounded online geocoding after an explicit click. OSM polygon centres are not entrance promises.
 - Route directory, ordered stop lists, source-time suspension flags, road paths.
+- Official DSAT timetable posters linked for every bus route; LRT links to its
+  published operating hours. Poster headways are not invented exact departures.
 - Start/end autocomplete, map picking, swapping and personal live GPS.
 - Depart-at / arrive-by, companies Must/Normal/Ban, 0–60 minute change buffer,
   walking/waiting/change/ride/transfer limits and existing 0–200% importance sliders.
@@ -53,8 +55,11 @@ Ferries, casino/hotel shuttles, coach services and Hong Kong–Macau cross-borde
 journeys are **not supported**. No Macau arrival notifications are sent until
 service/departure data can be verified. Existing Hong Kong notifications stay intact.
 
-## Sources checked 2026-11-14
+## Sources checked 2026-11-15
 
+- DSAT official route posters / timetable directory:
+  <https://www.dsat.gov.mo/dsat/bus_route.aspx>. Route 1 poster checked directly:
+  <https://www.dsat.gov.mo/bus/images/busroute/busroute_1.jpg>.
 - DSAT Bus Travelling System: <https://bis.dsat.gov.mo:37812/macauweb/>
   Official visitor endpoints `getRouteAndCompanyList.html`, `getRouteData.html`,
   `routestation/location`, and `/ddbus/common/supermap/route/traffic`.
