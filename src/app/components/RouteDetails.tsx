@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight, getPassLegFare, KMB_PASS_RULES } from '../../domain/monthlyPass';
 import { PlannerIcon } from './PlannerIcon';
@@ -42,9 +43,9 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile
         const selectedPrice = profile === 'unverified' ? copy(locale, '票價未核實', 'Fare unverified') : profile === 'pass' ? passLabel : profile === 'student'
           ? studentFares[index].available ? (studentFares[index].upperBound ? copy(locale, '最多 ', 'Up to ') : '') + '$' + studentFares[index].maximum.toFixed(2) : copy(locale, '票價待查', 'Fare unavailable')
           : leg.fareStatus === 'UNAVAILABLE' || leg.fare === undefined ? copy(locale, '票價待查', 'Fare unavailable') : '$' + leg.fare.toFixed(2);
-        return <li key={leg.id}>
+        return <Fragment key={leg.id}>{route.via && route.viaLegIndex === index && <li className="via-journey-step"><span className="step-marker"><PlannerIcon name="pin" size={16} /></span><div><strong>{copy(locale, '途經', 'Via')} · {route.via.name}</strong></div></li>}<li>
         <span className="step-marker step-operator-marker" style={routeBadgeStyle(legOperator(leg), leg.routeNumber)}><PlannerIcon name={modeIcon(leg.mode)} size={16} /></span>
-        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行前往目的地', 'Walk to your destination') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} {leg.mode !== 'WALK' && <DepartureBadge departure={leg.liveDepartures?.[0] ?? { status: leg.serviceStatus ?? 'UNVERIFIED' }} locale={locale} />}</strong>
+        <div><strong>{leg.mode === 'WALK' ? copy(locale, '步行', 'Walk') : operatorName(legOperator(leg), locale) + ' · ' + (leg.routeNumber || modeLabel(leg.mode, locale))} {leg.mode !== 'WALK' && <DepartureBadge departure={leg.liveDepartures?.[0] ?? { status: leg.serviceStatus ?? 'UNVERIFIED' }} locale={locale} />}</strong>
           <small>{leg.originStop?.name} → {leg.destinationStop?.name}</small>
           {leg.routeName && <small>{leg.routeName}</small>}
           {leg.departureTime && leg.arrivalTime && <small>{hongKongTimeLabel(leg.departureTime)} → {hongKongTimeLabel(leg.arrivalTime)} HKT</small>}
@@ -61,7 +62,7 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile
           {leg.fareStatus === 'UNAVAILABLE' && <small>{copy(locale, '此路段票價未有資料。', 'Fare data for this leg is unavailable.')}</small>}
           {index < route.legs.length - 1 && <small className="transfer-note">{copy(locale, '在此轉乘；全程轉乘步行約', 'Change here; total transfer walking about')} {transferWalk} min</small>}
         </div>
-      </li>; })}
+      </li></Fragment>; })}
       <li><span className="step-marker"><PlannerIcon name="pin" size={16} /></span><div><strong>{copy(locale, '抵達目的地', 'Arrive at your destination')}</strong>{!walkOnly && (route.destinationWalkMinutes ?? 0) > 0 && <small>{copy(locale, '下車後步行', 'Walk after alighting')} {route.destinationWalkMinutes} min</small>}</div></li>
     </ol>
     <details className="score-explanation"><summary>{copy(locale, '為甚麼推薦這條路線？', 'Why this route?')}<span>{route.finalScore.toFixed(1)}</span></summary>

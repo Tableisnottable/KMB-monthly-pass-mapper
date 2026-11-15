@@ -7,8 +7,9 @@ import { copy, type JourneyField, type JourneyLocations, type PlannerLocale } fr
 import type { PlaceResult } from './PlaceAutocomplete';
 import { hongKongInputValue, type JourneyTimeSelection } from '../../engine/journeyTime';
 
-export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus, onSearch, searching, locale, time, onTimeChange }: {
+export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus, onSearch, searching, locale, time, onTimeChange, onViaChange }: {
   places: JourneyLocations;
+  onViaChange: (enabled: boolean) => void;
   onInput: (field: JourneyField) => void;
   onSelect: (field: JourneyField, place: PlaceResult) => void;
   onSwap: () => void;
@@ -19,6 +20,11 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
   time: JourneyTimeSelection;
   onTimeChange: (time: JourneyTimeSelection) => void;
 }) {
+  const [via, setVia] = useState('');
+  const viaRef = useRef<HTMLInputElement>(null);
+  const viaEnabled = places.via !== undefined;
+  useEffect(() => { if (places.via) setVia(places.via.name); else if (places.via === undefined) setVia(''); }, [places.via]);
+  useEffect(() => { if (viaEnabled && !places.via) viaRef.current?.focus(); }, [viaEnabled]);
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const originRef = useRef<HTMLInputElement>(null), destinationRef = useRef<HTMLInputElement>(null);
@@ -44,7 +50,7 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
 
   return <form className="journey-search" onSubmit={event => {
     event.preventDefault();
-    if (places.origin && places.destination && !searching) onSearch();
+    if (places.origin && places.destination && places.via !== null && !searching) onSearch();
   }}>
     <div className="search-fields">
       <PlaceAutocomplete label={copy(locale, '起點', 'Start')} colorClass="origin-label" locale={locale}
@@ -58,6 +64,13 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
         onFocus={() => onFocus('destination')} onChange={value => { setDestination(value); onInput('destination'); }}
         onSelect={place => onSelect('destination', place)} />
     </div>
+    {viaEnabled && <div className="via-place-row">
+      <PlaceAutocomplete label={copy(locale, '途經', 'Via')} colorClass="via-label" locale={locale}
+        value={via} selectedPlace={places.via ?? null} inputRef={viaRef}
+        onFocus={() => onFocus('via')} onChange={value => { setVia(value); onInput('via'); }}
+        onSelect={place => onSelect('via', place)} />
+      <button type="button" className="via-remove" aria-label={copy(locale, '移除途經點', 'Remove Via')} onClick={() => onViaChange(false)}>×</button>
+    </div>}
     <div className="journey-time-controls">
       <label className="sr-only" htmlFor="journey-time-mode">{copy(locale, '出發或抵達時間', 'Departure or arrival time')}</label>
       <select id="journey-time-mode" value={time.mode} onChange={event => onTimeChange({ mode: event.target.value as JourneyTimeSelection['mode'], value: time.value || hongKongInputValue(new Date(Date.now() + 3600000)) })}>
@@ -65,9 +78,9 @@ export function JourneyPlaceSearch({ places, onInput, onSelect, onSwap, onFocus,
       </select>
       {time.mode !== 'now' && <><label className="sr-only" htmlFor="journey-date-time">{copy(locale, '日期及時間（香港 UTC+8）', 'Date and time (Hong Kong UTC+8)')}</label><input id="journey-date-time" type="datetime-local" value={time.value} required onChange={event => onTimeChange({ ...time, value: event.target.value })} /></>}
       {searching && <span className="planner-spinner" aria-label={copy(locale, '正在搜尋', 'Searching')} />}
-      <button type="submit" className="time-apply" disabled={!places.origin || !places.destination || searching || (time.mode !== 'now' && !time.value)}>{copy(locale, '搜尋', 'Go')}</button>
+      <button type="submit" className="time-apply" disabled={!places.origin || !places.destination || places.via === null || searching || (time.mode !== 'now' && !time.value)}>{copy(locale, '搜尋', 'Go')}</button>
     </div>
-    <div className="search-place-actions"><button type="button" className="use-location-button" disabled={locating} aria-busy={locating} onClick={useLocation}><PlannerIcon name="locate" size={18} />{locating ? copy(locale, 'GPS 定位中…', 'Locating…') : copy(locale, 'GPS 定位起點', 'Use GPS as start')}</button><span>Hong Kong · UTC+8</span></div>
+    <div className="search-place-actions"><button type="button" className="use-location-button" disabled={locating} aria-busy={locating} onClick={useLocation}><PlannerIcon name="locate" size={18} />{locating ? copy(locale, 'GPS 定位中…', 'Locating…') : copy(locale, 'GPS 定位起點', 'Use GPS as start')}</button>{!viaEnabled && <button type="button" className="add-via-button" onClick={() => onViaChange(true)}>+ {copy(locale, '途經點', 'Via')}</button>}<span>Hong Kong · UTC+8</span></div>
     {locationError && <p className="location-error" role="status">{locationError}</p>}
   </form>;
 }

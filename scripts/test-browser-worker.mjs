@@ -84,6 +84,22 @@ try {
   assert.equal(border.meta.maxTransfers, null);
   const borderComparison = await request('/api/travel-options?' + borderParams + '&modes=');
   assert.deepEqual(borderComparison.data, []);
+  const viaParams = new URLSearchParams({ fromLat: '22.33882', fromLon: '114.15387', toLat: '22.2819', toLon: '114.1582',
+    viaLat: '22.3192', viaLon: '114.1693', viaName: 'Mong Kok', modes: 'SUBWAY', operators: 'MTR', walkComparison: 'false',
+    timeMode: 'depart', time: serviceDay + 'T12:00:00+08:00' });
+  for (const timeMode of ['depart', 'arrive']) {
+    viaParams.set('timeMode', timeMode);
+    const via = await request('/api/journey?' + viaParams);
+    assert(via.data.length > 0, 'Missing Via journeys');
+    assert.equal(via.meta.via.name, 'Mong Kok');
+    for (const route of via.data) {
+      assert(route.viaLegIndex > 0 && route.viaLegIndex < route.legs.length);
+      assert.equal(route.via.lat, 22.3192);
+      const first = route.legs[route.viaLegIndex - 1], next = route.legs[route.viaLegIndex];
+      assert(Date.parse(next.departureTime) >= Date.parse(first.arrivalTime));
+      if (timeMode === 'arrive') assert(Date.parse(route.arrivalTime) <= Date.parse(viaParams.get('time')));
+    }
+  }
   const mapLeg = result.data[0].legs[0];
   const mapToken = [mapLeg.networkPattern, mapLeg.boardingIndex, mapLeg.alightingIndex].join(':');
   const deepMap = await request('/api/journey-geometry?' + borderParams + '&legs=' + Array(5).fill(mapToken).join(','));

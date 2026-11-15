@@ -552,6 +552,13 @@ button {
 .planner-toolbar .use-location-button:disabled { opacity: .65; cursor: progress; }
 .planner-toolbar .journey-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; margin: 0; padding: 0; border: 0; background: transparent; }
 .planner-toolbar .search-fields { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 7px; align-items: center; }
+.planner-toolbar .via-place-row { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 7px; margin-top: 8px; }
+.planner-toolbar .via-place-row .place-input { border-left: 4px solid #7851a9; }
+.planner-toolbar .via-label { color: #67428e; }
+.via-remove, .add-via-button { min-height: 44px; border: 1px solid #d1c4df; border-radius: 6px; background: #f6f1fb; color: #67428e; font: inherit; font-weight: 700; }
+.via-remove { font-size: 25px; }
+.add-via-button { padding: 8px 12px; font-size: 12px; margin-right: auto; }
+.via-journey-step { color: #67428e; }
 .planner-toolbar .place-input { height: 52px; border-radius: 6px; border-color: #c4cec6; background: #fafcf9; }
 .planner-toolbar .place-input:focus-within { border-color: #298333; outline: 2px solid #29833320; }
 .planner-toolbar .field-label { font-size: 13px; width: auto; padding: 0 8px 0 12px; color: #69796e; font-weight: 600; }

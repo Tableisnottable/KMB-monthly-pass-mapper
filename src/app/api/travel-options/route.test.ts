@@ -7,6 +7,13 @@ vi.mock('../../../data/routeGeometry', () => ({ routeOnStreets: vi.fn(async (_po
   ? { paths: [], source: 'UNAVAILABLE' } : { paths: [[[22.3, 114.1], [22.31, 114.11]]], source: 'OSM_ROAD', distanceMetres: 2000, durationSeconds: 601 }) }));
 describe('Walking, cycling, taxi and driving API', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('routes all enabled profiles through the same Via place', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&viaLat=22.32&viaLon=114.12'));
+    expect(response.status).toBe(200);
+    expect(vi.mocked(routeOnStreets).mock.calls).toHaveLength(3);
+    for (const call of vi.mocked(routeOnStreets).mock.calls) expect(call[0]).toEqual([[22.3, 114.1], [22.32, 114.12], [22.31, 114.11]]);
+    expect((await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&viaLon=114.12'))).status).toBe(400);
+  });
   it('uses a distinct real routing profile for each mode and preserves no-route results', async () => {
     const response = await GET(new NextRequest('http://localhost/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11'));
     const { data } = await response.json();

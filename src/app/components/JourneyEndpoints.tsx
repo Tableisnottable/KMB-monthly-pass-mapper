@@ -3,5 +3,5 @@ export function JourneyEndpoints({ places, originFallback, destinationFallback }
   function label(place: JourneyLocations['origin'], fallback?: string) {
     return <div><strong>{place?.name ?? fallback}</strong>{place?.type === 'map' && <small className="trip-address">{place.address}</small>}</div>;
   }
-  return <div className="trip-endpoints">{label(places.origin, originFallback)}<span>↓</span>{label(places.destination, destinationFallback)}</div>;
+  return <div className="trip-endpoints">{label(places.origin, originFallback)}<span>↓</span>{places.via && <>{label(places.via)}<span>↓</span></>}{label(places.destination, destinationFallback)}</div>;
 }

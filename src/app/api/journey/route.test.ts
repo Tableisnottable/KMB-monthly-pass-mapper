@@ -31,6 +31,64 @@ describe('Multimodal journey API', () => {
   });
   afterEach(() => { vi.useRealTimers(); });
 
+  it.each(['depart', 'arrive'])('plans through Mong Kok with connected %s times and complete fares', async timeMode => {
+    const time = '2026-11-14T12:00:00+08:00';
+    const { data, meta } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {
+      viaLat: '22.3192', viaLon: '114.1693', viaName: 'Mong Kok', timeMode, time,
+      modes: 'SUBWAY', operators: 'MTR', requiredModes: 'SUBWAY', walkComparison: 'false', changeMinutes: '5',
+    });
+    expect(data.length).toBeGreaterThan(0);
+    expect(meta.via.name).toBe('Mong Kok');
+    for (const route of data) {
+      expect(route.via).toMatchObject({ lat: 22.3192, lng: 114.1693 });
+      expect(route.viaLegIndex).toBeGreaterThan(0);
+      const first = route.legs[route.viaLegIndex - 1], next = route.legs[route.viaLegIndex];
+      expect(Date.parse(next.departureTime) - Date.parse(first.arrivalTime)).toBeGreaterThanOrEqual(5 * 60_000);
+      expect(route.discountedFare).toBeCloseTo(route.legs.reduce((sum: number, l: { fare: number }) => sum + l.fare, 0), 2);
+      expect(route.transferCount).toBe(route.legs.length - 1);
+      expect(route.finalScore).toBe(scoreRoutes([route], weightingDate(new Date(time)))[0].finalScore);
+      expect(journeyMatchesEndpoints(route, cheungShaWan, { lat: 22.2819, lng: 114.1582 })).toBe(true);
+      if (timeMode === 'arrive') expect(Date.parse(route.arrivalTime)).toBeLessThanOrEqual(Date.parse(time));
+      else expect(route.departureTime).toBe(new Date(time).toISOString());
+    }
+  }, 30000);
+
+  it('applies transfer limits to the whole Via journey, not to each half', async () => {
+    const { data } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {
+      viaLat: '22.3192', viaLon: '114.1693', timeMode: 'depart', time: '2026-11-14T12:00:00+08:00',
+      modes: 'SUBWAY', operators: 'MTR', walkComparison: 'false', limits: '{"transfers":0}',
+    });
+    expect(data).toEqual([]);
+  }, 30000);
+
+  it('rejects an incomplete Via rather than returning a direct journey', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/journey?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&viaLat=22.32'));
+    expect(response.status).toBe(400);
+  });
+
+  it('can satisfy required companies on different sides of Via while keeping banned companies out', async () => {
+    const { data } = await journey(cheungShaWan, { lat: 22.2819, lng: 114.1582 }, {
+      viaLat: '22.3192', viaLon: '114.1693', timeMode: 'depart', time: '2026-11-14T12:00:00+08:00',
+      modes: 'BUS,SUBWAY', operators: 'KMB,MTR', requiredOperators: 'KMB,MTR', walkComparison: 'false',
+    });
+    expect(data.length).toBeGreaterThan(0);
+    for (const route of data) {
+      expect(route.legs.some((leg: { operator: string }) => leg.operator === 'KMB')).toBe(true);
+      expect(route.legs.some((leg: { operator: string }) => leg.operator === 'MTR')).toBe(true);
+      expect(route.legs.every((leg: { operator: string }) => ['KMB', 'MTR'].includes(leg.operator))).toBe(true);
+    }
+  }, 30000);
+
+  it('does not add another boarding or fare when Via equals the start', async () => {
+    const options = { timeMode: 'depart', time: '2026-11-14T12:00:00+08:00', modes: 'SUBWAY', operators: 'MTR', walkComparison: 'false' };
+    const to = { lat: 22.2819, lng: 114.1582 };
+    const direct = await journey(cheungShaWan, to, options);
+    const same = await journey(cheungShaWan, to, { ...options, viaLat: String(cheungShaWan.lat), viaLon: String(cheungShaWan.lng) });
+    expect(same.data.length).toBeGreaterThan(0);
+    expect(same.data.map((r: { discountedFare: number }) => r.discountedFare)).toEqual(direct.data.map((r: { discountedFare: number }) => r.discountedFare));
+    expect(same.data.every((r: { viaLegIndex: number }) => r.viaLegIndex === 0)).toBe(true);
+  }, 30000);
+
   it('includes adult-priced direct airport buses and useful Cheung On feeder alternatives', async () => {
     const { data, meta } = await journey();
     expect(data.length).toBeGreaterThan(0);

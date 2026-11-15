@@ -4,6 +4,7 @@ import { transitGeometry, routeOnStreets, type Coordinate } from '../../../data/
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { withinRoutingArea } from '../../../domain/routingArea';
 import { parseRoutePreferences } from '../../../domain/routePreferences';
+import { parseJourneyVia } from '../../../domain/journeyVia';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -15,13 +16,23 @@ export async function GET(request: NextRequest) {
   }
   const tokens = (params.get('legs') ?? '').split(',').filter(Boolean);
   if (!tokens.length && params.get('walk') !== 'true') return NextResponse.json({ error: 'Choose transit legs or a walking journey.' }, { status: 400 });
-  let preferences;
-  try { preferences = parseRoutePreferences(params.get('preferences')); }
+  let preferences, via;
+  try { preferences = parseRoutePreferences(params.get('preferences')); via = parseJourneyVia(params); }
   catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
-  const legs = tokens.map(token => {
+  const viaIndex = Number(params.get('viaIndex'));
+  if (via && tokens.length && (!params.get('viaIndex')?.trim() || !Number.isSafeInteger(viaIndex) || viaIndex < 0 || viaIndex > tokens.length)) {
+    return NextResponse.json({ error: 'Choose the Via position in the journey.' }, { status: 400 });
+  }
+  type GeometryLeg = { walk: true; from: Coordinate; to: Coordinate } | { walk: false; pattern: number; board: number; alight: number };
+  const legs = tokens.map((token): GeometryLeg | null => {
+    if (token.startsWith('w:')) {
+      const parts = token.split(':').slice(1), [a, b, c, d] = parts.map(Number);
+      return parts.length === 4 && parts.every(v => v.trim()) && withinRoutingArea(a, b) && withinRoutingArea(c, d)
+        ? { walk: true, from: [a, b], to: [c, d] } : null;
+    }
     if (!/^\d+:\d+:\d+$/.test(token)) return null;
     const [pattern, board, alight] = token.split(':').map(Number), p = networkPatterns[pattern];
-    return p && board >= 0 && alight < p.s.length && board < alight && p.p[board] === 0 && p.a[alight] === 0 ? { pattern, board, alight } : null;
+    return p && board >= 0 && alight < p.s.length && board < alight && p.p[board] === 0 && p.a[alight] === 0 ? { walk: false, pattern, board, alight } : null;
   });
   if (legs.some(l => !l)) return NextResponse.json({ error: 'Invalid transit leg.' }, { status: 400 });
   const limiter = await getRateLimiter();
@@ -31,12 +42,18 @@ export async function GET(request: NextRequest) {
   const jobs: Promise<{ legIndex: number; walk: boolean; paths: Coordinate[][]; source: string }>[] = [];
   let previous = origin;
   for (const [legIndex, leg] of legs.map((l, i) => [i, l!] as const)) {
+    const waypoint: Coordinate[] = via && viaIndex === legIndex ? [[via.lat, via.lng]] : [];
+    if (leg.walk) {
+      jobs.push(routeOnStreets([previous, ...waypoint, leg.from, leg.to], true).then(geometry => ({ legIndex, walk: true, ...geometry })));
+      previous = leg.to; continue;
+    }
     const p = networkPatterns[leg.pattern], a = networkStops[p.s[leg.board]], b = networkStops[p.s[leg.alight]];
-    jobs.push(routeOnStreets([previous, [a[3], a[4]]], true).then(geometry => ({ legIndex, walk: true, ...geometry })));
+    jobs.push(routeOnStreets([previous, ...waypoint, [a[3], a[4]]], true).then(geometry => ({ legIndex, walk: true, ...geometry })));
     jobs.push(transitGeometry(leg.pattern, leg.board, leg.alight).then(geometry => ({ legIndex, walk: false, ...geometry })));
     previous = [b[3], b[4]];
   }
-  jobs.push(routeOnStreets([previous, destination], true, legs.length ? undefined : preferences).then(geometry => ({ legIndex: legs.length, walk: true, ...geometry })));
+  const finalVia: Coordinate[] = via && (!legs.length || viaIndex === legs.length) ? [[via.lat, via.lng]] : [];
+  jobs.push(routeOnStreets([previous, ...finalVia, destination], true, legs.length ? undefined : preferences).then(geometry => ({ legIndex: legs.length, walk: true, ...geometry })));
   const pieces = await Promise.all(jobs);
   return NextResponse.json({ pieces, missing: pieces.filter(p => p.source === 'UNAVAILABLE').length,
     attribution: 'Hong Kong Transport Department / CSDI; © OpenStreetMap contributors. Road fallback and footpaths use OSRM.' },

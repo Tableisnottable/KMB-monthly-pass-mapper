@@ -5,6 +5,7 @@ import { getRateLimiter } from '../../../lib/cloudflare';
 import { parseComparisonSelection } from '../../../domain/transportSelection';
 import { parseRoutePreferences } from '../../../domain/routePreferences';
 import { withinRoutingArea } from '../../../domain/routingArea';
+import { parseJourneyVia } from '../../../domain/journeyVia';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -17,13 +18,13 @@ export async function GET(request: NextRequest) {
   let selected;
   try { selected = parseComparisonSelection(request.nextUrl.searchParams.get('modes')); }
   catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
-  let preferences;
-  try { preferences = parseRoutePreferences(request.nextUrl.searchParams.get('preferences')); }
+  let preferences, via;
+  try { preferences = parseRoutePreferences(request.nextUrl.searchParams.get('preferences')); via = parseJourneyVia(request.nextUrl.searchParams); }
   catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
   const limiter = await getRateLimiter();
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   if (limiter && !(await limiter.limit({ key: 'travel-options:' + ip })).success) return NextResponse.json({ error: 'Please try again shortly.' }, { status: 429 });
-  const points: Coordinate[] = [[values[0], values[1]], [values[2], values[3]]];
+  const points: Coordinate[] = [[values[0], values[1]], ...(via ? [[via.lat, via.lng] as Coordinate] : []), [values[2], values[3]]];
   const modes: [TravelMode, StreetProfile][] = [['walk', 'foot'], ['cycle', 'bike'], ['taxi', 'car'], ['drive', 'car']];
   const profiles = new Map<StreetProfile, ReturnType<typeof routeOnStreets>>();
   const data = await Promise.all(modes.filter(([mode]) => selected === undefined || selected.includes(mode))

@@ -19,7 +19,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
   const container = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const journeyBounds = useRef<Leaflet.LatLngBounds | null>(null);
-  const { origin, destination } = places;
+  const { origin, via, destination } = places;
   const onMapPick = useRef(onPick);
   useEffect(() => { onMapPick.current = onPick; }, [onPick]);
   const [ready, setReady] = useState(false);
@@ -93,6 +93,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
       });
     }
     if (origin) flag(origin, copy(locale, '起點', 'Start'));
+    if (via) flag(via, copy(locale, '途經', 'Via'));
     if (destination) flag(destination, copy(locale, '目的地', 'End'));
     function fit() {
       if (points.length) {
@@ -115,11 +116,12 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
     setGeometryStatus('loading');
     setEstimatedRoad(false);
     const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng) });
+    if (via) { params.set('viaLat', String(via.lat)); params.set('viaLon', String(via.lng)); if (route.viaLegIndex !== undefined) params.set('viaIndex', String(route.viaLegIndex)); }
     if (route.legs.every(l => l.mode === 'WALK')) {
       params.set('walk', 'true');
       if (preferences) params.set('preferences', JSON.stringify(preferences));
     }
-    else params.set('legs', route.legs.map(l => `${l.networkPattern}:${l.boardingIndex}:${l.alightingIndex}`).join(','));
+    else params.set('legs', route.legs.map(l => l.mode === 'WALK' ? `w:${l.originStop!.lat}:${l.originStop!.lng}:${l.destinationStop!.lat}:${l.destinationStop!.lng}` : `${l.networkPattern}:${l.boardingIndex}:${l.alightingIndex}`).join(','));
     const timeout = window.setTimeout(() => { setGeometryStatus('error'); controller.abort(); }, 45000);
     fetch('/api/journey-geometry?' + params, { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Geometry unavailable');
@@ -144,7 +146,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
     }).catch(() => { if (!controller.signal.aborted) setGeometryStatus('error'); })
       .finally(() => window.clearTimeout(timeout));
     return () => { controller.abort(); window.clearTimeout(timeout); };
-  }, [ready, route, travel, origin, destination, locale, preferences]);
+  }, [ready, route, travel, origin, via, destination, locale, preferences]);
 
   useEffect(() => {
     const current = state.current;

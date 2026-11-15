@@ -29,7 +29,7 @@ export function groupJourneysByStops(routes: ScoredRoute[], sort: JourneySort = 
   const groups = new Map<string, JourneyGroup>();
   [...routes].sort((a, b) => sortValue(a, sort, profile, preferences) - sortValue(b, sort, profile, preferences) || a.finalScore - b.finalScore).forEach((route, index) => {
     const stops = stopSequenceKey(route);
-    const id = stops ? JSON.stringify([stops, hasEndedService(route)]) : `single:${index}:${route.id}`;
+    const id = stops ? JSON.stringify([stops, route.via?.lat, route.via?.lng, route.viaLegIndex, hasEndedService(route)]) : `single:${index}:${route.id}`;
     const group = groups.get(id);
     if (group) group.routes.push(route);
     else groups.set(id, { id, routes: [route] });
