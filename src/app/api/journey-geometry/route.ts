@@ -2,17 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { networkPatterns, networkStops } from '../../../data/transportNetwork';
 import { transitGeometry, routeOnStreets, type Coordinate } from '../../../data/routeGeometry';
 import { getRateLimiter } from '../../../lib/cloudflare';
+import { withinRoutingArea } from '../../../domain/routingArea';
+import { parseRoutePreferences } from '../../../domain/routePreferences';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const raw = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(k => params.get(k));
   const values = raw.map(Number);
-  if (raw.some(v => !v?.trim()) || values.some(v => !Number.isFinite(v)) || values[0] < 22.1 || values[0] > 22.6 || values[2] < 22.1 || values[2] > 22.6 || values[1] < 113.8 || values[1] > 114.5 || values[3] < 113.8 || values[3] > 114.5) {
-    return NextResponse.json({ error: 'Valid Hong Kong endpoints are required.' }, { status: 400 });
+  if (raw.some(v => !v?.trim()) || !withinRoutingArea(values[0], values[1]) || !withinRoutingArea(values[2], values[3])) {
+    return NextResponse.json({ error: 'Endpoints must be within the Hong Kong–Shenzhen routing area.' }, { status: 400 });
   }
   const tokens = (params.get('legs') ?? '').split(',').filter(Boolean);
-  if (tokens.length > 4 || (!tokens.length && params.get('walk') !== 'true')) return NextResponse.json({ error: 'Choose one to four transit legs, or a walking journey.' }, { status: 400 });
+  if (!tokens.length && params.get('walk') !== 'true') return NextResponse.json({ error: 'Choose transit legs or a walking journey.' }, { status: 400 });
+  let preferences;
+  try { preferences = parseRoutePreferences(params.get('preferences')); }
+  catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
   const legs = tokens.map(token => {
     if (!/^\d+:\d+:\d+$/.test(token)) return null;
     const [pattern, board, alight] = token.split(':').map(Number), p = networkPatterns[pattern];
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
     jobs.push(transitGeometry(leg.pattern, leg.board, leg.alight).then(geometry => ({ legIndex, walk: false, ...geometry })));
     previous = [b[3], b[4]];
   }
-  jobs.push(routeOnStreets([previous, destination], true).then(geometry => ({ legIndex: legs.length, walk: true, ...geometry })));
+  jobs.push(routeOnStreets([previous, destination], true, legs.length ? undefined : preferences).then(geometry => ({ legIndex: legs.length, walk: true, ...geometry })));
   const pieces = await Promise.all(jobs);
   return NextResponse.json({ pieces, missing: pieces.filter(p => p.source === 'UNAVAILABLE').length,
     attribution: 'Hong Kong Transport Department / CSDI; © OpenStreetMap contributors. Road fallback and footpaths use OSRM.' },

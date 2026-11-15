@@ -4,11 +4,8 @@ import { travelOption, type TravelMode } from '../../../domain/travelOptions';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { parseComparisonSelection } from '../../../domain/transportSelection';
 import { parseRoutePreferences } from '../../../domain/routePreferences';
+import { withinRoutingArea } from '../../../domain/routingArea';
 export const dynamic = 'force-dynamic';
-
-const ROUTING_AREA = { south: 22.1, north: 22.9, west: 113.75, east: 114.65 };
-const withinRoutingArea = (lat: number, lon: number) => lat >= ROUTING_AREA.south && lat <= ROUTING_AREA.north
-  && lon >= ROUTING_AREA.west && lon <= ROUTING_AREA.east;
 
 export async function GET(request: NextRequest) {
   const raw = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(k => request.nextUrl.searchParams.get(k));

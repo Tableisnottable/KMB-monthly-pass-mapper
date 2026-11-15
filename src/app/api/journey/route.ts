@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { findMultimodalJourneys, selectJourneyAlternatives, retimeConnections, setJourneyTimes } from '../../../engine/multimodalJourney';
 import { parseJourneyTime } from '../../../engine/journeyTime';
 import { scoreRoutes, type Route, type ScoredRoute } from '../../../engine/UpgradedScoringEngine';
-import { haversineKm } from '../../../engine/journeyHelpers';
+import { routeOnStreets } from '../../../data/routeGeometry';
+import { travelOption } from '../../../domain/travelOptions';
+import { withinRoutingArea } from '../../../domain/routingArea';
 import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { transportCoverage, weightingDate } from '../../../data/transportNetwork';
 import { getRateLimiter } from '../../../lib/cloudflare';
@@ -46,7 +48,10 @@ export async function GET(request: NextRequest) {
     weights = parseRouteWeights(params.get('weights')); preferences = parseRoutePreferences(params.get('preferences')); }
   catch (err) { return NextResponse.json({ error: (err as Error).message }, { status: 400 }); }
   const { mode, date } = selection;
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', false, { operators, modes, weights, minimumChangeMinutes, preferences, limits });
+  const walkingRoute = !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false'
+    && limits.walk !== 0 && withinRoutingArea(fromLat, fromLon) && withinRoutingArea(toLat, toLon)
+    ? routeOnStreets([[fromLat, fromLon], [toLat, toLon]], 'foot', preferences) : undefined;
+  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', false, { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits });
   const candidates: Route[] = selectJourneyAlternatives(result.routes.filter(route => (!requiredOperators?.length
     || requiredOperators.every(id => route.legs.some(leg => (leg.networkOperator ?? leg.operator).split('+').includes(id))))
     && (!requiredModes?.length || requiredModes.every(id => route.legs.some(leg => leg.mode === id)))), 64, preferences);
@@ -55,8 +60,9 @@ export async function GET(request: NextRequest) {
   else for (const route of candidates) setJourneyTimes(route, date, mode);
   let scored: ScoredRoute[] = selectJourneyAlternatives(scoreRoutes(candidates.filter(r => withinJourneyLimits(r, limits) && !r.legs?.some(l => l.serviceEnded)
     && (mode !== 'arrive' || new Date(r.arrivalTime!).getTime() <= date.getTime() + 1)), weightingDate(date), weights), 40, preferences);
-  const walkMinutes = Math.ceil(haversineKm(fromLat, fromLon, toLat, toLon) * 1.2 / (5 / 60));
-  if (walkMinutes <= 45 && !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false') {
+  const walking = walkingRoute ? travelOption('walk', await walkingRoute) : undefined;
+  const walkMinutes = walking?.available ? walking.minutes : undefined;
+  if (walkMinutes !== undefined) {
     const walk: Route = { id: 'walk-only', transferCount: 0, walkTransferTimeMinutes: 0,
       legs: [{ id: 'walk', mode: 'WALK', operator: 'WALK', routeNumber: '',
         originStop: { id: 'origin', name: locale === 'en' ? 'Start' : '起點', lat: fromLat, lng: fromLon },
@@ -78,7 +84,7 @@ export async function GET(request: NextRequest) {
     importedOn: transportCoverage.importedOn, coverage: transportCoverage.counts,
     candidates: result.candidates, durationMs: Date.now() - started,
     originUncovered: !result.originStops.length, destinationUncovered: !result.destinationStops.length,
-    tooCloseToRide: walkMinutes <= 6, maxTransfers: limits.transfers,
+    tooCloseToRide: walkMinutes !== undefined && walkMinutes <= 6, maxTransfers: limits.transfers,
     limitations: transportCoverage.limitations,
   } }, { headers: { 'Cache-Control': 'no-store' } });
 }

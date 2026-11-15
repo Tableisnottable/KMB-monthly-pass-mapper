@@ -182,7 +182,7 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
       </>}
     </div>
     <div className="map-pane">
-      <JourneyMap route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={onMapPick} locale={locale} />
+      <JourneyMap route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={onMapPick} locale={locale} preferences={preferences} />
       <button type="button" className="mobile-close-map" onClick={() => setShowMap(false)}><PlannerIcon name="back" size={17} />{copy(locale, '返回行程', 'Back to journeys')}</button>
     </div>
   </div></div></FareLabelContext.Provider></FareProfileContext.Provider>;

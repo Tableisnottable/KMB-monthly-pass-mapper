@@ -11,10 +11,11 @@ import { PlannerIcon } from './PlannerIcon';
 import type { TravelOption } from '../../domain/travelOptions';
 import { routeLineStyles } from './routeColours';
 import { useLiveLocation } from './useLiveLocation';
+import type { RoutePreferences } from '../../domain/routePreferences';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
 
-export function JourneyMap({ route, travel, places, onPick, locale }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale }) {
+export function JourneyMap({ route, travel, places, onPick, locale, preferences }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale; preferences?: RoutePreferences }) {
   const container = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const journeyBounds = useRef<Leaflet.LatLngBounds | null>(null);
@@ -114,7 +115,10 @@ export function JourneyMap({ route, travel, places, onPick, locale }: { route?: 
     setGeometryStatus('loading');
     setEstimatedRoad(false);
     const params = new URLSearchParams({ fromLat: String(origin.lat), fromLon: String(origin.lng), toLat: String(destination.lat), toLon: String(destination.lng) });
-    if (route.legs.every(l => l.mode === 'WALK')) params.set('walk', 'true');
+    if (route.legs.every(l => l.mode === 'WALK')) {
+      params.set('walk', 'true');
+      if (preferences) params.set('preferences', JSON.stringify(preferences));
+    }
     else params.set('legs', route.legs.map(l => `${l.networkPattern}:${l.boardingIndex}:${l.alightingIndex}`).join(','));
     const timeout = window.setTimeout(() => { setGeometryStatus('error'); controller.abort(); }, 45000);
     fetch('/api/journey-geometry?' + params, { signal: controller.signal }).then(async response => {
@@ -140,7 +144,7 @@ export function JourneyMap({ route, travel, places, onPick, locale }: { route?: 
     }).catch(() => { if (!controller.signal.aborted) setGeometryStatus('error'); })
       .finally(() => window.clearTimeout(timeout));
     return () => { controller.abort(); window.clearTimeout(timeout); };
-  }, [ready, route, travel, origin, destination, locale]);
+  }, [ready, route, travel, origin, destination, locale, preferences]);
 
   useEffect(() => {
     const current = state.current;

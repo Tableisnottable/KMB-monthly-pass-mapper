@@ -28,6 +28,25 @@ export function hasWalkableGeometry(path: Coordinate[]): boolean {
     && (index === 0 || distance(path[index - 1], point) <= MAX_WALKING_GAP_KM));
 }
 
+interface StreetRoute {
+  geometry: { coordinates: number[][] };
+  distance: number;
+  duration?: number;
+  legs?: { steps?: { mode?: string; distance?: number }[] }[];
+}
+
+function walkableStreetRoute(route: StreetRoute, path: Coordinate[]): boolean {
+  const steps = route.legs?.flatMap(leg => leg.steps ?? []);
+  // A short or densely drawn ferry crossing is still not a walking route.
+  if (steps?.some(step => step.mode === 'ferry')) return false;
+  // Full provider instructions can establish a continuous walking route even
+  // when a real straight footpath has vertices more than 200 metres apart.
+  if (route.legs?.length && route.legs.every(leg => leg.steps?.length)
+    && steps?.every(step => step.mode === 'walking' && Number.isFinite(step.distance) && step.distance! >= 0)
+    && Math.abs(steps.reduce((sum, step) => sum + step.distance!, 0) - route.distance) <= 5) return true;
+  return hasWalkableGeometry(path);
+}
+
 export function decodePolyline(value: string): Coordinate[] {
   let i = 0, lat = 0, lng = 0; const points: Coordinate[] = [];
   function number() {
@@ -204,15 +223,15 @@ export async function routeOnStreets(points: Coordinate[], mode: boolean | Stree
         // concurrent users in this process. Production can use a private backend.
         const delay = Math.max(0, nextPublicRequest - Date.now()); nextPublicRequest = Date.now() + delay + 1100;
         if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-        const response = await fetch(`${base}/${chunk.map(([lat, lng]) => `${lng},${lat}`).join(';')}?overview=full&geometries=geojson&steps=false${walking || preferences ? '&alternatives=3' : ''}`, { signal: AbortSignal.timeout(12000) });
+        const response = await fetch(`${base}/${chunk.map(([lat, lng]) => `${lng},${lat}`).join(';')}?overview=full&geometries=geojson&steps=${walking ? 'true' : 'false'}${walking || preferences ? '&alternatives=3' : ''}`, { signal: AbortSignal.timeout(12000) });
         if (!response.ok) return missing();
-        const data = await response.json() as { code?: string; waypoints?: { distance: number }[]; routes?: { geometry: { coordinates: number[][] }; distance: number; duration?: number }[] };
+        const data = await response.json() as { code?: string; waypoints?: { distance: number }[]; routes?: StreetRoute[] };
         if (data.code !== 'Ok' || !data.routes?.length || data.waypoints?.some(p => !Number.isFinite(p.distance) || p.distance > (walking ? 150 : 100))) return missing();
         const maxDistance = Math.max(1200, chunk.reduce((n, p, i) => n + (i ? distance(chunk[i - 1], p) * 1000 : 0), 0) * (walking ? 5 : 8));
         const candidates = data.routes.map(route => ({ route, path: route.geometry.coordinates.map(p => [p[1], p[0]] as Coordinate) }))
           .filter(({ route, path }) => path.length >= 2 && !path.some(p => p.some(v => !Number.isFinite(v)))
-            && (!walking || hasWalkableGeometry(path))
-            && Number.isFinite(route.distance) && route.distance >= 0 && route.distance <= maxDistance);
+            && (!walking || walkableStreetRoute(route, path))
+            && Number.isFinite(route.distance) && route.distance >= 0 && (walking || route.distance <= maxDistance));
         const valid = preferences ? (await Promise.all(candidates.map(async candidate => {
           const evaluation = await evaluateStreetPathWithData([candidate.path], preferences);
           return { ...candidate, ...evaluation, preferenceCost: (candidate.route.duration ?? candidate.route.distance / (walking ? 1.3 : 8)) + evaluation.preferenceCost };

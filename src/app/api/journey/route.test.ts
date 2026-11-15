@@ -7,9 +7,11 @@ import { enrichJourneyArrivals } from '../../../data/multimodalLive';
 import { DEFAULT_WEIGHTS } from '../../../engine/routeWeights';
 import { routeCorridors } from '../../../domain/routePreferences';
 import { journeyMatchesEndpoints } from '../../../domain/journeyEndpointMatch';
+import { routeOnStreets } from '../../../data/routeGeometry';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
 vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
+vi.mock('../../../data/routeGeometry', () => ({ routeOnStreets: vi.fn() }));
 const now = new Date('2026-11-13T04:00:00Z');
 const cheungShaWan = { lat: 22.33882, lng: 114.15387 };
 const airport = { lat: 22.31367, lng: 113.93763 };
@@ -23,7 +25,10 @@ async function journey(from = cheungShaWan, to = airport, extra: Record<string, 
 }
 
 describe('Multimodal journey API', () => {
-  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); vi.setSystemTime(now); });
+  beforeEach(() => {
+    vi.clearAllMocks(); vi.useFakeTimers(); vi.setSystemTime(now);
+    vi.mocked(routeOnStreets).mockResolvedValue({ paths: [], source: 'UNAVAILABLE' });
+  });
   afterEach(() => { vi.useRealTimers(); });
 
   it('includes adult-priced direct airport buses and useful Cheung On feeder alternatives', async () => {
@@ -117,9 +122,29 @@ describe('Multimodal journey API', () => {
   });
 
   it('returns a walking comparison for nearby places', async () => {
+    vi.mocked(routeOnStreets).mockResolvedValue({ paths: [[[22.33882, 114.15387], [22.3395, 114.1545]]],
+      source: 'OSM_FOOT', durationSeconds: 601, distanceMetres: 800 });
     const { data } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 });
-    expect(data.some((r: { legs: { mode: string }[] }) => r.legs.every(l => l.mode === 'WALK'))).toBe(true);
+    const walk = data.find((r: { id: string }) => r.id === 'walk-only');
+    expect(walk.legs[0].journeyTimeMinutes).toBe(11);
+    expect(Date.parse(walk.arrivalTime) - Date.parse(walk.departureTime)).toBe(11 * 60000);
   }, 20000);
+
+  it('does not invent a walk or recommend walking when no walkable path exists', async () => {
+    const { data, meta } = await journey(cheungShaWan, { lat: 22.3395, lng: 114.1545 }, { modes: '' });
+    expect(data).toEqual([]); expect(meta.tooCloseToRide).toBe(false);
+    expect(routeOnStreets).toHaveBeenCalled();
+  });
+
+  it('uses real walking times beyond 45 minutes and enforces the selected walking limit', async () => {
+    vi.mocked(routeOnStreets).mockResolvedValue({ paths: [[[22.33882, 114.15387], [22.3395, 114.1545]]],
+      source: 'OSM_FOOT', durationSeconds: 7200, distanceMetres: 9000 });
+    const to = { lat: 22.3395, lng: 114.1545 };
+    const { data } = await journey(cheungShaWan, to, { modes: '' });
+    expect(data[0].legs[0].journeyTimeMinutes).toBe(120);
+    const limited = await journey(cheungShaWan, to, { modes: '', limits: '{"walk":60}' });
+    expect(limited.data).toEqual([]);
+  });
 
   it('enforces company Must/Ban rules and a 15-minute change buffer after live retiming, using custom importance', async () => {
     const weights = { ...DEFAULT_WEIGHTS, fare: .9 };

@@ -11,7 +11,10 @@ import { transitTypeAllowed } from '../domain/transportSelection';
 import { DEFAULT_PREFERENCES, preferencePenalty, preferredRoads, routeCorridors, corridorLegAllowed, routeRoadsAllowed, type RoutePreferences } from '../domain/routePreferences';
 import { DEFAULT_LIMITS, limitAllows, withinJourneyLimits, type JourneyLimits } from '../domain/journeyLimits';
 import { NORMAL_ACCESS_RADIUS_KM, FALLBACK_ACCESS_RADIUS_KM } from '../domain/journeyAccess';
-export interface JourneySearchOptions { operators?: string[]; modes?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences; limits?: JourneyLimits }
+export interface JourneySearchOptions { operators?: string[]; modes?: string[]; requiredOperators?: string[]; requiredModes?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences; limits?: JourneyLimits }
+
+const serviceFamily = (leg: Segment) => leg.networkPattern === undefined || leg.mode !== 'MINIBUS'
+  ? leg.operator + ':' + leg.routeNumber : networkRoutes[networkPatterns[leg.networkPattern].r][0];
 type Label = { stop: number; elapsed: number; cost: number; legs: Segment[]; walk: number; pendingWalk: number; originWalk: number; used: number[]; visited: number[]; family: string; readyDelay: number };
 type Window = { start: number; end: number; headway: number; duration: number };
 const WALK_SPEED = 5 / 60, TIMETABLE_DAY_RANGE = 7;
@@ -131,12 +134,13 @@ export function activeWindows(pattern: NetworkPattern, date: Date, context = ser
   }
   return windows;
 }
-export function nextDeparture(windows: Window[], offset: number, earliest: number) {
+export function nextDeparture(windows: Window[], offset: number, earliest: number, durationFraction = 0) {
   let best: { wait: number; duration: number; headway: number; publishedHeadway?: number } | undefined;
   for (const w of windows) {
-    let departure = w.start + offset;
+    const stopOffset = offset + w.duration * durationFraction;
+    let departure = w.start + stopOffset;
     if (w.headway > 0 && departure < earliest) departure += Math.ceil((earliest - departure) / w.headway) * w.headway;
-    if (departure + 0.001 < earliest || (w.headway > 0 && departure >= w.end + offset)) continue;
+    if (departure + 0.001 < earliest || (w.headway > 0 && departure >= w.end + stopOffset)) continue;
     const wait = Math.max(0, departure - earliest);
     if (best && wait >= best.wait) continue;
     best = { wait, duration: w.duration, headway: Math.max(w.headway, wait * 2), publishedHeadway: w.headway || undefined };
@@ -144,10 +148,11 @@ export function nextDeparture(windows: Window[], offset: number, earliest: numbe
   return best;
 }
 /** Latest trip at a downstream stop; frequency end is exclusive. */
-export function previousDeparture(windows: Window[], offset: number, latest: number) {
+export function previousDeparture(windows: Window[], offset: number, latest: number, durationFraction = 0) {
   let best: { wait: number; duration: number; headway: number; publishedHeadway?: number } | undefined;
   for (const w of windows) {
-    let departure = w.start + offset;
+    const stopOffset = offset + w.duration * durationFraction;
+    let departure = w.start + stopOffset;
     if (w.headway > 0) {
       const n = Math.min(Math.floor((latest - departure + 1e-7) / w.headway), Math.ceil((w.end - w.start) / w.headway) - 1);
       if (n < 0) continue;
@@ -171,8 +176,8 @@ function patternWindows(pattern: NetworkPattern, date: Date, context = serviceCo
 }
 function departureAt(pattern: NetworkPattern, windows: Window[], position: number, time: number, reverse: boolean) {
   const total = pattern.t[pattern.t.length - 1];
-  const shifted = windows.map(w => { const offset = pattern.t[position] * (total ? w.duration / total : 1); return { ...w, start: w.start + offset, end: w.end + offset }; });
-  return reverse ? previousDeparture(shifted, 0, time) : nextDeparture(shifted, 0, time);
+  const offset = total ? 0 : pattern.t[position], fraction = total ? pattern.t[position] / total : 0;
+  return reverse ? previousDeparture(windows, offset, time, fraction) : nextDeparture(windows, offset, time, fraction);
 }
 function addLabel(map: Map<number, Label[]>, value: Label, limit = 4) {
   const labels = map.get(value.stop) ?? [];
@@ -213,6 +218,20 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
   const context = serviceContext(date);
   const windows: (Window[] | undefined)[] = [], results: Route[] = [];
   const fareCache = new Map<string, ReturnType<typeof normalAdultFare>>();
+  const stopCache = new Map<number, ReturnType<typeof networkStop>>();
+  const stop = (index: number) => {
+    if (!stopCache.has(index)) stopCache.set(index, networkStop(index, locale));
+    return stopCache.get(index)!;
+  };
+  const waitMultiplier = UpgradedScoringEngine.getTimeMultiplier(scoreDate, weights);
+  const directOptions: { family: string; duration: number; fare: number }[] = [];
+  // The results selector discards longer, dearer changes from an already useful
+  // direct service. Stop expanding those prefixes once even a free, instant
+  // onward ride could no longer survive that same rule. Rail fares can later
+  // combine, so only non-rail fares provide a safe lower bound here.
+  const discardedByDirect = (label: Label, elapsed: number) => !reverse && directOptions.some(direct =>
+    label.legs.length && serviceFamily(label.legs[0]) === direct.family && elapsed >= direct.duration + 5
+    && label.legs.reduce((fare, leg) => fare + (leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? 0 : leg.fare ?? 0), 0) >= direct.fare);
   let bestCompleteCost = Infinity;
   for (let round = 0; round < rounds && frontier.size; round++) {
     const arrivals = new Map<number, Label[]>();
@@ -237,15 +256,16 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
           if (options.preferences && !corridorLegAllowed(pattern.id, start, end, options.preferences)) continue;
           const scale = pattern.t[pattern.t.length - 1] > 0 ? duration / pattern.t[pattern.t.length - 1] : 1;
           const ride = Math.max(1, Math.round((pattern.t[end] - pattern.t[start]) * scale)), elapsed = label.elapsed + wait + ride;
-          if (!limitAllows(limits.ride, label.legs.reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), ride))) continue;
-          const waitCost = (reverse ? (label.legs.length ? wait : 0) : wait) * UpgradedScoringEngine.getTimeMultiplier(scoreDate, weights);
+          if (discardedByDirect(label, elapsed)) continue;
+          if (limits.ride !== null && !limitAllows(limits.ride, label.legs.reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), ride))) continue;
+          const waitCost = (reverse ? (label.legs.length ? wait : 0) : wait) * waitMultiplier;
           if (label.cost + ride * weights.ride + waitCost + (round ? weights.transfer : 0) > bestCompleteCost * 1.9 + 35) continue;
           const fareKey = `${pattern.r}:${pattern.s[start]}:${pattern.s[end]}`;
           if (!fareCache.has(fareKey)) fareCache.set(fareKey, normalAdultFare(pattern.r, pattern.s[start], pattern.s[end]));
           const adult = fareCache.get(fareKey)!;
           const leg: Segment = {
             id: `${pattern.id}:${start}:${end}`, operator, networkOperator: route[1], networkRouteId: route[0], networkPatternId: pattern.id, mode: route[5], routeNumber: route[2], routeName: route[locale === 'en' ? 4 : 3],
-            originStop: networkStop(pattern.s[start], locale), destinationStop: networkStop(pattern.s[end], locale),
+            originStop: stop(pattern.s[start]), destinationStop: stop(pattern.s[end]),
             journeyTimeMinutes: ride, scheduledIntervalMinutes: interval, realtimeEta: null, ...adult,
             serviceStatus: rail ? 'UNVERIFIED' : 'TIMETABLE', scheduledDepartureMinutes: reverse ? -elapsed : label.elapsed + wait,
             scheduledWaitMinutes: reverse ? 0 : wait, accessWalkMinutes: reverse ? 0 : label.pendingWalk,
@@ -271,6 +291,11 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
             // tighten the search bound and prune compliant alternatives.
             if (!options.preferences || routeRoadsAllowed(result, options.preferences)) {
               bestCompleteCost = Math.min(bestCompleteCost, cost + endWalk * weights.walk);
+              if (round === 0 && !rail && withinJourneyLimits(result, limits)
+                && (!options.requiredOperators?.length || options.requiredOperators.every(id => route[1].split('+').includes(id)))
+                && (!options.requiredModes?.length || options.requiredModes.every(id => route[5] === id))) {
+                directOptions.push({ family: serviceFamily(leg), duration: elapsed + endWalk, fare: adult.fare });
+              }
             }
             results.push(result);
           }
@@ -299,6 +324,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
     if (round === rounds - 1) break;
     frontier = new Map();
     for (const [stop, labels] of Array.from(arrivals)) for (const label of labels) {
+      if (discardedByDirect(label, label.elapsed)) continue;
       if (limitAllows(limits.walk, label.walk + 3)) addLabel(frontier, { ...label, elapsed: label.elapsed + 3, cost: label.cost + 3 * weights.walk, walk: label.walk + 3, pendingWalk: 3, readyDelay: Math.max(0, minimumChange - 3) }, simpleOnly ? 48 : 4);
       for (const t of transfers(stop)) if (reachable.has(t.index) && !label.visited.includes(t.index) && limitAllows(limits.walk, label.walk + t.walk)) addLabel(frontier, { ...label, stop: t.index, elapsed: label.elapsed + t.walk,
         cost: label.cost + t.walk * weights.walk, walk: label.walk + t.walk, pendingWalk: t.walk, readyDelay: Math.max(0, minimumChange - t.walk) }, simpleOnly ? 48 : 4);
@@ -345,8 +371,7 @@ export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40, pre
   const ranked = dedupeJourneys(routes).filter(route => routeRoadsAllowed(route, preferences)).sort((a, b) => rank(a) - rank(b));
   const durations = new Map(ranked.map(r => [r, r.legs.reduce((sum, l) => sum + (l.journeyTimeMinutes ?? 0) + (l.scheduledWaitMinutes ?? 0), r.walkTransferTimeMinutes)]));
   const duration = (r: ScoredRoute) => durations.get(r)!;
-  const family = (leg: Segment) => leg.networkPattern === undefined || leg.mode !== 'MINIBUS'
-    ? leg.operator + ':' + leg.routeNumber : networkRoutes[networkPatterns[leg.networkPattern].r][0];
+  const family = serviceFamily;
   const direct = ranked.filter(r => r.transferCount === 0);
   // Do not occupy the alternatives board with a gratuitous change from a bus
   // that already reaches the destination more quickly and for less money.

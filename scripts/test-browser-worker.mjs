@@ -3,6 +3,9 @@ import { once } from 'node:events';
 import { strict as assert } from 'node:assert';
 import { resolve } from 'node:path';
 
+// Route fixtures use the imported snapshot's Saturday service calendar.
+const serviceDay = '2026-11-14';
+
 // Exercise the actual browser bundle in a web-standard worker shim. This is
 // independent of Next.js and catches incorrect aliases or missing datasets.
 const thread = new Worker(`
@@ -10,6 +13,12 @@ const thread = new Worker(`
   globalThis.self = globalThis;
   globalThis.location = { origin: 'http://localhost:8787' };
   globalThis.postMessage = value => parentPort.postMessage(value);
+  // Freeze the business date for those fixtures, while retaining real Date.now
+  // for elapsed-time caches and provider-request throttling.
+  const WallClockDate = Date;
+  globalThis.Date = class extends WallClockDate {
+    constructor(...args) { super(...(args.length ? args : ['2026-11-13T04:00:00Z'])); }
+  };
   import(require('node:url').pathToFileURL(workerData).href).then(() => {
     parentPort.on('message', data => globalThis.onmessage({ data }));
     parentPort.postMessage({ ready: true });
@@ -21,7 +30,7 @@ async function request(path, status = 200) {
   const message = once(thread, 'message');
   thread.postMessage({ id, url: 'http://localhost:8787' + path });
   const [reply] = await message;
-  assert.equal(reply.id, id); assert.equal(reply.error, undefined); assert.equal(reply.status, status);
+  assert.equal(reply.id, id); assert.equal(reply.error, undefined); assert.equal(reply.status, status, reply.body);
   return JSON.parse(reply.body);
 }
 try {
@@ -36,7 +45,7 @@ try {
   await request('/api/place-label?lat=nope', 400);
   await request('/api/travel-options?fromLat=nope', 400);
   const params = new URLSearchParams({ fromLat: '22.33882', fromLon: '114.15387', toLat: '22.31367', toLon: '113.93763',
-    lang: 'en', timeMode: 'depart', time: '2026-11-14T10:00:00+08:00' });
+    lang: 'en', timeMode: 'depart', time: serviceDay + 'T10:00:00+08:00' });
   const result = await request('/api/journey?' + params);
   const names = result.data.map(route => route.legs.map(leg => leg.routeNumber).join('>'));
   for (const route of ['A20', 'A23', '44>A31', '44>E32']) assert(names.includes(route), 'Missing ' + route);
@@ -44,7 +53,7 @@ try {
   for (const route of result.data) {
     assert(route.discountedFare > 0); assert.equal(Date.parse(route.departureTime), Date.parse(params.get('time')));
   }
-  params.set('timeMode', 'arrive'); params.set('time', '2026-11-14T14:00:00+08:00');
+  params.set('timeMode', 'arrive'); params.set('time', serviceDay + 'T14:00:00+08:00');
   const reverse = await request('/api/journey?' + params); assert(reverse.data.length > 0);
   for (const route of reverse.data) assert(Date.parse(route.arrivalTime) <= Date.parse(params.get('time')));
   params.set('operators', 'KMB,LWB'); params.set('requiredOperators', 'KMB'); params.set('changeMinutes', '15');
@@ -68,14 +77,19 @@ try {
   }
   params.set('changeMinutes', '61'); await request('/api/journey?' + params, 400);
   const borderParams = new URLSearchParams({ fromLat: '22.534', fromLon: '114.057', toLat: '22.244', toLon: '114.156',
-    timeMode: 'depart', time: '2026-11-15T12:00:00+08:00' });
+    timeMode: 'depart', time: serviceDay + 'T12:00:00+08:00' });
   const border = await request('/api/journey?' + borderParams);
   assert(border.data.length > 0, 'Missing Futian-to-Ap-Lei-Chau cross-border journeys');
   assert.equal(border.meta.originUncovered, false); assert.equal(border.meta.destinationUncovered, false);
   assert.equal(border.meta.maxTransfers, null);
   const borderComparison = await request('/api/travel-options?' + borderParams + '&modes=');
   assert.deepEqual(borderComparison.data, []);
+  const mapLeg = result.data[0].legs[0];
+  const mapToken = [mapLeg.networkPattern, mapLeg.boardingIndex, mapLeg.alightingIndex].join(':');
+  const deepMap = await request('/api/journey-geometry?' + borderParams + '&legs=' + Array(5).fill(mapToken).join(','));
+  assert.equal(deepMap.pieces.length, 11);
+  assert.equal(deepMap.pieces.filter(piece => !piece.walk).length, 5);
   const empty = await request('/api/travel-options?fromLat=22.3&fromLon=114.1&toLat=22.31&toLon=114.11&modes=');
   assert.deepEqual(empty.data, []);
-  console.log(`Browser bundle passed: catalogue, ${result.data.length} adult-priced departures, airport alternatives, ${reverse.data.length} arrive-by journeys, ${border.data.length} cross-border journeys, Must/Ban for companies and types, 0/15/60-minute changes and disabled comparisons.`);
+  console.log(`Browser bundle passed: catalogue, ${result.data.length} adult-priced departures, airport alternatives, ${reverse.data.length} arrive-by journeys, ${border.data.length} cross-border journeys, five-leg map requests, Must/Ban for companies and types, 0/15/60-minute changes and disabled comparisons.`);
 } finally { await thread.terminate(); }
