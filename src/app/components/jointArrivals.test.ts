@@ -77,7 +77,7 @@ describe('Joint operator arrival displays', () => {
     const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures, operator: 'KMB+CTB', routeNumber: '112', locale }));
     expect(html).toContain('data-departure-type="LIVE"'); expect(html).toContain('data-departure-type="SCHEDULED"');
     expect(html).toContain('data-departure-type="ADDITIONAL"');
-    expect(html).toContain(locale === 'zh' ? '時間表' : 'Scheduled');
+    expect(html).toContain(locale === 'zh' ? '原定班次' : 'Scheduled');
     expect(html).toContain(locale === 'zh' ? '加班' : 'Additional');
     expect(html).not.toContain('Live arrivals · HKT');
   });
@@ -93,7 +93,7 @@ describe('Joint operator arrival displays', () => {
     expect(html).toMatch(/<details class="arrival-help"><summary>班次說明<\/summary>/);
     expect(html).not.toMatch(/<details[^>]*open/);
     const body = html.slice(html.indexOf('class="departure-choices"'), html.indexOf('<details class="arrival-help"'));
-    expect(body).toContain('時間表');
+    expect(body).toContain('原定班次');
     expect(body).not.toContain('時間表內');
     expect(body).not.toContain('時間表班次');
     expect(body.match(/class="departure-type /g)).toHaveLength(1);
@@ -107,7 +107,7 @@ describe('Joint operator arrival displays', () => {
     expect(html).not.toContain('班次調整');
     expect(html).toContain('21:15 → 21:20');
     expect(html).toContain('+5分 ?');
-    expect(html).toContain('時間表');
+    expect(html).toContain('原定班次');
     expect(html).toContain('<strong>80</strong>');
     const changed = html.slice(html.indexOf('data-departure-type="CHANGED"'), html.indexOf('role="listitem"', html.indexOf('data-departure-type="CHANGED"')));
     expect(changed.match(/class="departure-type /g)).toHaveLength(1);
