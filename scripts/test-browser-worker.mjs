@@ -63,6 +63,13 @@ try {
   const macauPlaces = await request('/api/macau?resource=places&q=Airport&scope=local&lang=en');
   assert(macauPlaces.data.some(place => /airport/i.test(place.name)), 'Missing local Macao place search');
   const operators = await request('/api/network?resource=operators'); assert(operators.data.length >= 17);
+  const nightBus = await request('/api/network?resource=timetable&route=1437&pattern=td%3A569&stop=9440&date=' + serviceDay);
+  assert.equal(nightBus.route[2], 'N241');
+  assert.equal(nightBus.slots.length, 11);
+  assert.equal(nightBus.slots[0].time, '2026-11-13T17:54:00.000Z');
+  assert.equal(nightBus.slots.at(-1).time, '2026-11-13T22:54:00.000Z');
+  const nightBoard = await request('/api/network?resource=departures&scope=route-stop&route=1437&pattern=td%3A569&stop=9440&board=' + nightBus.boardingIndex);
+  assert.deepEqual(nightBoard.data.map(row => row.time), nightBus.slots.map(row => row.time));
   const school = await request('/api/places?q=CSWCSS');
   assert(school.data[0].name.includes('CHEUNG SHA WAN CATHOLIC SECONDARY SCHOOL'));
   assert.equal(school.data[0].type, 'school');

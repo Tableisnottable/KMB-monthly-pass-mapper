@@ -81,14 +81,23 @@ describe('Published service timetables', () => {
     expect(patternTimetable(index, '2026-04-06')).toEqual([]);
     expect(serviceCalendarStatus(1, parseServiceDate('2026-04-06'))).toMatchObject({ active: false, covered: true });
   });
-  it('validates service dates, variants and boarding stops', () => {
+  it('validates service dates, variants and stop positions', () => {
     expect(() => parseServiceDate('2026-02-30')).toThrow();
     expect(() => parseServiceDate('13/11/2026')).toThrow();
     expect(() => routeTimetable('missing', day)).toThrow('Unknown route');
-    expect(() => routeTimetable(networkRoutes[original.r][0], day, original.id, 'missing')).toThrow('boarding stop');
+    expect(() => routeTimetable(networkRoutes[original.r][0], day, original.id, 'missing')).toThrow('Choose a stop');
     const data = routeTimetable(networkRoutes[original.r][0], day, original.id, networkStops[original.s[0]][0]);
     expect(data.entries).toHaveLength(2);
     expect(data.variants.length).toBeGreaterThan(0);
+    expect(() => routeTimetable(networkRoutes[original.r][0], day, original.id, networkStops[original.s[0]][0], 2)).toThrow('Choose a stop');
+  });
+  it('distinguishes repeated stops by position and includes an alighting-only final stop', () => {
+    const pattern = networkPatterns[index], routeId = networkRoutes[pattern.r][0];
+    networkPatterns[index] = { ...pattern, s: [pattern.s[0], pattern.s[1], pattern.s[0]], p: [0, 0, 1] };
+    const stop = networkStops[pattern.s[0]][0];
+    expect(routeTimetable(routeId, day, pattern.id, stop, 0).entries.map(row => row.startMinute)).toEqual([600, 900]);
+    expect(routeTimetable(routeId, day, pattern.id, stop, 2).entries.map(row => row.startMinute)).toEqual([620, 940]);
+    expect(patternTimetable(index, day, 2)).toEqual([]);
   });
 });
 

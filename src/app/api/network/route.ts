@@ -6,7 +6,7 @@ import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
 import { operatorInfo, transportOperators } from '../../../data/transportOperators';
-import { hongKongServiceDate, nextPublishedDeparture, publishedDeparturesAround, routeTimetable, upcomingPublishedDepartures } from '../../../data/networkTimetable';
+import { hongKongServiceDate, nextPublishedDeparture, publishedDeparturesAround, publishedTimetableSlots, routeTimetable, upcomingPublishedDepartures } from '../../../data/networkTimetable';
 import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
 import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
 import { departureTimingType, departureType } from '../../../domain/departureType';
@@ -67,8 +67,10 @@ export async function GET(request: NextRequest) {
   }
   if (resource === 'timetable') {
     try {
-      const data = routeTimetable(p.get('route') ?? '', p.get('date') ?? hongKongServiceDate(), p.get('pattern') ?? undefined, p.get('stop') ?? undefined);
-      return NextResponse.json({ ...data, company: operatorInfo(data.route[1]), residentDocument: residentsRoutes.find(route => route.number === data.route[2]), meta: { timezone: 'Asia/Hong_Kong',
+      const position = p.get('position');
+      const data = routeTimetable(p.get('route') ?? '', p.get('date') ?? hongKongServiceDate(), p.get('pattern') ?? undefined,
+        p.get('stop') ?? undefined, position === null ? undefined : position.trim() ? Number(position) : NaN);
+      return NextResponse.json({ ...data, slots: publishedTimetableSlots(data.entries), company: operatorInfo(data.route[1]), residentDocument: residentsRoutes.find(route => route.number === data.route[2]), meta: { timezone: 'Asia/Hong_Kong',
         importedOn: transportCoverage.importedOn, source: transportCoverage.sources['td-gtfs-en.zip'],
         frequencyEndExclusive: true, allPublishedWindows: true } });
     } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid timetable lookup.' }, { status: 400 }); }
@@ -96,18 +98,28 @@ export async function GET(request: NextRequest) {
   const stop = p.get('stop'), stopIndex = networkStops.findIndex(s => s[0] === stop);
   if (stopIndex < 0) return NextResponse.json({ error: 'Unknown transport stop.' }, { status: 400 });
   const includeHistory = p.get('history') === 'true';
+  const routeStop = p.get('scope') === 'route-stop';
+  if (routeStop) {
+    const pattern = networkPatterns.find(item => item.id === p.get('pattern'));
+    const board = p.get('board');
+    if (!pattern || !board?.trim() || !Number.isInteger(Number(board)) || pattern.s[Number(board)] !== stopIndex
+      || networkRoutes[pattern.r][0] !== p.get('route')) {
+      return NextResponse.json({ error: 'Choose a stop on this route direction.' }, { status: 400 });
+    }
+  }
   if (includeHistory && !p.get('route')) return NextResponse.json({ error: 'A route is required to look up past timetable shifts.' }, { status: 400 });
   const now = new Date(), locale = p.get('lang') === 'en' ? 'en' : 'zh';
-  const terminalLookup = includeHistory && p.get('terminal') === 'true';
+  const terminalLookup = !routeStop && includeHistory && p.get('terminal') === 'true';
   const candidates: Route[] = [];
+  const canBoard = (pattern: typeof networkPatterns[number], position: number) => position < pattern.s.length - 1 && pattern.p[position] === 0;
   networkPatterns.forEach((pattern, index) => {
     const r = networkRoutes[pattern.r], rail = r[5] === 'SUBWAY' || r[5] === 'LIGHT_RAIL';
     if ((!terminalLookup && p.get('pattern') && pattern.id !== p.get('pattern')) || (p.get('route') && r[0] !== p.get('route'))) return;
     if (terminalLookup && pattern.s[0] !== stopIndex) return;
     pattern.s.forEach((s, position) => {
-      if (s !== stopIndex || (terminalLookup && position !== 0) || pattern.p[position] !== 0 || position === pattern.s.length - 1) return;
+      if (s !== stopIndex || (terminalLookup && position !== 0) || (!routeStop && !canBoard(pattern, position))) return;
       if (p.get('board') !== null && position !== Number(p.get('board'))) return;
-      const next = rail ? undefined : nextPublishedDeparture(index, position, now);
+      const next = rail || routeStop || includeHistory ? undefined : nextPublishedDeparture(index, position, now);
       const dest = pattern.s.length - 1;
       candidates.push({ id: pattern.id, originWalkMinutes: 0, legs: [{
         id: pattern.id, operator: r[1] === 'KMB+CTB' ? 'KMB' : r[1] === 'LWB+CTB' ? 'LWB' : r[1], networkOperator: r[1], mode: r[5], routeNumber: r[2],
@@ -125,7 +137,11 @@ export async function GET(request: NextRequest) {
     return includeHistory ? left.networkPattern === right.networkPattern && left.boardingIndex === right.boardingIndex
       : networkPatterns[left.networkPattern!].r === networkPatterns[right.networkPattern!].r && left.destinationStop!.id === right.destinationStop!.id;
   }) === i);
-  if (!includeHistory) await enrichJourneyArrivals(unique, now);
+  const liveCandidates = routeStop ? unique.filter(r => {
+    const leg = r.legs![0];
+    return canBoard(networkPatterns[leg.networkPattern!], leg.boardingIndex!);
+  }) : unique;
+  if (!includeHistory && liveCandidates.length) await enrichJourneyArrivals(liveCandidates, now);
   return NextResponse.json({ data: unique.flatMap(r => {
     const leg = r.legs![0];
     const pattern = networkPatterns[leg.networkPattern!], route = networkRoutes[pattern.r];
@@ -142,18 +158,20 @@ export async function GET(request: NextRequest) {
       ...(departureType(row) === 'CHANGED' && row.timetableTime ? [Date.parse(row.timetableTime)] : [])]).filter(Number.isFinite));
     const cancelled = new Set((leg.departureNotices ?? []).flatMap(row => row.time ? [Date.parse(row.time)] : []));
     const observedTimes = new Set(observed.map(row => Date.parse(row.time)).filter(Number.isFinite));
-    const historical = includeHistory && leg.mode !== 'SUBWAY' && leg.mode !== 'LIGHT_RAIL'
-      ? publishedDeparturesAround(leg.networkPattern!, leg.boardingIndex ?? 0, now, 24 * 60, 0)
+    const historical = includeHistory && (routeStop || leg.mode !== 'SUBWAY' && leg.mode !== 'LIGHT_RAIL')
+      ? publishedDeparturesAround(leg.networkPattern!, leg.boardingIndex ?? 0, now, 24 * 60, 0, routeStop)
         .filter(row => row.pastSchedule && !observedTimes.has(Date.parse(row.time)) && !cancelled.has(Date.parse(row.time)))
       : [];
-    const upcoming = includeHistory || leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? []
-      : upcomingPublishedDepartures(leg.networkPattern!, leg.boardingIndex ?? 0, now)
-        .filter(row => Date.parse(row.time) > previewEnd && !cancelled.has(Date.parse(row.time)));
+    const upcoming = (includeHistory ? [] : routeStop
+      ? publishedDeparturesAround(leg.networkPattern!, leg.boardingIndex ?? 0, now, 0, Infinity, true)
+      : leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? []
+      : upcomingPublishedDepartures(leg.networkPattern!, leg.boardingIndex ?? 0, now))
+      .filter(row => Date.parse(row.time) > previewEnd && !cancelled.has(Date.parse(row.time)));
     const estimates = [...historical, ...upcoming];
     const departures = [...observed, ...estimates].map((departure, index) => ({ ...base, ...departure,
       company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
       id: `${r.id}:${departure.timetableEstimate ? 'estimate' : 'live'}:${index}`, departureType: departureType(departure), timingType: departureTimingType(departure), status: departureTimingType(departure) === 'SCHEDULED' ? 'TIMETABLE' : 'LIVE' }));
-    const fallback = !departures.length && !cancelled.has(Date.parse(leg.departureTime ?? '')) ? [{ ...base, id: r.id,
+    const fallback = !routeStop && !includeHistory && !departures.length && !cancelled.has(Date.parse(leg.departureTime ?? '')) ? [{ ...base, id: r.id,
       departureType: base.status === 'TIMETABLE' ? 'SCHEDULED' : undefined,
       timingType: base.status === 'TIMETABLE' ? 'SCHEDULED' : undefined,
       time: leg.departureTime ?? (base.minutes === null ? null : new Date(now.getTime() + base.minutes * 60000).toISOString()), scheduleMatch: 'UNVERIFIED',
