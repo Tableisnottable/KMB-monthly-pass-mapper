@@ -12,7 +12,7 @@ export function DepartureBadge({ departure, locale, showTiming = true }: { depar
     {showTiming && timing && <span className={'departure-type departure-' + timing.toLowerCase()} data-departure-type={timing}
       title={timing === 'LIVE' ? copy(locale, '營辦商即時預測，並非車輛 GPS 確認。', 'Operator live prediction, not a GPS confirmation.')
         : copy(locale, '時間表估算，並非即時預測。', 'Timetable estimate, not an operator live prediction.')}>
-      {timing === 'LIVE' ? copy(locale, '即時', 'Live') : copy(locale, '時間表', 'Scheduled')}
+      {timing === 'LIVE' ? copy(locale, '即時', 'Live') : copy(locale, '原定班次', 'Scheduled')}
     </span>}
     {service && <span className={'departure-type departure-' + service.toLowerCase()} data-departure-type={service}
       title={inferred ? copy(locale, '未符合已匯入時間表；可能是加班、延誤或資料更新，未獲確認。', 'Outside the imported timetable; possibly an extra, delay or schedule update. Unconfirmed.')
