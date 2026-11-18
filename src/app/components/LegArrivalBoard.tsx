@@ -4,13 +4,17 @@ import { useState } from 'react';
 import { transportFetch } from '../../browser/transportClient';
 import type { Segment } from '../../engine/UpgradedScoringEngine';
 import type { CancellationNotice, LiveDeparture } from '../../data/networkTimetable';
+import { isNonOperatingDeparture } from '../../domain/departureType';
 import { copy, legOperator, type PlannerLocale } from './plannerUi';
 import { JointArrivalBoard } from './JointArrivalBoard';
 import { useAutoRefresh } from './useAutoRefresh';
 import { RefreshStatus } from './RefreshStatus';
 
-/** Current stop departures are display-only; they never retime later transfers. */
-export function LegArrivalBoard({ leg, locale, laterConnection }: { leg: Segment; locale: PlannerLocale; laterConnection: boolean }) {
+/** Selecting a reachable departure retimes the rest of the journey. */
+export function LegArrivalBoard({ leg, locale, laterConnection, onSelectDeparture, earliestTime, selecting }: {
+  leg: Segment; locale: PlannerLocale; laterConnection: boolean;
+  onSelectDeparture?: (departure: LiveDeparture, key: string) => void; earliestTime?: string; selecting?: boolean;
+}) {
   const [departures, setDepartures] = useState(leg.liveDepartures ?? []);
   const [cancellations, setCancellations] = useState<CancellationNotice[]>(leg.departureNotices ?? []);
   const key = leg.networkPatternId && leg.boardingIndex !== undefined && leg.originStop?.id ? [leg.networkPatternId, leg.boardingIndex, leg.originStop.id, locale].join(':') : '';
@@ -19,17 +23,18 @@ export function LegArrivalBoard({ leg, locale, laterConnection }: { leg: Segment
       pattern: leg.networkPatternId!, board: String(leg.boardingIndex), lang: locale });
     const response = await transportFetch('/api/network?' + params, { signal, cache: 'no-store' });
     if (!response.ok) throw new Error('Departures unavailable');
-    const payload = await response.json() as { data: (Omit<LiveDeparture, 'time' | 'minutes'> & { status: string; time: string | null; minutes: number | null })[] };
+    const payload = await response.json() as { data: (Omit<LiveDeparture, 'time' | 'minutes'> & { status: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED' | 'NO_UPCOMING'; time: string | null; minutes: number | null })[] };
     if (signal.aborted) return;
-    setDepartures(payload.data.filter(row => row.departureType !== 'CANCELLED' && (row.status === 'LIVE' || row.status === 'TIMETABLE') && row.time !== null && row.minutes !== null) as LiveDeparture[]);
-    setCancellations(payload.data.filter(row => row.departureType === 'CANCELLED').map(row => ({ departureType: 'CANCELLED', operator: row.operator, remark: row.remark ?? '', time: row.time ?? undefined })));
+    setDepartures(payload.data.filter(row => !isNonOperatingDeparture(row) && (row.status === 'LIVE' || row.status === 'TIMETABLE') && row.time !== null && row.minutes !== null) as LiveDeparture[]);
+    setCancellations(payload.data.filter(row => isNonOperatingDeparture(row)).map(row => ({ departureType: row.departureType === 'MISSED' ? 'MISSED' : 'CANCELLED', operator: row.operator, remark: row.remark ?? '', time: row.time ?? undefined })));
   });
   return <div className="leg-arrivals">
-    {laterConnection && <p className="connection-arrivals-note">{copy(locale, '以下為此站現在的班次，不是預計轉乘時刻的保證班次。行程時間仍按到達此站後的可用班次計算。', 'Current departures at this stop, not guaranteed departures at your later connection time. Journey timing still uses connections reachable after you arrive.')}</p>}
+    {laterConnection && <p className="connection-arrivals-note">{copy(locale, '請選可趕及的班次', 'Choose a reachable departure')}</p>}
     <JointArrivalBoard departures={departures} cancellations={cancellations} operator={legOperator(leg)} routeNumber={leg.routeNumber}
       stopName={leg.originStop?.name} locale={locale} scheduledTime={leg.departureTime}
+      onSelectDeparture={onSelectDeparture} selectedDepartureKey={leg.selectedDepartureKey} earliestTime={earliestTime} selecting={selecting}
       timetableOnly={laterConnection || leg.serviceStatus === 'TIMETABLE'} />
-    <div className="leg-arrivals-actions"><button type="button" onClick={polling.refresh} disabled={polling.loading}>{polling.loading ? copy(locale, '更新中…', 'Updating…') : copy(locale, '更新此站班次', 'Refresh stop departures')}</button></div>
+    <div className="leg-arrivals-actions"><button type="button" onClick={polling.refresh} disabled={polling.loading}>{polling.loading ? copy(locale, '更新中…', 'Updating…') : copy(locale, '更新', 'Refresh')}</button></div>
     <RefreshStatus {...polling} locale={locale} />
   </div>;
 }

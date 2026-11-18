@@ -4,6 +4,7 @@ export type TravelMode = 'walk' | 'cycle' | 'taxi' | 'drive';
 export interface TravelOption {
   mode: TravelMode;
   available: boolean;
+  alternatives?: TravelOption[];
   minutes?: number;
   distanceMetres?: number;
   paths: Coordinate[][];
@@ -16,7 +17,7 @@ export function travelOption(mode: TravelMode, geometry: GeometryResult): Travel
     return { mode, available: false, paths: [] };
   }
   return { mode, available: true, minutes: Math.ceil(geometry.durationSeconds / 60),
-    distanceMetres: geometry.distanceMetres, paths: geometry.paths };
+    distanceMetres: geometry.distanceMetres, paths: geometry.paths, ...(geometry.alternatives?.length ? { alternatives: geometry.alternatives.map(value => travelOption(mode, value)).filter(value => value.available) } : {}) };
 }
 
 export function travelClock(option: TravelOption, mode: 'now' | 'depart' | 'arrive', value: string, now: number) {

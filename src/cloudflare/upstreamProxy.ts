@@ -4,6 +4,7 @@ const paths: Record<string, RegExp> = {
   'data.etagmb.gov.hk': /^\/(?:route-stop|eta\/route-stop)\//,
   'resource.data.one.gov.hk': /^\/td\/en\/specialtrafficnews\.xml$/,
   'nominatim.openstreetmap.org': /^\/(?:search|reverse)$/,
+  'www.map.gov.hk': /^\/gs\/api\/v1\.0\.0\/locationSearch$/,
   'routing.openstreetmap.de': /^\/(?:routed-foot\/route\/v1\/foot|routed-car\/route\/v1\/driving|routed-bike\/route\/v1\/cycling)\//,
 };
 export function safeProviderUrl(value: string | null): URL | undefined {
@@ -12,6 +13,11 @@ export function safeProviderUrl(value: string | null): URL | undefined {
     const url = new URL(value);
     if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash
       || !paths[url.hostname]?.test(url.pathname)) return;
+    if (url.hostname === 'www.map.gov.hk') {
+      const query = url.searchParams.get('q')?.trim();
+      if (!query || query.length < 2 || query.length > 120) return;
+      url.search = ''; url.searchParams.set('q', query);
+    }
     if (url.hostname === 'nominatim.openstreetmap.org') {
       if (url.pathname === '/reverse') {
         const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
@@ -31,7 +37,7 @@ export function safeProviderUrl(value: string | null): URL | undefined {
   } catch { return; }
 }
 export function providerCacheSeconds(url: URL): number {
-  if (url.hostname === 'nominatim.openstreetmap.org') return 300;
+  if (url.hostname === 'nominatim.openstreetmap.org' || url.hostname === 'www.map.gov.hk') return 300;
   if (url.hostname === 'routing.openstreetmap.de') return 86400;
   if (url.hostname === 'resource.data.one.gov.hk') return 60;
   if (/\/(?:stop|route|route-stop)\//.test(url.pathname) && !url.pathname.includes('/eta/')) return 3600;

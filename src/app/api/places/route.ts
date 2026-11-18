@@ -3,6 +3,7 @@ import { getRateLimiter } from '../../../lib/cloudflare';
 import { getStaticCitybusStops } from '../../../data/citybusStopsStatic';
 import { findTransitPlaces, isAirportQuery } from '../../../data/transitPlaceSearch';
 import { findNetworkPlaces } from '../../../data/networkPlaceSearch';
+import { findGovernmentPlaces } from '../../../data/governmentPlaceSearch';
 import { findSchoolPlaces } from '../../../data/schoolPlaceSearch';
 
 export const dynamic = 'force-dynamic';
@@ -50,8 +51,17 @@ export async function GET(request: NextRequest) {
   url.searchParams.set('format', 'jsonv2');
   url.searchParams.set('limit', '6');
   url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('accept-language', request.nextUrl.searchParams.get('lang') === 'en' ? 'en,zh-Hant' : 'zh-Hant,en');
 
   try {
+    // Government building/address coverage is broader than the transport catalogue.
+    // A failure falls back to OSM and local records; one provider never erases another.
+    const official = await findGovernmentPlaces(query).catch(() => []);
+    if (official.length && !isAirportQuery(query)) {
+      const candidates = [...official.slice(0, 5), ...localPlaces, ...official.slice(5)];
+      return NextResponse.json({ data: candidates.filter((place, index, all) => all.findIndex(other => other.id === place.id) === index).slice(0, 8),
+        meta: { provider: 'Lands Department Location Search', region: 'HK' } }, { headers: cacheHeaders });
+    }
     const response = await fetch(url, {
       headers: {
         Accept: 'application/json',

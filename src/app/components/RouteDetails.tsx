@@ -1,5 +1,7 @@
 'use client';
 
+import { boardingReadyTime } from '../../domain/departureSelection';
+import type { LiveDeparture } from '../../data/networkTimetable';
 import { Fragment } from 'react';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import { getMonthlyPassInsight, getPassLegFare, KMB_PASS_RULES } from '../../domain/monthlyPass';
@@ -15,7 +17,7 @@ import { studentLegFares, type FareProfile } from '../../domain/journeyFares';
 import { DEFAULT_WEIGHTS, customWeights, type RouteWeights } from '../../engine/routeWeights';
 import { JourneyNotificationControl } from './JourneyNotificationControl';
 
-export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile = 'adult', selectedFareLabel }: { route: ScoredRoute; locale: PlannerLocale; weights?: RouteWeights; profile?: FareProfile; selectedFareLabel?: string }) {
+export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile = 'adult', selectedFareLabel, onSelectDeparture, selectingDeparture, minimumChange = 3 }: { onSelectDeparture?: (index: number, departure: LiveDeparture, key: string) => void; selectingDeparture?: boolean; minimumChange?: number; route: ScoredRoute; locale: PlannerLocale; weights?: RouteWeights; profile?: FareProfile; selectedFareLabel?: string }) {
   const insight = getMonthlyPassInsight(route);
   const studentFares = studentLegFares(route);
   const viaStops = route.viaStops ?? (route.via && route.viaLegIndex !== undefined ? [{ stop: route.via, legIndex: route.viaLegIndex }] : []);
@@ -34,7 +36,7 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile
   return <div className="route-details">
     <h4>{copy(locale, '逐段行程', 'Your journey, step by step')}</h4>
     {route.departureTime && route.arrivalTime && <p className="journey-clock-summary">{hongKongTimeLabel(route.departureTime)} → {hongKongTimeLabel(route.arrivalTime)} <small>Hong Kong time</small></p>}
-    {!walkOnly && route.legs[0] && <JourneyNotificationControl leg={route.legs[0]} locale={locale} />}
+    {!walkOnly && route.legs[0] && <details className="journey-notification-settings"><summary>{copy(locale, '到站通知', 'Arrival notifications')}</summary><JourneyNotificationControl leg={route.legs[0]} locale={locale} /></details>}
     <ol className="directions-list">
       {!walkOnly && (route.originWalkMinutes ?? 0) > 0 && <li><span className="step-marker"><PlannerIcon name="walk" size={15} /></span><div><strong>{copy(locale, '步行至上車站', 'Walk to your stop')}</strong><small>{route.legs[0]?.originStop.name} · {route.originWalkMinutes} min</small></div></li>}
       {route.legs.map((leg, index) => {
@@ -55,7 +57,9 @@ export function RouteDetails({ route, locale, weights = DEFAULT_WEIGHTS, profile
           <small>{copy(locale, '約', 'About')} {leg.journeyTimeMinutes} min{leg.serviceEnded ? ' · ' + copy(locale, '暫無班次', 'No upcoming service') : leg.realtimeEta?.isLive ? ' · ' + (leg.liveDepartures?.[0] && departureType(leg.liveDepartures[0]) === 'ADDITIONAL' ? copy(locale, '加班到站', 'Additional arrival') : copy(locale, '即時到站', 'Live arrival')) + ' ' + leg.realtimeEta.etaMinutes + ' min' : leg.mode !== 'WALK' ? ' · ' + copy(locale, '預計等候', 'Estimated wait') + ' ' + Math.ceil(leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 12) / 2) + ' min' : ''}</small>
           {leg.mode !== 'WALK' && <>
             <LegStopTimeline leg={leg} locale={locale} />
-            <LegArrivalBoard key={leg.id} leg={leg} locale={locale} laterConnection={route.timeMode !== 'now' || index > 0} />
+            <LegArrivalBoard key={route.id + ':' + index} leg={leg}
+              onSelectDeparture={onSelectDeparture ? (departure, key) => onSelectDeparture(index, departure, key) : undefined}
+              selecting={selectingDeparture} earliestTime={new Date(boardingReadyTime(route, index, minimumChange)).toISOString()} locale={locale} laterConnection={route.timeMode !== 'now' || index > 0} />
           </>}
           {leg.serviceStatus === 'UNVERIFIED' && <small>{copy(locale, '此路段服務未能核實，請向營辦商確認。', 'Service on this leg is unverified. Confirm with the operator.')}</small>}
           {leg.serviceStatus === 'TIMETABLE' && <small>{copy(locale, '按官方時間表估算，並非即時到站預報。', 'Based on the published timetable, not a live arrival prediction.')}</small>}

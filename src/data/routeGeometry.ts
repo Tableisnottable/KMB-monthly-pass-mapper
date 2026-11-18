@@ -6,7 +6,7 @@ import { corridorChoices, roadLevel, type CorridorGroup, type RoutePreferences }
 
 export type Coordinate = [number, number]; // Leaflet order: latitude, longitude.
 export type StreetProfile = 'foot' | 'bike' | 'car';
-export type GeometryResult = { paths: Coordinate[][]; source: 'TD_CSDI' | 'OSM_TRACK' | 'OSM_ROAD' | 'OSM_FOOT' | 'OSM_BIKE' | 'UNAVAILABLE'; distanceMetres?: number; durationSeconds?: number };
+export type GeometryResult = { alternatives?: GeometryResult[]; paths: Coordinate[][]; source: 'TD_CSDI' | 'OSM_TRACK' | 'OSM_ROAD' | 'OSM_FOOT' | 'OSM_BIKE' | 'UNAVAILABLE'; distanceMetres?: number; durationSeconds?: number };
 let roadRows = new Map<string, string[][]>();
 let trackRows = new Map<string, string[]>();
 let alignmentLoading: Promise<void> | undefined;
@@ -38,7 +38,7 @@ interface StreetRoute {
 function walkableStreetRoute(route: StreetRoute, path: Coordinate[]): boolean {
   const steps = route.legs?.flatMap(leg => leg.steps ?? []);
   // A short or densely drawn ferry crossing is still not a walking route.
-  if (steps?.some(step => step.mode === 'ferry')) return false;
+  if (steps?.some(step => step.mode && step.mode !== 'walking')) return false;
   // Full provider instructions can establish a continuous walking route even
   // when a real straight footpath has vertices more than 200 metres apart.
   if (route.legs?.length && route.legs.every(leg => leg.steps?.length)
@@ -216,6 +216,7 @@ export async function routeOnStreets(points: Coordinate[], mode: boolean | Stree
         : process.env.OSRM_CAR_URL ?? 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
     const paths: Coordinate[][] = [];
     let distanceMetres = 0, durationSeconds = 0;
+    let alternatives: GeometryResult[] = [];
     try {
       for (let offset = 0; offset < points.length - 1; offset += 79) {
         const chunk = points.slice(offset, offset + 80);
@@ -239,13 +240,19 @@ export async function routeOnStreets(points: Coordinate[], mode: boolean | Stree
           : candidates;
         const routeChoice = valid[0];
         if (!routeChoice) return missing();
+        if (walking && points.length <= 80) {
+          const seen = new Set([JSON.stringify(routeChoice.path)]);
+          alternatives = valid.slice(1).filter(candidate => {
+            const key = JSON.stringify(candidate.path); if (seen.has(key)) return false; seen.add(key); return true;
+          }).slice(0, 3).map(candidate => ({ paths: [candidate.path], source, distanceMetres: candidate.route.distance, durationSeconds: candidate.route.duration }));
+        }
         paths.push(routeChoice.path);
         distanceMetres += routeChoice.route.distance;
         // Geometry-only responses remain usable, but never invent a duration.
         durationSeconds = routeChoice.route.duration !== undefined && Number.isFinite(routeChoice.route.duration) && routeChoice.route.duration >= 0
           ? durationSeconds + routeChoice.route.duration : NaN;
       }
-      return { paths, source, distanceMetres, ...(Number.isFinite(durationSeconds) ? { durationSeconds } : {}) };
+      return { paths, source, distanceMetres, ...(alternatives.length ? { alternatives } : {}), ...(Number.isFinite(durationSeconds) ? { durationSeconds } : {}) };
     } catch { return missing(); }
   })();
   inFlight.set(key, promise);

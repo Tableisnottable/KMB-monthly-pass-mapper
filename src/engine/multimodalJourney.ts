@@ -11,7 +11,7 @@ import { transitTypeAllowed } from '../domain/transportSelection';
 import { DEFAULT_PREFERENCES, preferencePenalty, preferredRoads, routeCorridors, corridorLegAllowed, routeRoadsAllowed, type RoutePreferences } from '../domain/routePreferences';
 import { DEFAULT_LIMITS, limitAllows, withinJourneyLimits, type JourneyLimits } from '../domain/journeyLimits';
 import { NORMAL_ACCESS_RADIUS_KM, FALLBACK_ACCESS_RADIUS_KM } from '../domain/journeyAccess';
-export interface JourneySearchOptions { operators?: string[]; modes?: string[]; requiredOperators?: string[]; requiredModes?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences; limits?: JourneyLimits }
+export interface JourneySearchOptions { operators?: string[]; modes?: string[]; requiredOperators?: string[]; requiredModes?: string[]; weights?: RouteWeights; minimumChangeMinutes?: number; preferences?: RoutePreferences; limits?: JourneyLimits; previewBudgetMs?: number }
 
 const serviceFamily = (leg: Segment) => leg.networkPattern === undefined || leg.mode !== 'MINIBUS'
   ? leg.operator + ':' + leg.routeNumber : networkRoutes[networkPatterns[leg.networkPattern].r][0];
@@ -59,7 +59,14 @@ function transfers(index: number) {
   return transferCache.get(index)!;
 }
 
+// Reachability depends on topology and restrictions, never on departure time.
+// Reuse it for the preview, complete search and different Via arrival times.
+const reachabilityCache = new Map<string, Set<number>>();
 function stopsThatCanReach(endings: Map<number, number>, reverse: boolean, options: JourneySearchOptions) {
+  const key = JSON.stringify([Array.from(endings.keys()).sort((a, b) => a - b), reverse,
+    options.operators, options.modes, options.preferences]);
+  const cached = reachabilityCache.get(key);
+  if (cached) { reachabilityCache.delete(key); reachabilityCache.set(key, cached); return cached; }
   const offsets = new Array<number>(networkPatterns.length), alightingPositions = new Map<number, { pattern: number; position: number }[]>();
   let nodeCount = networkStops.length;
   networkPatterns.forEach((pattern, patternIndex) => {
@@ -111,7 +118,10 @@ function stopsThatCanReach(endings: Map<number, number>, reverse: boolean, optio
       if (!visited.has(previousNode)) { visited.add(previousNode); queue.push(previousNode); }
     }
   }
-  return new Set(Array.from(visited).filter(node => node < networkStops.length));
+  const reachable = new Set(Array.from(visited).filter(node => node < networkStops.length));
+  if (reachabilityCache.size >= 24) reachabilityCache.delete(reachabilityCache.keys().next().value!);
+  reachabilityCache.set(key, reachable);
+  return reachable;
 }
 
 /** Include adjacent service days and GTFS times above 24:00 in both directions. */
@@ -179,6 +189,19 @@ function departureAt(pattern: NetworkPattern, windows: Window[], position: numbe
   const offset = total ? 0 : pattern.t[position], fraction = total ? pattern.t[position] / total : 0;
   return reverse ? previousDeparture(windows, offset, time, fraction) : nextDeparture(windows, offset, time, fraction);
 }
+/** Resolve the next reachable connection using this pattern's operating calendar. */
+export function nextJourneyConnection(leg: Segment, ready: Date) {
+  const pattern = leg.networkPattern === undefined ? undefined : networkPatterns[leg.networkPattern];
+  if (!pattern || pattern.id !== leg.networkPatternId || leg.boardingIndex === undefined || leg.alightingIndex === undefined
+    || !Number.isInteger(leg.boardingIndex) || !Number.isInteger(leg.alightingIndex) || leg.boardingIndex < 0
+    || leg.alightingIndex >= pattern.s.length || leg.boardingIndex >= leg.alightingIndex) return;
+  const next = departureAt(pattern, patternWindows(pattern, ready), leg.boardingIndex, 0, false);
+  if (!next) return;
+  const scale = pattern.t.at(-1)! > 0 ? next.duration / pattern.t.at(-1)! : 1;
+  return { departure: { time: new Date(ready.getTime() + next.wait * 60000).toISOString(), minutes: next.wait,
+    timingType: 'SCHEDULED' as const, departureType: 'SCHEDULED' as const, scheduleMatch: 'MATCHED' as const, timetableEstimate: true },
+    rideMinutes: Math.max(1, Math.round((pattern.t[leg.alightingIndex] - pattern.t[leg.boardingIndex]) * scale)) };
+}
 function addLabel(map: Map<number, Label[]>, value: Label, limit = 4) {
   const labels = map.get(value.stop) ?? [];
   const dominates = (a: Label, b: Label) => a.cost <= b.cost && a.elapsed <= b.elapsed
@@ -201,6 +224,8 @@ function addLabel(map: Map<number, Label[]>, value: Label, limit = 4) {
 
 type JourneySearchResult = { routes: ScoredRoute[]; originStops: { index: number; walk: number }[]; destinationStops: { index: number; walk: number }[]; candidates: number };
 export function findMultimodalJourneys(from: Point, to: Point, date = new Date(), locale: 'zh' | 'en' = 'zh', reverse = false, simpleOnly = false, options: JourneySearchOptions = {}): JourneySearchResult {
+  const previewDeadline = options.previewBudgetMs === undefined ? Infinity : performance.now() + options.previewBudgetMs;
+  let previewComplete = true;
   const weights = options.weights ?? DEFAULT_WEIGHTS;
   const minimumChange = options.minimumChangeMinutes ?? 3;
   const limits = options.limits ?? DEFAULT_LIMITS;
@@ -224,14 +249,22 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
     return stopCache.get(index)!;
   };
   const waitMultiplier = UpgradedScoringEngine.getTimeMultiplier(scoreDate, weights);
-  const directOptions: { family: string; duration: number; fare: number }[] = [];
+  const directOptions = new Map<string, { duration: number; fare: number }[]>();
+  const prefixCosts = new WeakMap<Label, { family: string; fare: number }>();
   // The results selector discards longer, dearer changes from an already useful
   // direct service. Stop expanding those prefixes once even a free, instant
   // onward ride could no longer survive that same rule. Rail fares can later
   // combine, so only non-rail fares provide a safe lower bound here.
-  const discardedByDirect = (label: Label, elapsed: number) => !reverse && directOptions.some(direct =>
-    label.legs.length && serviceFamily(label.legs[0]) === direct.family && elapsed >= direct.duration + 5
-    && label.legs.reduce((fare, leg) => fare + (leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? 0 : leg.fare ?? 0), 0) >= direct.fare);
+  const discardedByDirect = (label: Label, elapsed: number) => {
+    if (reverse || !label.legs.length) return false;
+    let prefix = prefixCosts.get(label);
+    if (!prefix) {
+      prefix = { family: serviceFamily(label.legs[0]), fare: label.legs.reduce((fare, leg) =>
+        fare + (leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? 0 : leg.fare ?? 0), 0) };
+      prefixCosts.set(label, prefix);
+    }
+    return directOptions.get(prefix.family)?.some(direct => elapsed >= direct.duration + 5 && prefix!.fare >= direct.fare) ?? false;
+  };
   let bestCompleteCost = Infinity;
   for (let round = 0; round < rounds && frontier.size; round++) {
     const arrivals = new Map<number, Label[]>();
@@ -239,12 +272,13 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
     const directionBoardings = boardingPatterns[reverse ? 1 : 0];
     frontier.forEach((_, stop) => (directionBoardings.get(stop) ?? []).forEach(index => candidatePatterns.add(index)));
     candidatePatterns.forEach(patternIndex => {
+      if (performance.now() > previewDeadline) { previewComplete = false; return; }
       const pattern = networkPatterns[patternIndex];
-      const serviceWindows = windows[patternIndex] ?? (windows[patternIndex] = patternWindows(pattern, date, context));
-      if (!serviceWindows.length) return;
       if (simpleOnly && round === 1 && !finishing.has(patternIndex)) return;
       const route = networkRoutes[pattern.r], rail = route[5] === 'SUBWAY' || route[5] === 'LIGHT_RAIL';
       if (!operatorAllowed(route[1], options.operators) || !transitTypeAllowed(route[5], options.modes)) return;
+      const serviceWindows = windows[patternIndex] ?? (windows[patternIndex] = patternWindows(pattern, date, context));
+      if (!serviceWindows.length) return;
       const operator = route[1] === 'KMB+CTB' ? 'KMB' : route[1] === 'LWB+CTB' ? 'LWB' : route[1];
       const boardings: { label: Label; position: number; wait: number; duration: number; interval: number; publishedHeadway?: number }[] = [];
       for (let step = 0; step < pattern.s.length; step++) {
@@ -294,7 +328,14 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
               if (round === 0 && !rail && withinJourneyLimits(result, limits)
                 && (!options.requiredOperators?.length || options.requiredOperators.every(id => route[1].split('+').includes(id)))
                 && (!options.requiredModes?.length || options.requiredModes.every(id => route[5] === id))) {
-                directOptions.push({ family: serviceFamily(leg), duration: elapsed + endWalk, fare: adult.fare });
+                const family = serviceFamily(leg), duration = elapsed + endWalk, fare = adult.fare;
+                const existing = directOptions.get(family) ?? [];
+                // Only undominated duration/fare pairs can affect this exact
+                // pruning predicate. Hundreds of board/alight combinations of
+                // the same direct bus otherwise repeat identical comparisons.
+                if (!existing.some(value => value.duration <= duration && value.fare <= fare)) {
+                  directOptions.set(family, [...existing.filter(value => value.duration < duration || value.fare < fare), { duration, fare }]);
+                }
               }
             }
             results.push(result);
@@ -319,6 +360,9 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
         }
       }
     });
+    if (!previewComplete) break;
+    // Keep the established search saturation threshold. Returning more of the
+    // already-discovered alternatives must not force extra transfer rounds.
     if (!simpleOnly && results.length >= 40
       && selectJourneyAlternatives(scoreRoutes(results, scoreDate, weights), 40, options.preferences).length >= 40) break;
     if (round === rounds - 1) break;

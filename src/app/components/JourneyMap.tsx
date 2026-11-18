@@ -16,7 +16,7 @@ import type { RoutePreferences } from '../../domain/routePreferences';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
 
-export function JourneyMap({ route, travel, places, onPick, locale, preferences }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale; preferences?: RoutePreferences }) {
+export function JourneyMap({ route, travel, places, onPick, locale, preferences, followPosition }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale; preferences?: RoutePreferences; followPosition?: GeolocationPosition | null }) {
   const container = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const journeyBounds = useRef<Leaflet.LatLngBounds | null>(null);
@@ -27,7 +27,8 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
   const [message, setMessage] = useState('');
   const [tileError, setTileError] = useState(false);
   const [gpsEnabled, setGpsEnabled] = useState(false);
-  const gps = useLiveLocation(gpsEnabled);
+  const ownGps = useLiveLocation(gpsEnabled && !followPosition);
+  const gps = followPosition ? { position: followPosition, status: 'live' as const } : ownGps;
   const gpsCentered = useRef(false);
   useEffect(() => { if (origin?.type === 'location') setGpsEnabled(true); }, [origin?.id, origin?.type]);
   const [geometryStatus, setGeometryStatus] = useState<'loading' | 'ready' | 'partial' | 'error'>('loading');
@@ -155,14 +156,14 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences 
     const current = state.current;
     if (!ready || !current) return;
     current.locationLayer.clearLayers();
-    if (!gpsEnabled || !gps.position) return;
+    if ((!gpsEnabled && !followPosition) || !gps.position) return;
     const { latitude, longitude, accuracy } = gps.position.coords;
     const point: Leaflet.LatLngTuple = [latitude, longitude];
     if (Number.isFinite(accuracy) && accuracy > 0) current.L.circle(point, { radius: Math.min(accuracy, 10000), color: '#3478e5', weight: 1, fillOpacity: .12, interactive: false }).addTo(current.locationLayer);
     current.L.circleMarker(point, { radius: 8, color: '#fff', weight: 3, fillColor: '#3478e5', fillOpacity: 1, interactive: false })
       .bindTooltip(copy(locale, '你的位置', 'Your live location')).addTo(current.locationLayer);
-    if (!gpsCentered.current) { current.map.setView(point, 16); gpsCentered.current = true; }
-  }, [ready, gpsEnabled, gps.position, locale]);
+    if (followPosition || !gpsCentered.current) { current.map.setView(point, 16); gpsCentered.current = true; }
+  }, [ready, gpsEnabled, gps.position, locale, followPosition]);
   function locate() { gpsCentered.current = false; setGpsEnabled(value => !value); }
 
   return <section className="journey-map" id="map" aria-label={copy(locale, '行程地圖', 'Journey map')}>

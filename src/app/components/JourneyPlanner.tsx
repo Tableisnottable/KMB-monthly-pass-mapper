@@ -41,6 +41,7 @@ const defaultSettings = (): PlannerSettings => ({ companies: defaultCompanies(),
 export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes: ScoredRoute[]; locale?: PlannerLocale }) {
   const [routes, setRoutes] = useState(initialRoutes);
   const [searching, setSearching] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<JourneyMeta | null>(null);
   const [searched, setSearched] = useState(false);
@@ -69,6 +70,10 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [activeField, setActiveField] = useState<JourneyField>('origin');
   const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult; vias?: PlaceResult[] } | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fetch('/api/journey?operation=warm').catch(() => {}); }, 500);
+    return () => window.clearTimeout(timer);
+  }, []);
   const arrivalsDialog = useRef<HTMLDialogElement>(null);
   const menuDialog = useRef<HTMLDialogElement>(null);
   const settingsDialog = useRef<HTMLDialogElement>(null);
@@ -94,6 +99,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   }
 
   function resetJourney() {
+    setRefining(false);
     activeSearch.current?.abort(); activeSearch.current = null;
     setSearching(false); setRoutes([]); setMeta(null); setSearched(false); setError(null); setEndpoints(null);
   }
@@ -118,6 +124,17 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       params.set('weights', JSON.stringify(applied.weights)); params.set('preferences', JSON.stringify(applied.preferences)); params.set('changeMinutes', String(applied.changeMinutes));
       params.set('limits', JSON.stringify(applied.limits));
       if (time.mode !== 'now') params.set('time', time.value + ':00+08:00');
+      if (!background) {
+        const previewParams = new URLSearchParams(params); previewParams.set('phase', 'preview');
+        try {
+          const firstResponse = await fetch('/api/journey?' + previewParams, { cache: 'no-store', signal: controller.signal });
+          const first = await firstResponse.json() as { data?: ScoredRoute[]; meta?: JourneyMeta };
+          if (activeSearch.current !== controller) return;
+          const valid = first.data?.filter(route => journeyMatchesEndpoints(route, origin, destination)) ?? [];
+          if (firstResponse.ok && valid.length) { setRoutes(valid); setMeta(first.meta ?? null); setSearched(true); setSearching(false); }
+        } catch { if (controller.signal.aborted) return; }
+        setRefining(true);
+      }
       const response = await fetch('/api/journey?' + params, { cache: 'no-store', signal: controller.signal });
       const payload = await response.json() as { data?: ScoredRoute[]; meta?: JourneyMeta; error?: string };
       if (!response.ok || !Array.isArray(payload.data)) throw new Error(payload.error ?? copy(locale, '暫時無法搜尋行程。', 'Journey search is temporarily unavailable.'));
@@ -136,7 +153,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     } finally {
       window.clearTimeout(timeout);
       signal?.removeEventListener('abort', abort);
-      if (activeSearch.current === controller) { setSearching(false); activeSearch.current = null; }
+      if (activeSearch.current === controller) { setSearching(false); setRefining(false); activeSearch.current = null; }
     }
   }
 
@@ -247,6 +264,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
         aria-haspopup="dialog" onClick={() => openSettings(id)}>{copy(locale, zh, en)}{Boolean(count) && <small>{count}</small>}<PlannerIcon name="chevron" size={12} /></button>)}
       <button type="button" className="filter-reset" disabled={!settingsChanged} onClick={() => applySettings(defaultSettings())}>{copy(locale, '重設', 'Reset')}</button>
     </div>
+    {refining && <p className="search-refining" role="status">{copy(locale, '正在補齊路線及即時班次…', 'Adding routes and live departures…')}</p>}
     {error && <p className="planner-notice notice-error" role="alert">{error}</p>}
     {notice && <p className="planner-notice notice-warning" role="status"><span>{notice}</span>{noTransitRoutes && settingsChanged && <button type="button" className="notice-action" onClick={() => applySettings(defaultSettings())}>{copy(locale, '不限篩選重搜', 'Try all routes')}</button>}</p>}
     {dataUpdateAvailable && <p className="planner-notice notice-warning" role="status">{copy(locale, '有新交通、票價或時間表資料。', 'Updated transport, fare or timetable data is available.')} <button type="button" onClick={() => window.location.reload()}>{copy(locale, '重新載入以使用新資料', 'Reload to use updated data')}</button></p>}
@@ -262,15 +280,16 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       </div>
       <nav className="header-actions" aria-label={copy(locale, '主選單', 'Main navigation')}>
         <a href={locale === 'en' ? '/' : '/en'} className="language-button" aria-label={locale === 'en' ? '繁體中文' : 'English'}>{locale === 'en' ? '中' : 'EN'}</a>
+        <a href={'/routes?lang=' + locale} aria-label={copy(locale, '查路線', 'Bus routes')} title={copy(locale, '查路線', 'Bus routes')}><PlannerIcon name="bus" size={21} /></a>
         <button type="button" onClick={() => setArrivalsOpen(true)} aria-label={copy(locale, '到站時間', 'Live arrivals')} title={copy(locale, '到站時間', 'Live arrivals')}><PlannerIcon name="clock" size={21} /></button>
         <a className="get-somewhere" href={locale === 'en' ? '/en' : '/'}><PlannerIcon name="monitor" size={23} /><span>{copy(locale, '帶我去目的地', 'Get Me Somewhere')}</span></a>
       </nav>
     </header>
-    <PlannerBoard routes={routes} searchPanel={searchPanel} emptyHint={emptyHint} endpoints={endpoints}
+    <PlannerBoard changeMinutes={changeMinutes} limits={limits} routes={routes} searchPanel={searchPanel} emptyHint={emptyHint} endpoints={endpoints}
       places={places} onMapPick={pickMapPoint} locale={locale} fareProfile={fareProfile} selectedFareLabel={selectedFareLabel} preferences={preferences} time={time} weights={weights} comparisons={comparisons} />
     <dialog className="menu-dialog" ref={menuDialog} onCancel={() => setMenuOpen(false)} onClose={() => setMenuOpen(false)}>
       <div className="dialog-heading"><strong>Transit Compass HK</strong><button type="button" onClick={() => setMenuOpen(false)} aria-label={copy(locale, '關閉選單', 'Close menu')}><PlannerIcon name="close" size={22} /></button></div>
-      <nav aria-label={copy(locale, '更多選項', 'More options')}><a href={locale === 'en' ? '/en' : '/'}>{copy(locale, '規劃行程', 'Get Me Somewhere')}</a><button type="button" onClick={() => { setMenuOpen(false); setArrivalsOpen(true); }}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href={'/timetables?lang=' + locale}>{copy(locale, '營辦商及班次時間表', 'Companies & timetables')}</a><a href="/traffic">{copy(locale, '道路交通消息', 'Road traffic')}</a><a href="/updates">{copy(locale, '巴士服務消息', 'Bus service updates')}</a><a href={'/install?lang=' + locale}>{copy(locale, '安裝 App', 'Install app')}</a><a href={locale === 'en' ? '/' : '/en'}>{locale === 'en' ? '繁體中文' : 'English'}</a></nav>
+      <nav aria-label={copy(locale, '更多選項', 'More options')}><a href={'/routes?lang=' + locale}>{copy(locale, '查巴士路線', 'Browse bus routes')}</a><a href={locale === 'en' ? '/en' : '/'}>{copy(locale, '規劃行程', 'Get Me Somewhere')}</a><button type="button" onClick={() => { setMenuOpen(false); setArrivalsOpen(true); }}>{copy(locale, '到站時間', 'Live arrivals')}</button><a href={'/timetables?lang=' + locale}>{copy(locale, '營辦商及班次時間表', 'Companies & timetables')}</a><a href="/traffic">{copy(locale, '道路交通消息', 'Road traffic')}</a><a href="/updates">{copy(locale, '巴士服務消息', 'Bus service updates')}</a><a href={'/install?lang=' + locale}>{copy(locale, '安裝 App', 'Install app')}</a><a href={locale === 'en' ? '/' : '/en'}>{locale === 'en' ? '繁體中文' : 'English'}</a></nav>
       <div className="menu-footnote"><a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a><p><a href="/api/sources">{copy(locale, '資料來源及鳴謝', 'Data sources & attribution')}</a></p><p>{copy(locale, '獨立交通規劃原型。鐵路、巴士、小巴、電車、渡輪及步行。車程及票價為估算。', 'Independent transit prototype. Rail, buses, minibuses, trams, ferries and walking. Times and fares are estimates.')}</p></div>
     </dialog>
     <dialog className="settings-dialog" ref={settingsDialog} aria-labelledby="journey-settings-title" onCancel={() => setSettingsSection(null)} onClose={() => setSettingsSection(null)}>

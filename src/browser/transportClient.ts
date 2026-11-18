@@ -32,7 +32,9 @@ export async function transportFetch(input: string, init?: RequestInit): Promise
   if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   // Keep the journey calculator warm between completed searches. Abort still
   // terminates it, while a separate catalogue worker stays responsive.
-  const dedicated = url.pathname === '/api/journey';
+  // Departure selection stays responsive while the graph worker refines the
+  // preview. Cancelling a selection must not terminate that full search.
+  const dedicated = url.pathname === '/api/journey' && url.searchParams.get('operation') !== 'retime';
   const connection = dedicated ? journey ?? (journey = connect()) : shared ?? (shared = connect());
   const id = ++sequence;
   return new Promise<Response>((resolve, reject) => {
@@ -49,7 +51,14 @@ export async function transportFetch(input: string, init?: RequestInit): Promise
     const cleanup = () => {
       window.clearTimeout(timeout); init?.signal?.removeEventListener('abort', abort);
     };
-    const dispose = () => { connection.worker.terminate(); if (journey === connection) journey = undefined; };
+    const dispose = () => {
+      connection.worker.terminate();
+      for (const other of Array.from(connection.pending.values())) {
+        other.cleanup(); other.reject(new DOMException('Aborted', 'AbortError'));
+      }
+      connection.pending.clear();
+      if (journey === connection) journey = undefined;
+    };
     connection.pending.set(id, { resolve, reject, cleanup });
     init?.signal?.addEventListener('abort', abort, { once: true });
     connection.worker.postMessage({ id, url: url.href });

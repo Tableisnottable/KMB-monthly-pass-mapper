@@ -10,12 +10,19 @@ import { readRecentPlaces, saveRecentPlace } from './recentPlaces';
 export interface PlaceResult {
   id: string;
   name: string;
+  nameZh?: string; nameEn?: string;
+  addressZh?: string; addressEn?: string;
   address: string;
   lat: number;
   lng: number;
   type: string;
   googleMapsUrl: string;
 }
+
+export const placeDisplayName = (place: PlaceResult, locale: PlannerLocale) =>
+  (locale === 'zh' ? typeof place.nameZh === 'string' && place.nameZh : typeof place.nameEn === 'string' && place.nameEn) || place.name;
+export const placeDisplayAddress = (place: PlaceResult, locale: PlannerLocale) =>
+  (locale === 'zh' ? typeof place.addressZh === 'string' && place.addressZh : typeof place.addressEn === 'string' && place.addressEn) || place.address;
 
 export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect, onFocus, selectedPlace, inputRef, locale = 'zh' }: {
   label: string;
@@ -36,13 +43,16 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
   const [active, setActive] = useState(-1);
   const selected = useRef<string | null>(null);
   const [recent, setRecent] = useState<PlaceResult[]>([]);
-  const showRecent = value.trim().length < 2;
+  const interacted = useRef(false);
+  const ownInputRef = useRef<HTMLInputElement>(null);
+  const fieldInput = inputRef ?? ownInputRef;
+  const showRecent = value.trim().length < 2 || selectedPlace?.name === value;
   const suggestions = showRecent ? recent : results;
-  const expanded = open && (showRecent || selected.current !== value && selectedPlace?.name !== value);
+  const expanded = open;
 
   useEffect(() => {
     const query = value.trim();
-    setResults([]);
+    setResults([]); interacted.current = false;
     setActive(-1);
     setError(false);
     if (query.length < 2 || selected.current === value || selectedPlace?.name === value) {
@@ -54,16 +64,20 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
     const timer = window.setTimeout(async () => {
       let hasLocal = false;
       try {
-        const local = await fetch('/api/places?scope=local&q=' + encodeURIComponent(query), { signal: controller.signal });
+        const local = await fetch('/api/places?scope=local&lang=' + locale + '&q=' + encodeURIComponent(query), { signal: controller.signal });
         const nearby = local.ok ? await local.json() as { data?: PlaceResult[] } : {};
         if (!controller.signal.aborted && nearby.data?.length) {
           hasLocal = true;
-          setResults(nearby.data); setActive(0); setLoading(false);
+          setResults(nearby.data.slice(0, 3)); setActive(0);
         }
-        const response = await fetch('/api/places?q=' + encodeURIComponent(query), { signal: controller.signal });
+        const response = await fetch('/api/places?lang=' + locale + '&q=' + encodeURIComponent(query), { signal: controller.signal });
         if (!response.ok) throw new Error('Place lookup failed');
         const payload = await response.json() as { data?: PlaceResult[] };
-        if (!controller.signal.aborted) { setResults(payload.data ?? []); setActive(payload.data?.length ? 0 : -1); }
+        if (!controller.signal.aborted) {
+          const incoming = payload.data ?? [];
+          setResults(previous => interacted.current ? [...previous, ...incoming.filter(place => !previous.some(row => row.id === place.id))].slice(0, 10) : incoming);
+          if (!interacted.current) setActive(incoming.length ? 0 : -1);
+        }
       } catch {
         if (!controller.signal.aborted && !hasLocal) setError(true);
       } finally {
@@ -71,7 +85,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
       }
     }, 400);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [value, selectedPlace]);
+  }, [value, selectedPlace, locale]);
 
   function choose(place: PlaceResult) {
     selected.current = place.name;
@@ -82,22 +96,22 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
   }
 
   return (
-    <div className="place-field" onBlur={event => {
+    <div className={"place-field" + (expanded ? " is-editing" : "")} onBlur={event => {
       if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
     }}>
       <label className="place-input" htmlFor={id}>
         <span className={'field-label ' + colorClass}>{label}</span>
         <span className="place-text">
-          <input ref={inputRef} id={id} aria-label={label} role="combobox" aria-autocomplete="list" aria-expanded={expanded}
+          <input ref={fieldInput} id={id} aria-label={label} role="combobox" aria-autocomplete="list" aria-expanded={expanded}
             placeholder={colorClass === 'via-label' ? copy(locale, '途經哪裏？', 'Via where?') : colorClass === 'origin-label' ? copy(locale, '由哪裏出發？', 'Where from?') : copy(locale, '想去哪裏？', 'Where to?')}
             enterKeyHint="search" aria-controls={expanded ? id + '-list' : undefined} aria-activedescendant={expanded && suggestions[active] ? id + '-' + active : undefined}
-            autoComplete="off" value={value}
+            autoComplete="off" value={selectedPlace && selectedPlace.name === value ? placeDisplayName(selectedPlace, locale) : value}
             onChange={event => { selected.current = null; onChange(event.target.value); setOpen(true); }}
             onFocus={event => { onFocus?.(); setRecent(readRecentPlaces()); setActive(-1); if (selectedPlace) event.currentTarget.select(); setOpen(true); }}
             onKeyDown={event => {
               if (event.key === 'Escape') { setOpen(false); return; }
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                event.preventDefault(); setOpen(true);
+                event.preventDefault(); interacted.current = true; setOpen(true);
                 setActive(index => suggestions.length ? (index + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length : -1);
               }
               if (event.key === 'Enter' && expanded && active >= 0 && suggestions[active]) {
@@ -106,21 +120,24 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
             }} />
         </span>
       </label>
-      {selectedPlace && <small className="selected-place-description" title={selectedPlace.address}>{selectedPlace.address}
+      {selectedPlace && <small className="selected-place-description" title={placeDisplayAddress(selectedPlace, locale)}>{placeDisplayAddress(selectedPlace, locale)}
         {(selectedPlace.type === 'map' || selectedPlace.type === 'location') && <span className="endpoint-coordinate">{selectedPlace.lat.toFixed(5)}, {selectedPlace.lng.toFixed(5)}</span>}</small>}
       {value && <button type="button" className="field-clear" aria-label={copy(locale, '清除', 'Clear') + ' ' + label}
-        onClick={() => { selected.current = null; onChange(''); setRecent(readRecentPlaces()); setOpen(true); inputRef?.current?.focus(); }}><PlannerIcon name="close" size={14} /></button>}
+        onClick={() => { selected.current = null; onChange(''); setRecent(readRecentPlaces()); setOpen(true); fieldInput.current?.focus(); }}><PlannerIcon name="close" size={14} /></button>}
       {expanded && (
         <div className="place-results" id={id + '-list'} role="listbox" aria-label={label}>
-          {showRecent && <p className="place-results-hint">{recent.length ? copy(locale, '最近選擇 · 儲存於此裝置', 'Recent places · saved on this device') : copy(locale, '輸入車站、街道、商場或地點名稱。也可點選地圖。', 'Search a station, street, shopping centre or place. You can also pick on the map.')}</p>}
-          {!showRecent && loading ? <p role="status">{copy(locale, '正在搜尋地點…', 'Finding places…')}</p>
-            : !showRecent && error ? <p role="status">{copy(locale, '地點搜尋暫時無法使用，請稍後再試。', 'Place search is unavailable. Please try again shortly.')}</p>
-            : !showRecent && suggestions.length === 0 ? <p>{copy(locale, '找不到地點，請試另一個名稱或使用地圖。', 'No places found. Try another name or use the map.')}</p>
-            : suggestions.map((place, index) => <button type="button" role="option" aria-selected={active === index}
+          {showRecent && <p className="place-results-hint">{recent.length ? copy(locale, '最近地點', 'Recent places') : copy(locale, '搜尋地點、地址或車站', 'Search a place, address or station')}</p>}
+          {!showRecent && loading && <p className="place-search-progress" role="status">{copy(locale, '搜尋中…', 'Searching…')}</p>}
+          {!showRecent && !loading && error && <p role="status">{copy(locale, '搜尋暫時無法使用，請重試或在地圖選擇。', 'Search unavailable. Retry or choose on the map.')}</p>}
+          {!showRecent && !loading && !error && !suggestions.length && <p>{copy(locale, '試試完整名稱或附近街道', 'Try the full name or a nearby street')}</p>}
+          {suggestions.map((place, index) => <button type="button" role="option" aria-selected={active === index}
               id={id + '-' + index} key={place.id} className={active === index ? 'active' : ''}
-              onMouseDown={event => event.preventDefault()} onClick={() => choose(place)}>
-              <PlannerIcon name="pin" size={18} /><span><strong>{place.name}</strong><small>{place.address}</small></span>
+              onPointerEnter={() => { interacted.current = true; }} onMouseDown={event => event.preventDefault()} onClick={() => choose(place)}>
+              <span className="place-result-icon"><PlannerIcon name={place.type === 'station' ? 'train' : place.type === 'bus_stop' ? 'bus' : place.type === 'ferry_terminal' ? 'ferry' : 'pin'} size={20} /></span>
+              <span><strong>{placeDisplayName(place, locale)}</strong><small>{placeDisplayAddress(place, locale)}</small></span>
+              <PlannerIcon name="chevron" size={16} />
             </button>)}
+          <button type="button" className="choose-place-map" onClick={() => { onFocus?.(); setOpen(false); }}><PlannerIcon name="pin" size={18} />{copy(locale, '在地圖選擇', 'Choose on map')}</button>
         </div>
       )}
     </div>

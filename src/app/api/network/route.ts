@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { networkPatterns, networkRoutes, networkStops, networkStop, transportCoverage } from '../../../data/transportNetwork';
+import { networkPatterns, networkRoutes, networkStops, networkStop, normalAdultFare, transportCoverage } from '../../../data/transportNetwork';
+import { transitGeometry } from '../../../data/routeGeometry';
 import { enrichJourneyArrivals, notificationTargets } from '../../../data/multimodalLive';
 import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
@@ -18,6 +19,20 @@ export async function GET(request: NextRequest) {
   }
   const p = request.nextUrl.searchParams, resource = p.get('resource') ?? 'coverage';
   if (resource === 'coverage') return NextResponse.json(transportCoverage);
+  if (resource === 'route-map') {
+    const routeIndex = networkRoutes.findIndex(route => route[0] === p.get('route'));
+    if (routeIndex < 0) return NextResponse.json({ error: 'Unknown route.' }, { status: 404 });
+    const route = networkRoutes[routeIndex], locale = p.get('lang') === 'en' ? 'en' : 'zh';
+    return NextResponse.json({ route: { id: route[0], operator: route[1], number: route[2], mode: route[5] },
+      patterns: networkPatterns.flatMap((pattern, index) => pattern.r !== routeIndex ? [] : [{ id: pattern.id, index, direction: pattern.d,
+        stops: pattern.s.map((stop, position) => ({ ...networkStop(stop, locale), boarding: pattern.p[position] === 0,
+          ...normalAdultFare(routeIndex, stop, pattern.s.at(-1)!) })) }]) }, { headers: { 'Cache-Control': 'public, max-age=3600' } });
+  }
+  if (resource === 'route-shape') {
+    const index = networkPatterns.findIndex(pattern => pattern.id === p.get('pattern'));
+    if (index < 0) return NextResponse.json({ error: 'Unknown direction.' }, { status: 404 });
+    return NextResponse.json(await transitGeometry(index, 0, networkPatterns[index].s.length - 1), { headers: { 'Cache-Control': 'public, max-age=3600' } });
+  }
   if (resource === 'operators') {
     const residentPatterns = networkPatterns.filter(pattern => isResidentsService({ number: networkRoutes[pattern.r][2] }));
     return NextResponse.json({ data: [...transportOperators.map(operator => ({ ...operator,

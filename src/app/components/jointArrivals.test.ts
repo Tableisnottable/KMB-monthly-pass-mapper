@@ -2,12 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { arrivalRemark, groupStationDepartures } from './jointArrivals';
-import { JointArrivalBoard } from './JointArrivalBoard';
+import { departureChoiceKey, JointArrivalBoard } from './JointArrivalBoard';
 import type { LiveDeparture } from '../../data/networkTimetable';
 
 const row = { id: 'first', routeId: 'joint-104', patternId: 'outbound', stopId: 'stop-A', destination: 'Central',
   operator: 'KMB', networkOperator: 'KMB+CTB', mode: 'BUS' };
 describe('Joint operator arrival displays', () => {
+  it('keeps simultaneous buses selectable and disables unreachable departures', () => {
+    const departure: LiveDeparture = { time: '2026-11-18T02:05:00Z', minutes: 5, operator: 'KMB', scheduleMatch: 'MATCHED' };
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [departure, { ...departure }], operator: 'KMB', locale: 'en',
+      onSelectDeparture: () => {}, selectedDepartureKey: departureChoiceKey(departure, 1), earliestTime: '2026-11-18T02:06:00Z' }));
+    expect(html.match(/role="radio"/g)).toHaveLength(2);
+    expect(html.match(/aria-checked="true"/g)).toHaveLength(1);
+    expect(html.match(/disabled=""/g)).toHaveLength(2);
+    expect(html).toContain('Too early');
+  });
   it('groups both companies into one service while retaining all individual arrivals', () => {
     const input = [row, { ...row, id: 'second', operator: 'CTB' }, { ...row, id: 'third' }];
     const groups = groupStationDepartures(input);
@@ -36,8 +45,8 @@ describe('Joint operator arrival displays', () => {
     expect(html).toContain('彩虹道遊樂場');
     expect(html.indexOf('02:54')).toBeLessThan(html.indexOf('03:15'));
     expect(html.indexOf('03:15')).toBeLessThan(html.indexOf('03:38'));
-    expect(html).toMatch(/02:54[\s\S]*?<strong>1<\/strong>[\s\S]*?九巴/);
-    expect(html).toMatch(/03:15[\s\S]*?<strong>23<\/strong>[\s\S]*?城巴/);
+    expect(html).toMatch(/02:54[\s\S]*?九巴[\s\S]*?<strong>1<\/strong>/);
+    expect(html).toMatch(/03:15[\s\S]*?城巴[\s\S]*?<strong>23<\/strong>/);
     expect(html).toContain('data-departure-type="ADDITIONAL"');
     expect(html).toContain('加班');
     expect(departures[0].minutes).toBe(46);
@@ -47,7 +56,7 @@ describe('Joint operator arrival displays', () => {
       { time: '2026-11-13T18:54:00Z', minutes: -1, operator: 'CTB', scheduleMatch: 'MATCHED' }];
     const empty = renderToStaticMarkup(createElement(JointArrivalBoard, { departures, operator: 'KMB+CTB', locale: 'en' }));
     expect(empty).toContain('No verified live predictions');
-    expect(empty).not.toContain('<tr ');
+    expect(empty).not.toContain('role="listitem"');
     const unknown = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [
       { time: '2026-11-13T18:54:00Z', minutes: 1, scheduleMatch: 'UNVERIFIED' },
     ], operator: 'KMB+CTB', locale: 'en' }));
@@ -66,9 +75,9 @@ describe('Joint operator arrival displays', () => {
       { time: '2026-11-14T09:47:00Z', minutes: 49, operator: 'KMB', remark: '加班車', scheduleMatch: 'ADDED', addedReason: 'PROVIDER' },
     ];
     const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures, operator: 'KMB+CTB', routeNumber: '112', locale }));
-    expect(html).toContain('<tr data-departure-type="LIVE"'); expect(html).toContain('<tr data-departure-type="SCHEDULED"');
-    expect(html).toContain('<tr data-departure-type="ADDITIONAL"');
-    expect(html).toContain(locale === 'zh' ? '時間表班次' : 'Scheduled · timetable');
+    expect(html).toContain('data-departure-type="LIVE"'); expect(html).toContain('data-departure-type="SCHEDULED"');
+    expect(html).toContain('data-departure-type="ADDITIONAL"');
+    expect(html).toContain(locale === 'zh' ? '時間表' : 'Scheduled');
     expect(html).toContain(locale === 'zh' ? '加班' : 'Additional');
     expect(html).not.toContain('Live arrivals · HKT');
   });
@@ -83,8 +92,9 @@ describe('Joint operator arrival displays', () => {
     expect(html).not.toContain('公布班距');
     expect(html).toMatch(/<details class="arrival-help"><summary>班次說明<\/summary>/);
     expect(html).not.toMatch(/<details[^>]*open/);
-    const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)![1];
-    expect(body).toContain('時間表內');
+    const body = html.slice(html.indexOf('class="departure-choices"'), html.indexOf('<details class="arrival-help"'));
+    expect(body).toContain('時間表');
+    expect(body).not.toContain('時間表內');
     expect(body).not.toContain('時間表班次');
     expect(body.match(/class="departure-type /g)).toHaveLength(1);
   });
@@ -94,12 +104,12 @@ describe('Joint operator arrival displays', () => {
         departureType: 'CHANGED', changedReason: 'POSSIBLE_SHIFT', timetableTime: '2026-11-14T13:15:00Z', deviationMinutes: 5 },
       { time: '2026-11-14T14:30:00Z', minutes: 80, scheduleMatch: 'MATCHED', departureType: 'SCHEDULED', timetableEstimate: true },
     ] }));
-    expect(html).toContain('班次調整?');
+    expect(html).not.toContain('班次調整');
     expect(html).toContain('21:15 → 21:20');
     expect(html).toContain('+5分 ?');
-    expect(html).toContain('時間表估算');
+    expect(html).toContain('時間表');
     expect(html).toContain('<strong>80</strong>');
-    const changed = html.match(/<tr data-departure-type="CHANGED"[\s\S]*?<\/tr>/)![0];
+    const changed = html.slice(html.indexOf('data-departure-type="CHANGED"'), html.indexOf('role="listitem"', html.indexOf('data-departure-type="CHANGED"')));
     expect(changed.match(/class="departure-type /g)).toHaveLength(1);
   });
   it('offers more departures while initially showing three rows', () => {
@@ -108,7 +118,7 @@ describe('Joint operator arrival displays', () => {
       departureType: 'SCHEDULED', timetableEstimate: true, scheduleMatch: 'MATCHED',
     }));
     const html = renderToStaticMarkup(createElement(JointArrivalBoard, { locale: 'en', operator: 'KMB', departures }));
-    expect(html.match(/<tr /g)).toHaveLength(3);
+    expect(html.match(/role="listitem"/g)).toHaveLength(3);
     expect(html).toContain('More departures (+10)');
     expect(html).toContain('aria-expanded="false"');
   });

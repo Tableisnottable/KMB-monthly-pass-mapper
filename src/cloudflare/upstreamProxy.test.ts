@@ -26,6 +26,13 @@ describe('Free-hosting public provider proxy', () => {
     expect(url.searchParams.get('bounded')).toBe('1'); expect(url.searchParams.get('viewbox')).toBe('113.8,22.6,114.5,22.1');
     expect(providerCacheSeconds(url)).toBe(300);
   });
+  it('allows government place queries while stripping unrelated parameters', () => {
+    const url = safeProviderUrl('https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=Harbour%20City&redirect=https://example.com')!;
+    expect(url.search).toBe('?q=Harbour+City');
+    expect(providerCacheSeconds(url)).toBe(300);
+    expect(safeProviderUrl('https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=x')).toBeUndefined();
+    expect(safeProviderUrl('https://www.map.gov.hk/admin?q=Harbour')).toBeUndefined();
+  });
   it('does not follow upstream redirects or forward user credentials', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response('', { status: 302, headers: { Location: 'https://example.com' } }));
     const response = await proxyProvider(new Request('https://planner.example/api/upstream?url=' + encodeURIComponent('https://data.etabus.gov.hk/v1/transport/kmb/stop/'),
