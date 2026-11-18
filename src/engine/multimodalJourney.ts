@@ -224,7 +224,6 @@ function addLabel(map: Map<number, Label[]>, value: Label, limit = 4) {
 
 type JourneySearchResult = { routes: ScoredRoute[]; originStops: { index: number; walk: number }[]; destinationStops: { index: number; walk: number }[]; candidates: number };
 export function findMultimodalJourneys(from: Point, to: Point, date = new Date(), locale: 'zh' | 'en' = 'zh', reverse = false, simpleOnly = false, options: JourneySearchOptions = {}): JourneySearchResult {
-  const previewDeadline = options.previewBudgetMs === undefined ? Infinity : performance.now() + options.previewBudgetMs;
   let previewComplete = true;
   const weights = options.weights ?? DEFAULT_WEIGHTS;
   const minimumChange = options.minimumChangeMinutes ?? 3;
@@ -265,13 +264,21 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
     }
     return directOptions.get(prefix.family)?.some(direct => elapsed >= direct.duration + 5 && prefix!.fare >= direct.fare) ?? false;
   };
+  // The first topology preflight can be slower on a cold device. Give the
+  // actual scan its budget too, rather than returning an empty preview before
+  // even examining a service. Repeated searches reuse that preflight.
+  const previewDeadline = options.previewBudgetMs === undefined ? Infinity : performance.now() + options.previewBudgetMs;
   let bestCompleteCost = Infinity;
   for (let round = 0; round < rounds && frontier.size; round++) {
     const arrivals = new Map<number, Label[]>();
     const candidatePatterns = new Set<number>();
     const directionBoardings = boardingPatterns[reverse ? 1 : 0];
     frontier.forEach((_, stop) => (directionBoardings.get(stop) ?? []).forEach(index => candidatePatterns.add(index)));
-    candidatePatterns.forEach(patternIndex => {
+    const orderedPatterns = Array.from(candidatePatterns);
+    // Spend the quick preview budget on services reaching the destination
+    // first; the unrestricted complete search keeps its existing scan order.
+    if (options.previewBudgetMs !== undefined) orderedPatterns.sort((a, b) => Number(finishing.has(b)) - Number(finishing.has(a)));
+    orderedPatterns.forEach(patternIndex => {
       if (performance.now() > previewDeadline) { previewComplete = false; return; }
       const pattern = networkPatterns[patternIndex];
       if (simpleOnly && round === 1 && !finishing.has(patternIndex)) return;

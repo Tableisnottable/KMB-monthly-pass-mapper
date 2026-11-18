@@ -71,7 +71,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult; vias?: PlaceResult[] } | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   useEffect(() => {
-    const timer = window.setTimeout(() => { void fetch('/api/journey?operation=warm').catch(() => {}); }, 500);
+    const timer = window.setTimeout(() => { void fetch('/api/journey?operation=warm').catch(() => {}); }, 0);
     return () => window.clearTimeout(timer);
   }, []);
   const arrivalsDialog = useRef<HTMLDialogElement>(null);
