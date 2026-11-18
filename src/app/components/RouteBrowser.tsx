@@ -8,6 +8,7 @@ import { copy, routeBadgeStyle, type PlannerLocale } from './plannerUi';
 import { operatorName } from '../../data/transportOperators';
 import { routeLineStyles } from './routeColours';
 import { PlannerIcon } from './PlannerIcon';
+import { JointArrivalBoard } from './JointArrivalBoard';
 
 interface RouteRow { id: string; operator: string; number: string; nameTc: string; nameEn: string; mode: string }
 interface RouteStop extends Stop { lat: number; lng: number; boarding: boolean; fare: number; fareStatus: string }
@@ -63,7 +64,9 @@ export function RouteBrowser() {
         <a className="route-timetable-link" href={'/timetables?' + new URLSearchParams({ route: route.id, pattern: patternId, lang: locale })}>{copy(locale, '時間表', 'Timetable')} →</a>
         <ol className="route-browser-stops">{pattern?.stops.map((item, i) => <li data-stop-index={i} key={item.id + ':' + i}><button type="button" aria-pressed={i === stopIndex} onClick={() => setStopIndex(i)}>
           <span className="route-stop-number">{i + 1}</span><span><strong>{item.name}</strong>{i < pattern.stops.length - 1 && <small>{item.fareStatus === 'UNAVAILABLE' ? copy(locale, '票價待查', 'Fare unavailable') : 'HK$' + item.fare.toFixed(1) + (item.fareStatus === 'FULL_FARE' ? copy(locale, ' 上限', ' maximum') : '')}</small>}</span>
-        </button>{i === stopIndex && leg && item.boarding && i < pattern.stops.length - 1 && <LegArrivalBoard key={pattern.id + ':' + i} leg={leg} locale={locale} laterConnection={false} />}</li>)}</ol>
+        </button>{i === stopIndex && leg && item.boarding && i < pattern.stops.length - 1 && <LegArrivalBoard key={pattern.id + ':' + i} leg={leg} locale={locale} laterConnection={false} />}
+          {i === stopIndex && route && i === pattern.stops.length - 1 && <JointArrivalBoard key={pattern.id + ':terminal:' + i} departures={[]} operator={route.operator} routeNumber={route.number}
+            stopName={item.name} locale={locale} historyQuery={{ route: route.id, stop: item.id, terminal: true }} />}</li>)}</ol>
       </>}
       {loading && <p role="status">{copy(locale, '載入中…', 'Loading…')}</p>}{error && <p role="alert">{error}</p>}
     </section><RouteBrowserMap pattern={pattern} selected={stopIndex} route={route} onStop={index => { setStopIndex(index); requestAnimationFrame(() => document.querySelector('[data-stop-index="' + index + '"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })); }} locale={locale} /></div>

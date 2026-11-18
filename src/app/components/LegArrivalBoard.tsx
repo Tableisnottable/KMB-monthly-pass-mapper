@@ -33,7 +33,8 @@ export function LegArrivalBoard({ leg, locale, laterConnection, onSelectDepartur
     <JointArrivalBoard departures={departures} cancellations={cancellations} operator={legOperator(leg)} routeNumber={leg.routeNumber}
       stopName={leg.originStop?.name} locale={locale} scheduledTime={leg.departureTime}
       onSelectDeparture={onSelectDeparture} selectedDepartureKey={leg.selectedDepartureKey} earliestTime={earliestTime} selecting={selecting}
-      timetableOnly={laterConnection || leg.serviceStatus === 'TIMETABLE'} />
+      timetableOnly={laterConnection || leg.serviceStatus === 'TIMETABLE'} historyQuery={leg.networkRouteId && leg.networkPatternId && leg.originStop?.id
+        ? { route: leg.networkRouteId, pattern: leg.networkPatternId, board: leg.boardingIndex, stop: leg.originStop.id } : undefined} />
     <div className="leg-arrivals-actions"><button type="button" onClick={polling.refresh} disabled={polling.loading}>{polling.loading ? copy(locale, '更新中…', 'Updating…') : copy(locale, '更新', 'Refresh')}</button></div>
     <RefreshStatus {...polling} locale={locale} />
   </div>;

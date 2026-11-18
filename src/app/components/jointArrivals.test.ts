@@ -17,6 +17,12 @@ describe('Joint operator arrival displays', () => {
     expect(html.match(/disabled=""/g)).toHaveLength(2);
     expect(html).toContain('Too early');
   });
+  it('offers an on-demand past-departure lookup even when no upcoming service is available', () => {
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [], operator: 'KMB', routeNumber: '38', locale: 'en',
+      historyQuery: { route: 'route-38', pattern: 'pattern-38', stop: 'stop-1', board: 0 } }));
+    expect(html).toContain('View past departures');
+    expect(html).toContain('aria-expanded="false"');
+  });
   it('groups both companies into one service while retaining all individual arrivals', () => {
     const input = [row, { ...row, id: 'second', operator: 'CTB' }, { ...row, id: 'third' }];
     const groups = groupStationDepartures(input);

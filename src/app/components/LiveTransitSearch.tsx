@@ -76,6 +76,7 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
         <strong>{row.status === 'NO_UPCOMING' ? '—' : row.minutes === null ? '—' : row.minutes + ' min'}{row.time && <small>{hongKongTimeLabel(row.time)} HKT</small>}</strong>
         <JointArrivalBoard operator={group.jointOperator ?? row.networkOperator ?? row.operator} routeNumber={row.number}
           stopName={locale === 'en' ? selected.nameEn : selected.nameTc} locale={locale}
+          historyQuery={{ route: row.routeId, pattern: row.patternId, stop: row.stopId }}
           cancellations={group.rows.filter(item => isNonOperatingDeparture(item)).map(item => ({ departureType: item.departureType === 'MISSED' ? 'MISSED' : 'CANCELLED', operator: item.operator, remark: item.remark ?? '', time: item.time ?? undefined }))}
           departures={group.rows.flatMap(item => !isNonOperatingDeparture(item) && (item.status === 'LIVE' || item.status === 'TIMETABLE') && item.time !== null && item.minutes !== null
             ? [{ time: item.time, minutes: item.minutes, operator: item.operator, remark: item.remark,

@@ -779,6 +779,12 @@ button.departure-choice:hover { background: #e5edf3; }
 .joint-arrival-board .comparison-early { color: #6150a2; }
 .joint-arrival-board .joint-arrival-remark, .joint-arrival-board .joint-arrival-note { color: #667c8a; }
 .joint-arrival-board .arrival-more-button { border: 0; border-top: 1px solid #dce3ea; color: #466d87; font-size: 13px; margin-top: 5px; }
+.joint-arrival-board .arrival-history-button { width: 100%; margin-top: 6px; padding: 7px 5px; border: 1px solid #c7d7e4; border-radius: 7px; color: #466d87; font-size: 12px; }
+.joint-arrival-board .arrival-history-button:disabled { opacity: .55; }
+.joint-arrival-board .departure-history { max-height: 310px; overflow: auto; margin-top: 6px; border-top: 1px solid #dce3ea; }
+.joint-arrival-board .departure-history-row { border-bottom: 1px solid #dce3ea; }
+.joint-arrival-board .departure-history-destination, .joint-arrival-board .departure-history-note { display: block; margin-top: 3px; color: #718391; font-size: 10px; }
+.joint-arrival-board .departure-already-left strong { color: #7b8b97; font-size: 13px; }
 .departure-missed { background: #eee7f5; color: #62416e; border-color: #c8b0d3; }
 .arrival-help { color: #667d8d; }
 .arrival-help p { font-size: 11px; }
