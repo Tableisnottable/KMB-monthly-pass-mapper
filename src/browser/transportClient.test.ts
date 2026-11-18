@@ -31,6 +31,15 @@ describe('Warm and cancellable background calculators', () => {
     FakeWorker.instances[0].reply(1, { data: ['airport'] }); FakeWorker.instances[0].reply(0, { data: ['104'] });
     expect(await (await first).json()).toEqual({ data: ['104'] }); expect(await (await second).json()).toEqual({ data: ['airport'] });
   });
+  it('can cancel a departure selection without interrupting the full journey search', async () => {
+    const { transportFetch } = await import('./transportClient'); const controller = new AbortController();
+    const journey = transportFetch('/api/journey');
+    const selection = transportFetch('/api/journey?operation=retime', { signal: controller.signal });
+    const rejected = expect(selection).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort(); await rejected;
+    expect(FakeWorker.instances[0].terminated).toBe(false);
+    FakeWorker.instances[0].reply(); expect((await journey).status).toBe(200);
+  });
   it('rejects failed loads and creates a fresh worker on retry', async () => {
     const { transportFetch } = await import('./transportClient');
     const first = transportFetch('/api/network?resource=routes'); const failed = expect(first).rejects.toThrow('Could not load');

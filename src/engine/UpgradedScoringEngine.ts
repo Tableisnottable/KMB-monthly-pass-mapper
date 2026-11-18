@@ -35,6 +35,7 @@ export interface Segment {
   realtimeEta?: RealtimeEta | null;
   /** All upcoming provider predictions at this boarding stop. */
   liveDepartures?: LiveDeparture[];
+  selectedDepartureKey?: string;
   /** Provider-confirmed cancellations are notices, never boardable journeys. */
   departureNotices?: CancellationNotice[];
   isEtaFresh?: boolean;

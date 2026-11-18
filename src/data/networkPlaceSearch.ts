@@ -22,7 +22,7 @@ export function findNetworkPlaces(query: string) {
       if (seen.has(key)) return false;
       seen.add(key); return true;
     }).slice(0, 6).map(s => ({
-      id: 'network:' + s[0], name: s[1] + ' ' + s[2],
+      id: 'network:' + s[0], name: s[1] + ' ' + s[2], nameZh: s[1], nameEn: s[2],
       address: '香港 Hong Kong · ' + (s[6] === 'SUBWAY' ? '港鐵站 MTR station'
         : s[6] === 'LIGHT_RAIL' ? '輕鐵站 Light Rail stop' : s[6] === 'FERRY' ? '渡輪碼頭 Ferry pier' : '公共交通站點 Public transport stop'),
       lat: s[3], lng: s[4], type: s[6] === 'SUBWAY' || s[6] === 'LIGHT_RAIL' ? 'station' : s[6] === 'FERRY' ? 'ferry_terminal' : 'bus_stop',

@@ -31,7 +31,7 @@ export function findTransitPlaces(query: string, stops: TransitStopRecord[]) {
     return true;
   }).sort((a, b) => a.name_tc.length - b.name_tc.length).slice(0, 4).map(stop => ({
     id: 'ctb-stop-' + stop.stop,
-    name: stop.name_tc + ' ' + stop.name_en,
+    name: stop.name_tc + ' ' + stop.name_en, nameZh: stop.name_tc, nameEn: stop.name_en,
     address: '香港 Hong Kong · 城巴車站 Citybus stop',
     lat: stop.lat,
     lng: stop.long,

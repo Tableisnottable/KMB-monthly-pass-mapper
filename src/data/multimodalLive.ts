@@ -5,7 +5,7 @@ import { networkPatterns, networkRoutes, networkStops } from './transportNetwork
 import { haversineKm } from '../engine/journeyHelpers';
 import type { Segment, Route } from '../engine/UpgradedScoringEngine';
 import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable } from './networkTimetable';
-import { departureTimingType, providerMarksCancelled, providerMarksScheduled } from '../domain/departureType';
+import { departureTimingType, isNonOperatingDeparture, providerMarksCancelled, providerMarksMissed, providerMarksScheduled } from '../domain/departureType';
 import type { NotificationTarget } from '../domain/journeyNotifications';
 
 type Train = { dest: string; time: string; valid?: string };
@@ -40,16 +40,15 @@ function fresh(value: string | undefined, now: Date) {
   return Math.abs(now.getTime() - providerTimestamp(value)) <= 120_000;
 }
 function attach(leg: Segment, predictions: { time: string | null; remark?: string; operator?: string }[], now: Date, earliest = 0) {
-  leg.departureNotices = predictions.filter(row => providerMarksCancelled(row.remark)).map(row => ({
-    departureType: 'CANCELLED', operator: row.operator, remark: row.remark!,
+  leg.departureNotices = predictions.filter(isNonOperatingDeparture).map(row => ({
+    departureType: providerMarksMissed(row.remark) && !providerMarksCancelled(row.remark) ? 'MISSED' : 'CANCELLED', operator: row.operator, remark: row.remark!,
     time: row.time && Number.isFinite(Date.parse(row.time)) ? row.time : undefined,
   }));
-  const seen = new Set<string>();
-  const departures = classifyDepartureTypes(leg.networkPattern!, leg.boardingIndex ?? 0, predictions.filter((prediction): prediction is typeof prediction & { time: string } => !!prediction.time && !providerMarksCancelled(prediction.remark)).filter(prediction => {
+  const departures = classifyDepartureTypes(leg.networkPattern!, leg.boardingIndex ?? 0, predictions.filter((prediction): prediction is typeof prediction & { time: string } => !!prediction.time && !isNonOperatingDeparture(prediction)).filter(prediction => {
     const minutes = (Date.parse(prediction.time) - now.getTime()) / 60000;
-    const key = prediction.time + ':' + prediction.operator;
-    if (!Number.isFinite(minutes) || minutes < Math.max(0, earliest) - 0.5 || seen.has(key)) return false;
-    seen.add(key); return true;
+    // Different vehicles may share an ETA (for example B10). Provider rows
+    // remain distinct even when their operator and timestamp match.
+    return Number.isFinite(minutes) && minutes >= Math.max(0, earliest) - 0.5;
   }).map(prediction => ({ ...prediction, timingType: providerMarksScheduled(prediction.remark) ? 'SCHEDULED' as const : 'LIVE' as const,
     minutes: Math.max(0, Math.ceil((Date.parse(prediction.time) - now.getTime()) / 60000)),
     ...compareDepartureToTimetable(leg.networkPattern!, leg.boardingIndex ?? 0, prediction.time),
@@ -154,7 +153,7 @@ export async function enrichJourneyArrivals(routes: Route[], now = new Date()): 
           if (!match) return [];
           const rows = citybus ? await getCitybusEta(match.stop, leg.routeNumber!) : await getKmbStopEta(match.stop);
           const remark = (r: typeof rows[number]) => [r.rmk_tc, r.rmk_en, 'remarks_tc' in r ? r.remarks_tc : '', 'remarks_en' in r ? r.remarks_en : ''].filter(Boolean).join(' · ');
-          return rows.filter(r => r.route === leg.routeNumber && r.dir === match.dir && (citybus || Number(r.seq) === Number(match.seq)) && (r.eta || providerMarksCancelled(remark(r)))
+          return rows.filter(r => r.route === leg.routeNumber && r.dir === match.dir && (citybus || Number(r.seq) === Number(match.seq)) && (r.eta || providerMarksCancelled(remark(r)) || providerMarksMissed(remark(r)))
             && (!r.data_timestamp || fresh(r.data_timestamp, now)))
             .map(r => ({ time: r.eta, operator, remark: remark(r) }));
         }));

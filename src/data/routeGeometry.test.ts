@@ -40,6 +40,19 @@ describe('Physical route geometry', () => {
     }] })));
     expect(await routeOnStreets([[22.3, 114.18], [22.301, 114.181]], 'foot')).toEqual({ paths: [], source: 'UNAVAILABLE' });
   });
+  it('retains distinct valid pedestrian alternatives and rejects driving steps', async () => {
+    const valid = (lng: number, duration: number) => ({ distance: 180, duration,
+      geometry: { coordinates: [[114.2, 22.31], [lng, 22.3105], [114.201, 22.311]] },
+      legs: [{ steps: [{ mode: 'walking', distance: 180 }] }] });
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'Ok', routes: [
+      { ...valid(114.2005, 30), legs: [{ steps: [{ mode: 'driving', distance: 180 }] }] },
+      valid(114.2006, 150), valid(114.2007, 180), valid(114.2007, 180),
+    ] })));
+    const result = await routeOnStreets([[22.31, 114.2], [22.311, 114.201]], 'foot');
+    expect(result.durationSeconds).toBe(150);
+    expect(result.alternatives).toHaveLength(1);
+    expect(result.alternatives![0].durationSeconds).toBe(180);
+  });
   it('accepts a long straight footpath with complete walking instructions', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'Ok', routes: [{ distance: 700, duration: 560,
       geometry: { coordinates: [[114.23, 22.42], [114.235, 22.424]] },

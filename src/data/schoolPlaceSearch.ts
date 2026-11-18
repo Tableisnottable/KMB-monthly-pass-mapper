@@ -30,7 +30,7 @@ export function findSchoolPlaces(query: string) {
   }).filter(match => Number.isFinite(match.score)).sort((a, b) => a.score - b.score || a.school.row[2].localeCompare(b.school.row[2]) || a.school.row[0].localeCompare(b.school.row[0]));
   const exact = matches.some(match => match.score < 2);
   return { exact, places: matches.filter(match => !exact || match.score < 2).slice(0, 6).map(({ school: { row } }) => ({
-    id: 'edb-school:' + row[0], name: row[1] + ' ' + row[2],
+    id: 'edb-school:' + row[0], name: row[1] + ' ' + row[2], nameZh: row[1], nameEn: row[2], addressZh: row[3], addressEn: row[4],
     address: row[3] + ' · ' + row[4] + ' · 教育局 Education Bureau',
     lat: row[5], lng: row[6], type: 'school',
     googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(row[5] + ',' + row[6]),

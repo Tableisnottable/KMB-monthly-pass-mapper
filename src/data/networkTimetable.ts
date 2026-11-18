@@ -17,7 +17,7 @@ export interface LiveDeparture extends TimetableComparison {
   timetableEstimate?: boolean;
 }
 export interface CancellationNotice {
-  departureType: 'CANCELLED';
+  departureType: 'CANCELLED' | 'MISSED';
   operator?: string;
   remark: string;
   time?: string;

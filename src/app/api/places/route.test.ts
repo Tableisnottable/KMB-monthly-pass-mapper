@@ -10,6 +10,14 @@ async function search(query: string) {
 }
 
 describe('Transit place suggestions', () => {
+  it('finds a mall from government building data when transport names cannot find it', async () => {
+    const fetch = vi.fn(async () => Response.json([{ nameZH: '海港城', nameEN: 'HARBOUR CITY', districtZH: '油尖旺區', x: 835267, y: 817346 }]));
+    vi.stubGlobal('fetch', fetch);
+    const response = await search('Harbour City');
+    const { data, meta } = await response.json();
+    expect(data[0].name).toBe('海港城'); expect(data[0].nameEn).toBe('HARBOUR CITY');
+    expect(meta.provider).toContain('Lands Department'); expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it('returns local stop matches immediately without waiting for geocoding', async () => {
     const fetch = vi.fn(async () => { throw new Error('Must not wait for geocoding'); }); vi.stubGlobal('fetch', fetch);
     const response = await GET(new NextRequest('http://localhost/api/places?scope=local&q=Airport'));

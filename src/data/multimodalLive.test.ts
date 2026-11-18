@@ -46,7 +46,7 @@ describe('Official live arrivals', () => {
     expect(route.legs![0].serviceStatus).toBe('UNVERIFIED');
     expect(route.legs![0].serviceEnded).not.toBe(true);
   });
-  it('retains every fresh bus prediction and provider extra-trip remarks without requiring a scheduled trip', async () => {
+  it('retains simultaneous buses and provider extra-trip remarks without requiring a scheduled trip', async () => {
     const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][1] === 'KMB' && pattern.s.length > 1);
     const pattern = networkPatterns[index], routeNumber = networkRoutes[pattern.r][2];
     const origin = networkStop(pattern.s[0]), destination = networkStop(pattern.s[1]);
@@ -56,14 +56,14 @@ describe('Official live arrivals', () => {
     ]);
     vi.mocked(getStaticKmbRouteStops).mockImplementation((_route, bound) => bound === 'outbound'
       ? [{ stop: 'mock-origin', seq: 1 }, { stop: 'mock-destination', seq: 2 }] : undefined);
-    vi.mocked(getKmbStopEta).mockResolvedValue([3, 8].map(minutes => ({ route: routeNumber, dir: 'O', seq: 1,
+    vi.mocked(getKmbStopEta).mockResolvedValue([3, 8, 8].map(minutes => ({ route: routeNumber, dir: 'O', seq: 1,
       dest_tc: '', dest_en: '', eta: new Date(now.getTime() + minutes * 60000).toISOString(),
       rmk_tc: minutes === 3 ? '加班車' : '', data_timestamp: now.toISOString() })));
     const route: Route = { id: 'extra-bus', legs: [{ operator: 'KMB', mode: 'BUS', routeNumber,
       networkPattern: index, boardingIndex: 0, alightingIndex: 1, originStop: origin, destinationStop: destination,
       serviceEnded: true, serviceStatus: 'TIMETABLE' }] };
     await enrichJourneyArrivals([route], now);
-    expect(route.legs![0].liveDepartures?.map(departure => departure.minutes)).toEqual([3, 8]);
+    expect(route.legs![0].liveDepartures?.map(departure => departure.minutes)).toEqual([3, 8, 8]);
     expect(route.legs![0].liveDepartures?.[0]).toMatchObject({ scheduleMatch: 'ADDED', addedReason: 'PROVIDER' });
     expect(route.legs![0].serviceEnded).toBe(false);
     expect(route.legs![0].realtimeEta?.etaMinutes).toBe(3);

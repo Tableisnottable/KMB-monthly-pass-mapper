@@ -25,6 +25,26 @@ async function journey(from = cheungShaWan, to = airport, extra: Record<string, 
 }
 
 describe('Multimodal journey API', () => {
+  it('returns a quick preview without waiting for ETA or walking providers', async () => {
+    const { data, meta } = await journey(cheungShaWan, airport, { phase: 'preview', timeMode: 'depart', time: '2026-11-14T10:00:00+08:00' });
+    expect(meta.phase).toBe('preview'); expect(data.length).toBeGreaterThan(0);
+    expect(enrichJourneyArrivals).not.toHaveBeenCalled(); expect(routeOnStreets).not.toHaveBeenCalled();
+  });
+  it('retimes a selected published departure through the browser API', async () => {
+    const { data } = await journey(cheungShaWan, airport, { phase: 'preview', timeMode: 'depart', time: '2026-11-14T10:00:00+08:00' });
+    const route = data.find((r: { legs: unknown[] }) => r.legs.length === 1);
+    expect(route).toBeDefined();
+    const time = new Date(Date.parse(route.legs[0].departureTime) + 15 * 60000).toISOString();
+    const params = new URLSearchParams({ operation: 'retime', route: JSON.stringify(route), leg: '0', key: 'test',
+      departure: JSON.stringify({ time, minutes: 15, scheduleMatch: 'MATCHED', timingType: 'SCHEDULED' }) });
+    const response = await GET(new NextRequest('http://localhost/api/journey?' + params));
+    expect(response.status).toBe(200);
+    const updated = (await response.json()).data;
+    expect(updated.legs[0].departureTime).toBe(time);
+    expect(Date.parse(updated.arrivalTime)).toBe(Date.parse(route.arrivalTime) + 15 * 60000);
+    params.set('departure', JSON.stringify({ time, minutes: 15, departureType: 'MISSED' }));
+    expect((await GET(new NextRequest('http://localhost/api/journey?' + params))).status).toBe(400);
+  });
   beforeEach(() => {
     vi.clearAllMocks(); vi.useFakeTimers(); vi.setSystemTime(now);
     vi.mocked(routeOnStreets).mockResolvedValue({ paths: [], source: 'UNAVAILABLE' });

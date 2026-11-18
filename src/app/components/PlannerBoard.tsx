@@ -19,15 +19,19 @@ import type { TravelMode } from '../../domain/travelOptions';
 import type { JourneyTimeSelection } from '../../engine/journeyTime';
 import type { RouteWeights } from '../../engine/routeWeights';
 import { corridorChoices, routeCorridors, type RoutePreferences } from '../../domain/routePreferences';
+import { transportFetch } from '../../browser/transportClient';
+import type { LiveDeparture } from '../../data/networkTimetable';
+import type { JourneyLimits } from '../../domain/journeyLimits';
 import { STUDENT_FARE_SOURCE } from '../../domain/journeyFares';
 import { JourneyEndpoints } from './JourneyEndpoints';
+import { JourneyNavigation } from './JourneyNavigation';
 import { comparisonTypes, type ComparisonPreferences } from '../../domain/transportSelection';
 const FareProfileContext = createContext<FareProfile>('adult');
 const FareLabelContext = createContext<string | undefined>(undefined);
 
 function WalkTime({ routes, locale }: { routes: ScoredRoute[]; locale: PlannerLocale }) {
   const times = routes.map(totalWalkMinutes), min = Math.min(...times), max = Math.max(...times);
-  return <span className="journey-walk-time"><PlannerIcon name="walk" size={16} />{copy(locale, '全程步行 ', 'Total walking ')}{min}{max !== min ? '–' + max : ''} {copy(locale, '分鐘', 'min')}</span>;
+  return <span className="journey-walk-time"><PlannerIcon name="walk" size={16} />{copy(locale, '步行 ', 'Walk ')}{min}{max !== min ? '–' + max : ''} {copy(locale, '分鐘', 'min')}</span>;
 }
 
 function CorridorLabels({ route, locale }: { route: ScoredRoute; locale: PlannerLocale }) {
@@ -55,8 +59,8 @@ function JourneyRow({ route, locale, onSelect, selected = false }: { route: Scor
   const isWalk = route.legs.every(leg => leg.mode === 'WALK');
   const selectedPrice = profile === 'adult' ? fareLabel(route, locale) : profile === 'pass' ? groupPassFareLabel({ id: route.id, routes: [route] }, locale) : profile === 'student' ? groupStudentFareLabel({ id: route.id, routes: [route] }, locale) : copy(locale, '票價未核實', 'Fare unverified');
   return <button type="button" className={'route-option' + (ended ? ' ended' : '') + (selected ? ' is-selected' : '')} onClick={onSelect} aria-pressed={selected}
-    aria-label={journeyMinutes(route) + ' minute journey, ' + route.legs.map(leg => leg.routeNumber || leg.mode).join(', ') + ', ' + copy(locale, '全程步行 ', 'Total walking ') + totalWalkMinutes(route) + ' min, ' + copy(locale, '普通成人 ', 'Normal adult ') + fareLabel(route, locale) + ', ' + copy(locale, '所選 ', 'Selected ') + (selectedLabel ?? profile) + ' ' + selectedPrice}>
-    {selected && <span className="route-selected-label"><PlannerIcon name="pin" size={13} />{copy(locale, '已選取 · 地圖顯示中', 'Selected on map')}</span>}
+    aria-label={journeyMinutes(route) + ' minute journey, ' + route.legs.map(leg => leg.routeNumber || leg.mode).join(', ') + ', ' + copy(locale, '步行 ', 'Walk ') + totalWalkMinutes(route) + ' min, ' + copy(locale, '普通成人 ', 'Normal adult ') + fareLabel(route, locale) + ', ' + copy(locale, '所選 ', 'Selected ') + (selectedLabel ?? profile) + ' ' + selectedPrice}>
+    {selected && <span className="route-selected-label"><PlannerIcon name="pin" size={13} />{copy(locale, '已選', 'Selected')}</span>}
     <span className="route-option-top"><RouteSymbols route={route} locale={locale} /><span className="route-duration">{live && !ended && <PlannerIcon name="signal" size={17} />}{journeyMinutes(route)}<small>min</small></span></span>
     <FareComparison routes={[route]} locale={locale} profile={profile} selectedLabel={selectedLabel} />
     <WalkTime routes={[route]} locale={locale} /><CorridorLabels route={route} locale={locale} />
@@ -80,7 +84,7 @@ function JourneyChoiceGroup({ group, locale, onSelect, onPreview, selectedId }: 
   return <details className={'combined-journeys' + (selectedRoute ? ' is-selected' : '')}>
     <summary className="combined-journey-summary" onClick={() => onPreview(selectedRoute ?? best)}>
       <span className="journey-card-labels"><span className="combined-card-label"><PlannerIcon name="layers" size={13} />{copy(locale, '合併路線', 'Combined routes')}</span>
-        {selectedRoute && <span className="route-selected-label"><PlannerIcon name="pin" size={13} />{copy(locale, '已選取 · 地圖顯示中', 'Selected on map')}</span>}</span>
+        {selectedRoute && <span className="route-selected-label"><PlannerIcon name="pin" size={13} />{copy(locale, '已選', 'Selected')}</span>}</span>
       <span className="route-option-top"><span className="combined-option-count">{group.routes.length} {copy(locale, '個行程', 'journeys')}</span>
         <span className="route-duration">{groupDurationLabel(group)}<small>min</small></span></span>
       <FareComparison routes={group.routes} locale={locale} profile={profile} selectedLabel={selectedLabel} />
@@ -90,7 +94,7 @@ function JourneyChoiceGroup({ group, locale, onSelect, onPreview, selectedId }: 
       <span className="combined-stop-pair">{best.legs[0].originStop?.name} → {best.legs.at(-1)?.destinationStop?.name}</span>
       {selectedRoute && <span className="combined-selected-journey">{copy(locale, '地圖行程：', 'Map journey: ')}{selectedRoute.legs.map(leg => leg.routeNumber || modeLabel(leg.mode, locale)).join(' → ')}</span>}
       {best.departureTime && best.arrivalTime && <span className="route-clock-line">{copy(locale, '首選 ', 'Top option ')}{hongKongTimeLabel(best.departureTime)} → {hongKongTimeLabel(best.arrivalTime)} <small>HKT</small></span>}
-      <span className="combined-expand-label">{copy(locale, '相同上落車及轉乘站 · 查看行程', 'Same boarding, alighting and transfer stops · View journeys')}<PlannerIcon name="chevron" size={13} /></span>
+      <span className="combined-expand-label">{copy(locale, '選擇行程', 'Choose journey')}<PlannerIcon name="chevron" size={13} /></span>
     </summary>
     <div className="combined-journey-options" role="group" aria-label={copy(locale, '選擇完整行程', 'Choose a complete journey')}>
       {group.routes.map(route => <JourneyRow key={route.id} route={route} locale={locale} onSelect={() => onSelect(route)} selected={route.id === selectedId} />)}
@@ -113,7 +117,7 @@ function JourneySortControl({ value, onChange, fareBasis, onFareBasis, locale }:
   </label>;
 }
 
-export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places, onMapPick, fareProfile, selectedFareLabel, preferences, time, weights, comparisons, locale = 'zh' }: {
+export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, endpoints, places, onMapPick, fareProfile, selectedFareLabel, preferences, time, weights, comparisons, changeMinutes = 3, limits, locale = 'zh' }: {
   routes: ScoredRoute[];
   searchPanel: ReactNode;
   emptyHint?: string;
@@ -127,8 +131,19 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
   time: JourneyTimeSelection;
   weights: RouteWeights;
   comparisons: ComparisonPreferences;
+  changeMinutes?: number; limits?: JourneyLimits;
 }) {
+  const [overrides, setOverrides] = useState<Record<string, ScoredRoute>>({});
+  const [selecting, setSelecting] = useState(false);
+  const [departureError, setDepartureError] = useState('');
+  const selectionRequest = useRef<AbortController | null>(null);
+  useEffect(() => { selectionRequest.current?.abort(); setOverrides({}); setDepartureError(''); setSelecting(false); }, [endpoints, time, preferences, weights, limits, changeMinutes]);
+  useEffect(() => () => selectionRequest.current?.abort(), []);
+  const routes = sourceRoutes.map(route => overrides[route.id] ?? route);
   const [selectedId, setSelectedId] = useState('');
+  const [navigating, setNavigating] = useState(false);
+  const [navigationPosition, setNavigationPosition] = useState<GeolocationPosition | null>(null);
+  useEffect(() => { setNavigating(false); setNavigationPosition(null); }, [endpoints, selectedId]);
   const [showDetails, setShowDetails] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
@@ -137,16 +152,40 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
   const comparisonModes = comparisonTypes.filter(type => comparisons[type.id]).map(type => type.id);
   const travel = useTravelOptions(endpoints ?? { origin: null, destination: null }, comparisonModes, preferences);
   const [travelMode, setTravelMode] = useState<TravelMode | null>(null);
-  const selectedTravel = travel.options.find(option => option.mode === travelMode && option.available);
+  const [travelAlternative, setTravelAlternative] = useState(0);
+  const baseTravel = travel.options.find(option => option.mode === travelMode && option.available);
+  const travelChoices = baseTravel ? [baseTravel, ...(baseTravel.alternatives ?? [])] : [];
+  const selectedTravel = travelChoices[travelAlternative] ?? baseTravel;
   const sidebar = useRef<HTMLDivElement>(null);
-  useEffect(() => { setSelectedId(current => routes.some(route => route.id === current) ? current : routes.find(route => route.legs.some(leg => leg.mode !== 'WALK'))?.id ?? ''); }, [routes]);
-  useEffect(() => { setTravelMode(null); setShowDetails(false); }, [travel.key]);
+  useEffect(() => { setSelectedId(current => routes.some(route => route.id === current) ? current : routes.find(route => route.legs.some(leg => leg.mode !== 'WALK'))?.id ?? ''); }, [sourceRoutes]);
+  useEffect(() => { setTravelMode(null); setTravelAlternative(0); setShowDetails(false); }, [travel.key]);
   const selected = routes.find(route => route.id === selectedId && route.legs.some(leg => leg.mode !== 'WALK')) ?? routes.find(route => route.legs.some(leg => leg.mode !== 'WALK'));
   const recommended = routes.filter(route => !hasEndedService(route) && route.legs.some(leg => leg.mode !== 'WALK'));
   const ended = routes.filter(hasEndedService);
   const recommendedGroups = groupJourneysByStops(recommended, sort, sortFare === 'adult' ? 'adult' : fareProfile, preferences);
   const endedGroups = groupJourneysByStops(ended, sort, sortFare === 'adult' ? 'adult' : fareProfile, preferences);
   const mapPlaces = endpoints ?? places;
+  async function selectDeparture(index: number, departure: LiveDeparture, key: string) {
+    if (!selected) return;
+    selectionRequest.current?.abort();
+    const controller = new AbortController(); selectionRequest.current = controller;
+    setSelecting(true); setDepartureError('');
+    const payload = { ...selected, legs: selected.legs.map(({ path, ...leg }) => leg) };
+    const params = new URLSearchParams({ operation: 'retime', route: JSON.stringify(payload), departure: JSON.stringify(departure),
+      leg: String(index), key, changeMinutes: String(changeMinutes), weights: JSON.stringify(weights), timeMode: time.mode, time: time.value });
+    if (limits) params.set('limits', JSON.stringify(limits));
+    try {
+      const response = await transportFetch('/api/journey?' + params, { signal: controller.signal });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'Could not select departure.');
+      if (controller.signal.aborted) return;
+      const updated = result.data as ScoredRoute;
+      updated.legs.forEach((leg, i) => { leg.path = selected.legs[i].path; });
+      setOverrides(current => ({ ...current, [selected.id]: updated }));
+    } catch (error) {
+      if (!controller.signal.aborted) setDepartureError(copy(locale, '這班車未能接續行程，請選另一班或檢查時間限制。', error instanceof Error ? error.message : 'Choose another departure.'));
+    } finally { if (!controller.signal.aborted) setSelecting(false); }
+  }
   function choose(route: ScoredRoute) {
     setTravelMode(null);
     setSelectedId(route.id); setShowDetails(true);
@@ -156,33 +195,41 @@ export function PlannerBoard({ routes, searchPanel, emptyHint, endpoints, places
     setTravelMode(null);
     setSelectedId(route.id);
   }
-  return <FareProfileContext.Provider value={fareProfile}><FareLabelContext.Provider value={selectedFareLabel}><div className="planner-layout">{searchPanel}<div className={'planner-workspace' + (showMap ? ' map-visible' : '')}>
+  return <FareProfileContext.Provider value={fareProfile}><FareLabelContext.Provider value={selectedFareLabel}><div className={'planner-layout' + (navigating ? ' is-navigating' : '')}>{searchPanel}<div className={'planner-workspace' + (showMap ? ' map-visible' : '')}>
     <div className="planner-sidebar-scroll" ref={sidebar}>
-      {showDetails && selectedTravel ? <TravelOptionDetails key={travel.key + selectedTravel.mode} option={selectedTravel} places={mapPlaces} locale={locale} time={time} profile={fareProfile}
-        onBack={() => { setShowDetails(false); setTravelMode(null); }} onMap={() => setShowMap(true)} /> : showDetails && selected ? <section className="trip-panel" id="journey-details" aria-label={copy(locale, '行程詳情', 'Journey details')}>
+      {navigating && selected && <JourneyNavigation key={selected.id} route={selected} places={mapPlaces} locale={locale} onStop={() => { setNavigating(false); setNavigationPosition(null); }} onPosition={setNavigationPosition} />}
+      {showDetails && selectedTravel ? <>
+        {travelChoices.length > 1 && <div className="walking-alternatives" role="group" aria-label={copy(locale, '步行方案', 'Walking options')}>{travelChoices.map((option, index) => <button type="button" key={index} aria-pressed={option === selectedTravel} onClick={() => setTravelAlternative(index)}><PlannerIcon name="walk" size={18} /><span>{copy(locale, '方案 ', 'Option ') + (index + 1)}<strong>{option.minutes} min</strong><small>{Math.round(option.distanceMetres ?? 0)} m</small></span></button>)}</div>}
+        <TravelOptionDetails key={travel.key + selectedTravel.mode} option={selectedTravel} places={mapPlaces} locale={locale} time={time} profile={fareProfile}
+        onBack={() => { setShowDetails(false); setTravelMode(null); }} onMap={() => setShowMap(true)} /></> : showDetails && selected ? <section className="trip-panel" id="journey-details" aria-label={copy(locale, '行程詳情', 'Journey details')}>
         <div className="trip-heading"><button type="button" className="all-results-button" onClick={() => { setShowDetails(false); sidebar.current?.scrollTo({ top: 0 }); }}><span>{copy(locale, '所有行程結果', 'All journey results')}</span><PlannerIcon name="chevron" size={14} /></button><JourneyEndpoints places={mapPlaces} originFallback={selected.legs[0]?.originStop?.name} destinationFallback={selected.legs.at(-1)?.destinationStop?.name} /></div>
         <div className="trip-summary"><RouteSymbols route={selected} locale={locale} /><span className="trip-walk"><PlannerIcon name="walk" size={17} />{selected.legs.every(leg => leg.mode === 'WALK') ? journeyMinutes(selected) : selected.walkTransferTimeMinutes} min</span><span className="route-duration">{journeyMinutes(selected)}<small>min</small></span></div>
         <div className="trip-fare-comparison"><FareComparison routes={[selected]} locale={locale} profile={fareProfile} selectedLabel={selectedFareLabel} /></div>
+        {!navigating && <button type="button" className="start-journey-go" disabled={selecting} onClick={() => { setNavigating(true); setShowMap(false); sidebar.current?.scrollTo({ top: 0 }); }}>GO <PlannerIcon name="arrow" size={22} /></button>}
         <button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
-        <RouteDetails route={selected} locale={locale} weights={weights} profile={fareProfile} selectedFareLabel={selectedFareLabel} />
+        {overrides[selected.id] && <div className="departure-selection-note" role="status">{copy(locale, '已更新行程時間', 'Journey times updated')} <button type="button" disabled={selecting} onClick={() => { setOverrides(current => { const next = { ...current }; delete next[selected.id]; return next; }); setDepartureError(''); }}>{copy(locale, '重設', 'Reset')}</button></div>}
+        {departureError && <p className="departure-selection-error" role="alert">{departureError}</p>}
+        <RouteDetails onSelectDeparture={selectDeparture} selectingDeparture={selecting} minimumChange={changeMinutes} route={selected} locale={locale} weights={weights} profile={fareProfile} selectedFareLabel={selectedFareLabel} />
       </section> : <>
         <button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}><PlannerIcon name="monitor" size={15} />{copy(locale, '顯示地圖', 'Show Map')}</button>
         <section className="results-pane" id="routes" aria-label={copy(locale, '行程選擇', 'Journey options')}>
-          {endpoints && comparisonModes.length > 0 && <><QuickTravelOptions options={travel.options} modes={comparisonModes} loading={travel.loading} locale={locale} onChoose={option => { setTravelMode(option.mode); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }} />
+          {endpoints && comparisonModes.length > 0 && <><QuickTravelOptions options={travel.options} modes={comparisonModes} loading={travel.loading} locale={locale} onChoose={option => { setTravelMode(option.mode); setTravelAlternative(0); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }} />
             <p className="quick-mode-note">{copy(locale, '按道路／路徑估算，非即時交通；「—」表示未有可用路徑。', 'Road/path estimates, not live traffic. “—” means no route is available.')}</p></>}
           {routes.length > 0 ? <>
             {recommendedGroups.length > 0 && <div className="route-group"><div className="route-group-heading"><h2>{copy(locale, '建議', 'Suggested')}</h2><JourneySortControl value={sort} onChange={setSort} fareBasis={sortFare} onFareBasis={setSortFare} locale={locale} /></div><div className="route-list">{(showAllRoutes ? recommendedGroups : recommendedGroups.slice(0, 12)).map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} onPreview={preview} selectedId={selected?.id} />)}</div>
               {recommendedGroups.length > 12 && <button type="button" className="more-journeys" onClick={() => setShowAllRoutes(value => !value)}>{showAllRoutes ? copy(locale, '顯示較少路線', 'Show fewer options') : copy(locale, '顯示全部 ', 'Show all ') + recommendedGroups.length + copy(locale, ' 組行程', ' journey groups')}</button>}</div>}
             {endedGroups.length > 0 && <div className="route-group"><div className="route-group-heading"><h2>{copy(locale, '暫無班次', 'No upcoming service')}</h2>{recommendedGroups.length === 0 && <JourneySortControl value={sort} onChange={setSort} fareBasis={sortFare} onFareBasis={setSortFare} locale={locale} />}</div><div className="route-list">{endedGroups.map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} onPreview={preview} selectedId={selected?.id} />)}</div></div>}
+            <details className="route-notes"><summary>{copy(locale, '票價及資料說明', 'Fare and data notes')}</summary>
             <p className="route-estimate-note">{copy(locale, '車程及票價為估算，路線按你的權重排列。', 'Times and fares are estimates. Routes use your weighted ranking.')} <a href="/coverage">{copy(locale, '交通資料涵蓋範圍', 'Transport coverage')}</a></p>
             <p className="route-estimate-note">{copy(locale, '月票價假設已有有效九巴月票及足夠每日乘車額，不包括購買月票費用。無月票價為普通成人車費。', 'Pass fares assume a valid KMB Monthly Pass and sufficient daily rides; the pass purchase price is separate. Without-pass fares are normal adult fares.')} <a href={KMB_PASS_RULES.sourceUrl} target="_blank" rel="noreferrer">{copy(locale, '九巴月票條款', 'KMB pass terms')}</a></p>
             <p className="route-estimate-note">{copy(locale, '學生價假設有效學生身分八達通，採用港鐵公布的學生起訖票價。其他公司未核實的學生優惠不作假設，暫採成人價。機場快綫不適用學生乘車優惠。', 'Student fares assume valid Student Octopus status and use published MTR student OD fares. Unverified student offers on other operators use adult fares. The Student Travel Scheme does not cover Airport Express.')} <a href={STUDENT_FARE_SOURCE} target="_blank" rel="noreferrer">{copy(locale, '學生乘車優惠', 'Student scheme')}</a></p>
+            </details>
           </> : <p className="map-instruction" role="status">{emptyHint}</p>}
         </section>
       </>}
     </div>
     <div className="map-pane">
-      <JourneyMap route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={onMapPick} locale={locale} preferences={preferences} />
+      <JourneyMap followPosition={navigationPosition} route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={navigating ? () => {} : onMapPick} locale={locale} preferences={preferences} />
       <button type="button" className="mobile-close-map" onClick={() => setShowMap(false)}><PlannerIcon name="back" size={17} />{copy(locale, '返回行程', 'Back to journeys')}</button>
     </div>
   </div></div></FareLabelContext.Provider></FareProfileContext.Provider>;

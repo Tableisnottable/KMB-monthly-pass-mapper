@@ -20,7 +20,7 @@ export function PaymentControl({ value, onChange, passes, onPasses, locale }: { 
       </button>)}
     </div>
   </details>
-  <details className="my-passes" ref={details} onToggle={event => { if (event.currentTarget.open) setPanelTop(Math.min(event.currentTarget.querySelector('summary')!.getBoundingClientRect().bottom + 8, window.innerHeight - 240)); }}><summary>{copy(locale, '我的月票／通行證', 'My passes')} ({passes.length})</summary><div className="payment-pass-panel" style={{ top: panelTop }}>
+  <details className="my-passes" ref={details} onToggle={event => { if (event.currentTarget.open) setPanelTop(Math.min(event.currentTarget.querySelector('summary')!.getBoundingClientRect().bottom + 8, window.innerHeight - 240)); }}><summary>{copy(locale, '月票', 'Passes')} ({passes.length})</summary><div className="payment-pass-panel" style={{ top: panelTop }}>
     <div className="payment-pass-heading"><h3>{copy(locale, '我擁有的月票及通行證', 'Passes I own')}</h3><button type="button" onClick={() => { if (details.current) details.current.open = false; }}>{copy(locale, '完成', 'Done')}</button></div>
     <label className="owned-kmb-pass"><input type="checkbox" checked={passes.some(pass => pass.id === 'kmb')} onChange={event => {
       if (event.target.checked) { onPasses([...passes, { id: 'kmb', name: 'KMB Monthly Pass' }]); onChange('kmb-pass'); }

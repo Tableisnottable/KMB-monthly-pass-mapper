@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findMultimodalJourneys, selectJourneyAlternatives, retimeConnections, setJourneyTimes } from '../../../engine/multimodalJourney';
+import { findMultimodalJourneys, selectJourneyAlternatives, retimeConnections, setJourneyTimes, nextJourneyConnection } from '../../../engine/multimodalJourney';
+import { selectJourneyDeparture } from '../../../domain/departureSelection';
+import { isNonOperatingDeparture } from '../../../domain/departureType';
 import { parseJourneyTime } from '../../../engine/journeyTime';
 import { scoreRoutes, type Route, type ScoredRoute } from '../../../engine/UpgradedScoringEngine';
 import { routeOnStreets } from '../../../data/routeGeometry';
@@ -19,17 +21,51 @@ import { joinViaJourney } from '../../../engine/viaJourney';
 
 export const dynamic = 'force-dynamic';
 
+/** Slow external feeds may finish later; they must never hold the route list open. */
+async function beforeDeadline<T>(promise: Promise<T>, deadline: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | number | undefined;
+  try {
+    return await Promise.race([promise.catch(() => undefined), new Promise<undefined>(resolve => {
+      timer = setTimeout(resolve, Math.max(0, deadline - Date.now()));
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
 export async function GET(request: NextRequest) {
+  if (request.nextUrl.searchParams.get('operation') === 'warm') return NextResponse.json({ ready: true });
   const ipAddress = request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const limiter = await getRateLimiter();
   if (limiter && !(await limiter.limit({ key: `journey:${ipAddress}` })).success) {
     return NextResponse.json({ error: 'Too many journey requests. Please try again shortly.' },
       { status: 429, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' } });
   }
+  if (request.nextUrl.searchParams.get('operation') === 'retime') return retimeJourney(request.nextUrl.searchParams);
   return planJourney(request.nextUrl.searchParams);
 }
 
-async function planJourney(params: URLSearchParams, now = new Date()): Promise<NextResponse> {
+function retimeJourney(params: URLSearchParams) {
+  try {
+    const route = JSON.parse(params.get('route') ?? 'null') as ScoredRoute;
+    const choice = JSON.parse(params.get('departure') ?? 'null');
+    const rawIndex = params.get('leg');
+    if (!rawIndex || !/^\d+$/.test(rawIndex) || !route?.legs?.length || route.legs.length > 256 || !choice?.time
+      || !route.departureTime || route.legs.some(leg => !Number.isFinite(leg.journeyTimeMinutes) || (leg.journeyTimeMinutes ?? -1) < 0)) throw new Error('Invalid journey.');
+    const change = parseChangeMinutes(params.get('changeMinutes'));
+    const result = selectJourneyDeparture(route, Number(rawIndex), choice, params.get('key') ?? '', (leg, ready) => {
+      const live = leg.liveDepartures?.filter(row => !isNonOperatingDeparture(row) && Date.parse(row.time) >= ready.getTime())
+        .sort((a, b) => Date.parse(a.time) - Date.parse(b.time))[0];
+      // Only extrapolate beyond the provider preview, never fill gaps inside it.
+      if (live) return { departure: live };
+      return nextJourneyConnection(leg, ready);
+    }, change);
+    if (!withinJourneyLimits(result, parseJourneyLimits(params.get('limits')))) throw new Error('Selected departure exceeds journey limits.');
+    if (params.get('timeMode') === 'arrive' && Date.parse(result.arrivalTime!) > parseJourneyTime('arrive', params.get('time'), new Date()).date.getTime()) throw new Error('Selected departure arrives after your deadline.');
+    const scored = scoreRoutes([result], weightingDate(new Date(result.departureTime!)), parseRouteWeights(params.get('weights')))[0];
+    return NextResponse.json({ data: scored }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Could not select departure.' }, { status: 400 }); }
+}
+
+async function planJourney(params: URLSearchParams, now = new Date(), responseDeadline = Date.now() + 7000): Promise<NextResponse> {
   const raw = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(key => params.get(key));
   const [fromLat, fromLon, toLat, toLon] = raw.map(Number);
   if (raw.some(v => !v?.trim()) || [fromLat, fromLon, toLat, toLon].some(v => !Number.isFinite(v)) ||
@@ -38,6 +74,7 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
   }
   const locale = params.get('lang') === 'en' ? 'en' : 'zh';
   const started = Date.now();
+  const preview = params.get('phase') === 'preview';
   let via;
   try { via = parseJourneyVias(params); }
   catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
@@ -57,20 +94,27 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
     weights = parseRouteWeights(params.get('weights')); preferences = parseRoutePreferences(params.get('preferences')); }
   catch (err) { return NextResponse.json({ error: (err as Error).message }, { status: 400 }); }
   const { mode, date } = selection;
-  if (via.length) return planViaJourney(params, via, date, now);
-  const walkingRoute = !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false'
+  if (via.length) return planViaJourney(params, via, date, now, responseDeadline);
+  const walkingRoute = !preview && !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false'
     && limits.walk !== 0 && withinRoutingArea(fromLat, fromLon) && withinRoutingArea(toLat, toLon)
     ? routeOnStreets([[fromLat, fromLon], [toLat, toLon]], 'foot', preferences) : undefined;
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', false, { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits });
+  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', preview, { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits, ...(preview ? { previewBudgetMs: 1500 } : {}) });
   const candidates: Route[] = selectJourneyAlternatives(result.routes.filter(route => (!requiredOperators?.length
     || requiredOperators.every(id => route.legs.some(leg => (leg.networkOperator ?? leg.operator).split('+').includes(id))))
     && (!requiredModes?.length || requiredModes.every(id => route.legs.some(leg => leg.mode === id)))), 64, preferences);
   // A current prediction says nothing about a trip on a selected future date.
-  if (mode === 'now') { await enrichJourneyArrivals(candidates, now); retimeConnections(candidates, now, minimumChangeMinutes); }
+  if (mode === 'now' && !preview) {
+    // Isolate mutation: a timed-out ETA request cannot change a returned journey.
+    const liveCandidates = structuredClone(candidates);
+    const enriched = await beforeDeadline(enrichJourneyArrivals(liveCandidates, now).then(() => liveCandidates), responseDeadline);
+    if (enriched) { candidates.splice(0, candidates.length, ...enriched); retimeConnections(candidates, now, minimumChangeMinutes); }
+    else for (const route of candidates) setJourneyTimes(route, date, mode);
+  }
   else for (const route of candidates) setJourneyTimes(route, date, mode);
   let scored: ScoredRoute[] = selectJourneyAlternatives(scoreRoutes(candidates.filter(r => withinJourneyLimits(r, limits) && !r.legs?.some(l => l.serviceEnded)
-    && (mode !== 'arrive' || new Date(r.arrivalTime!).getTime() <= date.getTime() + 1)), weightingDate(date), weights), 40, preferences);
-  const walking = walkingRoute ? travelOption('walk', await walkingRoute) : undefined;
+    && (mode !== 'arrive' || new Date(r.arrivalTime!).getTime() <= date.getTime() + 1)), weightingDate(date), weights), 64, preferences);
+  const walkingGeometry = walkingRoute ? await beforeDeadline(walkingRoute, responseDeadline) : undefined;
+  const walking = walkingGeometry ? travelOption('walk', walkingGeometry) : undefined;
   const walkMinutes = walking?.available ? walking.minutes : undefined;
   if (walkMinutes !== undefined) {
     const walk: Route = { id: 'walk-only', transferCount: 0, walkTransferTimeMinutes: 0,
@@ -84,6 +128,7 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
     if (withinJourneyLimits(walk, limits)) scored = [...scored, scoreRoutes([walk], weightingDate(date), weights)[0]].sort((a, b) => a.finalScore - b.finalScore);
   }
   return NextResponse.json({ data: scored, meta: {
+    phase: preview ? 'preview' : 'complete',
     source: 'Transport Department GTFS; MTR topology/fares; official KMB, Citybus and MTR arrivals',
     live: scored.some(r => r.legs.some(l => l.realtimeEta?.isLive)),
     timeMode: mode, requestedTime: date.toISOString(), timeZone: 'Asia/Hong_Kong', farePassenger: 'NORMAL_ADULT',
@@ -100,7 +145,7 @@ async function planJourney(params: URLSearchParams, now = new Date()): Promise<N
 }
 
 /** Plan stages in order (backwards for arrive-by), keeping a bounded beam rather than a recursive product. */
-async function planViaJourney(params: URLSearchParams, vias: ViaStop[], date: Date, now: Date): Promise<NextResponse> {
+async function planViaJourney(params: URLSearchParams, vias: ViaStop[], date: Date, now: Date, responseDeadline: number): Promise<NextResponse> {
   const started = Date.now(), mode = params.get('timeMode') ?? 'now', reverse = mode === 'arrive';
   const preferences = parseRoutePreferences(params.get('preferences'));
   const weights = parseRouteWeights(params.get('weights')), limits = parseJourneyLimits(params.get('limits'));
@@ -140,7 +185,7 @@ async function planViaJourney(params: URLSearchParams, vias: ViaStop[], date: Da
       query.set('fromLat', String(from.lat)); query.set('fromLon', String(from.lng));
       query.set('toLat', String(to.lat)); query.set('toLon', String(to.lng));
       query.set('timeMode', timeMode); query.set('time', anchor.toISOString());
-      const response = await planJourney(query, now);
+      const response = await planJourney(query, now, responseDeadline);
       if (!response.ok) throw new Error((await response.json()).error ?? 'Via journey unavailable.');
       return await response.json() as { data: ScoredRoute[]; meta: Record<string, unknown> };
     };
@@ -180,7 +225,7 @@ async function planViaJourney(params: URLSearchParams, vias: ViaStop[], date: Da
   if (!Object.keys(firstMeta).length) {
     const direct = new URLSearchParams(params);
     for (const key of ['viaLat', 'viaLon', 'viaName']) direct.delete(key);
-    const response = await planJourney(direct, now), payload = await response.json();
+    const response = await planJourney(direct, now, responseDeadline), payload = await response.json();
     return NextResponse.json({ ...payload, data: payload.data?.map((route: ScoredRoute) => ({ ...route, viaStops: vias.map(stop => ({ stop, legIndex: 0 })) })), meta: { ...payload.meta, vias } }, { status: response.status });
   }
   const allowed = beam.filter(route => withinJourneyLimits(route, limits) && routeRoadsAllowed(route, preferences)

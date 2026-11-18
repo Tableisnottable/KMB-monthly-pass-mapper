@@ -10,6 +10,21 @@ const lookup = (params: string) => GET(new NextRequest('http://localhost/api/net
 afterEach(() => { vi.mocked(enrichJourneyArrivals).mockReset(); vi.useRealTimers(); });
 
 describe('All-network catalogue', () => {
+  it('provides route directions, complete ordered stops and fares without endpoints', async () => {
+    const route = networkRoutes.find(row => row[2] === '74X')!;
+    const response = await lookup('resource=route-map&route=' + encodeURIComponent(route[0]));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.route.number).toBe('74X');
+    expect(data.patterns.length).toBeGreaterThan(1);
+    for (const pattern of data.patterns) {
+      const source = networkPatterns[pattern.index];
+      expect(pattern.stops.map((stop: { id: string }) => stop.id)).toEqual(source.s.map(index => networkStops[index][0]));
+      expect(pattern.stops[0].lat).toBeGreaterThan(22);
+      expect(['PUBLISHED', 'FULL_FARE', 'UNAVAILABLE']).toContain(pattern.stops[0].fareStatus);
+    }
+    expect((await lookup('resource=route-map&route=missing')).status).toBe(404);
+  });
   it('reports the actual snapshot coverage', async () => {
     const response = await lookup('resource=coverage');
     const data = await response.json();

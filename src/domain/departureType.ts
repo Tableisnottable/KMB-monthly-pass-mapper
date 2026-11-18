@@ -1,4 +1,4 @@
-export type DepartureType = 'LIVE' | 'SCHEDULED' | 'ADDITIONAL' | 'CHANGED' | 'CANCELLED';
+export type DepartureType = 'LIVE' | 'SCHEDULED' | 'ADDITIONAL' | 'CHANGED' | 'CANCELLED' | 'MISSED';
 export type DepartureTimingType = 'LIVE' | 'SCHEDULED';
 export interface TimetableComparison {
   timetableTime?: string;
@@ -23,8 +23,11 @@ export const providerMarksScheduled = (remark = '') => /(?:\bscheduled\s+(?:bus|
 export const providerMarksChanged = (remark = '') => /(?:\brescheduled\b|\brevised\s+(?:timetable|departure|service)\b|班次調整|調整班次|更改班次)/i.test(remark);
 export const providerMarksCancelled = (remark = '') => /(?:\bcancell?ed\b|班次取消|取消班次|已取消|暫停服務|暂停服务)/i.test(remark);
 
+export const providerMarksMissed = (remark = '') => /(?:脫班|脱班|\bmissed\s+(?:trip|departure|service)\b|\btrip\s+not\s+operated\b)/i.test(remark);
+export const isNonOperatingDeparture = (departure: DepartureEvidence) => departure.departureType === 'CANCELLED' || departure.departureType === 'MISSED' || providerMarksCancelled(departure.remark) || providerMarksMissed(departure.remark);
+
 export function departureTimingType(departure: DepartureEvidence): DepartureTimingType | undefined {
-  if (departure.departureType === 'CANCELLED' || providerMarksCancelled(departure.remark)) return undefined;
+  if (isNonOperatingDeparture(departure)) return undefined;
   if (departure.timingType) return departure.timingType;
   if (providerMarksScheduled(departure.remark) || departure.departureType === 'SCHEDULED' || departure.status === 'TIMETABLE') return 'SCHEDULED';
   if (departure.status === 'UNVERIFIED' || departure.status === 'NO_UPCOMING') return undefined;
@@ -34,6 +37,7 @@ export function departureTimingType(departure: DepartureEvidence): DepartureTimi
 /** A provider's scheduled bus is not a vehicle-tracked ETA, even in an ETA feed. */
 export function departureType(departure: DepartureEvidence): DepartureType | undefined {
   if (departure.departureType === 'CANCELLED' || providerMarksCancelled(departure.remark)) return 'CANCELLED';
+  if (departure.departureType === 'MISSED' || providerMarksMissed(departure.remark)) return 'MISSED';
   if (departure.addedReason === 'PROVIDER' || providerMarksAdditional(departure.remark)) return 'ADDITIONAL';
   if (departure.departureType === 'CHANGED' || departure.changedReason || providerMarksChanged(departure.remark)) return 'CHANGED';
   if (departure.scheduleMatch === 'ADDED' || departure.departureType === 'ADDITIONAL') return 'ADDITIONAL';
