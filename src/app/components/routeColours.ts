@@ -30,7 +30,7 @@ const otherModes: Readonly<Record<string, string>> = {
 };
 
 export function routeSignColours(operator: string, routeNumber = ''): RouteSignColours {
-  const members = operator.split('+'), primary = companyPalette[members[0]], secondary = companyPalette[members[1]];
+  const members = operator.split('+').map(member => member.trim().toUpperCase()).filter(Boolean), primary = companyPalette[members[0]], secondary = companyPalette[members[1]];
   if (primary) return { background: primary[0], foreground: primary[1], line: primary[0],
     convention: operator + ' company display colours', verified: true,
     lineColours: Array.from(new Set(members.flatMap(member => companyPalette[member] ? [companyPalette[member][0]] : []))),
@@ -55,8 +55,8 @@ export function routeLineColours(operator: string, routeNumber = ''): string[] {
 /** Draw stripes on the same physical path, preserving every company and accent. */
 export function routeLineStyles(operator: string, routeNumber = '') {
   const colours = routeLineColours(operator, routeNumber);
-  return colours.map((color, index) => ({ color, weight: 5, lineCap: index ? 'butt' as const : 'round' as const,
-    ...(index ? { dashArray: `12 ${12 * (colours.length - 1)}`, dashOffset: String(-12 * index) } : {}),
+  return colours.map((color, index) => ({ color, weight: 7, lineCap: index ? 'butt' as const : 'round' as const,
+    ...(index ? { dashArray: `14 ${14 * (colours.length - 1)}`, dashOffset: String(-14 * index) } : {}),
   }));
 }
 
@@ -71,8 +71,12 @@ export function routeBadgeStyle(operator: string, routeNumber = '') {
   return {
     backgroundColor: colours.background,
     color: colours.foreground,
-    ...(bands.length > 1 ? { backgroundImage: `linear-gradient(90deg, ${bands.map((colour, index) => `${colour} ${index * 100 / bands.length}% ${(index + 1) * 100 / bands.length}%`).join(', ')})`,
-      backgroundSize: '100% 8px', backgroundPosition: 'bottom', backgroundRepeat: 'no-repeat', paddingBottom: '7px' } : {}),
+    ...(bands.length > 1 ? {
+      // A full-height split keeps both operators visible on compact route cards.
+      backgroundImage: `linear-gradient(135deg, ${bands.map((colour, index) => `${colour} ${index * 100 / bands.length}% ${(index + 1) * 100 / bands.length}%`).join(', ')})`,
+      backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+      textShadow: '0 1px 2px #17212bcc, 0 0 2px #17212bcc',
+    } : {}),
     '--route-icon-background': colours.iconBackground ?? colours.background,
     '--route-icon-colour': colours.iconForeground ?? colours.foreground,
     ...(colours.iconAccent ? { '--route-icon-accent': colours.iconAccent } : {}),
