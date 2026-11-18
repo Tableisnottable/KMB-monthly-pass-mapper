@@ -15,6 +15,8 @@ export interface LiveDeparture extends TimetableComparison {
   addedReason?: AddedReason;
   changedReason?: 'PROVIDER' | 'OBSERVED_SPACING' | 'POSSIBLE_SHIFT';
   timetableEstimate?: boolean;
+  /** Calculated published timetable slot whose scheduled time has passed. */
+  pastSchedule?: boolean;
 }
 export interface CancellationNotice {
   departureType: 'CANCELLED' | 'MISSED';
@@ -80,25 +82,30 @@ export function nextPublishedDeparture(patternIndex: number, boardingIndex: numb
   return result;
 }
 
-/** A bounded three-hour preview; headway-derived times remain explicit estimates. */
-export function upcomingPublishedDepartures(patternIndex: number, boardingIndex: number, now: Date): LiveDeparture[] {
-  const start = now.getTime(), end = start + 180 * 60000, times = new Map<number, LiveDeparture>();
+/** Calculate published slots around the current clock; frequency rows remain explicit estimates. */
+export function publishedDeparturesAround(patternIndex: number, boardingIndex: number, now: Date, pastMinutes = 0, futureMinutes = 180): LiveDeparture[] {
+  const anchor = now.getTime(), start = anchor - pastMinutes * 60000, end = anchor + futureMinutes * 60000, times = new Map<number, LiveDeparture>();
   for (const shift of [-1, 0, 1]) {
-    const date = hongKongServiceDate(new Date(start + shift * 86400000));
+    const date = hongKongServiceDate(new Date(anchor + shift * 86400000));
     for (const entry of patternTimetable(patternIndex, date, boardingIndex)) {
       const first = Date.parse(entry.start), step = entry.headwayMinutes * 60000;
       const last = step ? Math.min(end, Date.parse(entry.end) - 1) : first;
       let time = step ? first + Math.max(0, Math.ceil((start - first) / step)) * step : first;
       for (; time <= last && time <= end; time += step) {
-        if (time >= start) times.set(time, { time: new Date(time).toISOString(), minutes: Math.ceil((time - start) / 60000),
+        if (time >= start) times.set(time, { time: new Date(time).toISOString(), minutes: Math.ceil((time - now.getTime()) / 60000),
           departureType: 'SCHEDULED', timingType: 'SCHEDULED', scheduleMatch: 'MATCHED', timetableEstimate: true,
-          timetableTime: new Date(time).toISOString(), deviationMinutes: 0,
+          pastSchedule: time < now.getTime(), timetableTime: new Date(time).toISOString(), deviationMinutes: 0,
           comparisonBasis: entry.estimatedStopTime ? 'INTERPOLATED' : step ? 'FREQUENCY' : 'FIXED' });
         if (!step) break;
       }
     }
   }
-  return Array.from(times.values()).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)).slice(0, 200);
+  return Array.from(times.values()).sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+}
+
+/** A bounded three-hour preview; headway-derived times remain explicit estimates. */
+export function upcomingPublishedDepartures(patternIndex: number, boardingIndex: number, now: Date): LiveDeparture[] {
+  return publishedDeparturesAround(patternIndex, boardingIndex, now).slice(0, 200);
 }
 
 const routePatterns = new Map<number, number[]>();

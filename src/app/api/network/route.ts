@@ -6,7 +6,7 @@ import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
 import { operatorInfo, transportOperators } from '../../../data/transportOperators';
-import { hongKongServiceDate, nextPublishedDeparture, routeTimetable, upcomingPublishedDepartures } from '../../../data/networkTimetable';
+import { hongKongServiceDate, nextPublishedDeparture, publishedDeparturesAround, routeTimetable, upcomingPublishedDepartures } from '../../../data/networkTimetable';
 import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
 import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
 import { departureTimingType, departureType } from '../../../domain/departureType';
@@ -95,13 +95,17 @@ export async function GET(request: NextRequest) {
   if (resource !== 'departures') return NextResponse.json({ error: 'resource must be coverage, operators, routes, stops, timetable, residents or departures.' }, { status: 400 });
   const stop = p.get('stop'), stopIndex = networkStops.findIndex(s => s[0] === stop);
   if (stopIndex < 0) return NextResponse.json({ error: 'Unknown transport stop.' }, { status: 400 });
+  const includeHistory = p.get('history') === 'true';
+  if (includeHistory && !p.get('route')) return NextResponse.json({ error: 'A route is required to look up past timetable shifts.' }, { status: 400 });
   const now = new Date(), locale = p.get('lang') === 'en' ? 'en' : 'zh';
+  const terminalLookup = includeHistory && p.get('terminal') === 'true';
   const candidates: Route[] = [];
   networkPatterns.forEach((pattern, index) => {
     const r = networkRoutes[pattern.r], rail = r[5] === 'SUBWAY' || r[5] === 'LIGHT_RAIL';
-    if (p.get('pattern') && pattern.id !== p.get('pattern') || p.get('route') && r[0] !== p.get('route')) return;
+    if ((!terminalLookup && p.get('pattern') && pattern.id !== p.get('pattern')) || (p.get('route') && r[0] !== p.get('route'))) return;
+    if (terminalLookup && pattern.s[0] !== stopIndex) return;
     pattern.s.forEach((s, position) => {
-      if (s !== stopIndex || pattern.p[position] !== 0 || position === pattern.s.length - 1) return;
+      if (s !== stopIndex || (terminalLookup && position !== 0) || pattern.p[position] !== 0 || position === pattern.s.length - 1) return;
       if (p.get('board') !== null && position !== Number(p.get('board'))) return;
       const next = rail ? undefined : nextPublishedDeparture(index, position, now);
       const dest = pattern.s.length - 1;
@@ -116,10 +120,12 @@ export async function GET(request: NextRequest) {
       }] });
     });
   });
-  const unique = candidates.sort((a, b) => (a.legs![0].scheduledDepartureMinutes ?? Infinity) - (b.legs![0].scheduledDepartureMinutes ?? Infinity)).filter((r, i, all) => all.findIndex(other =>
-    networkPatterns[other.legs![0].networkPattern!].r === networkPatterns[r.legs![0].networkPattern!].r
-    && other.legs![0].destinationStop!.id === r.legs![0].destinationStop!.id) === i);
-  await enrichJourneyArrivals(unique, now);
+  const unique = candidates.sort((a, b) => (a.legs![0].scheduledDepartureMinutes ?? Infinity) - (b.legs![0].scheduledDepartureMinutes ?? Infinity)).filter((r, i, all) => all.findIndex(other => {
+    const left = other.legs![0], right = r.legs![0];
+    return includeHistory ? left.networkPattern === right.networkPattern && left.boardingIndex === right.boardingIndex
+      : networkPatterns[left.networkPattern!].r === networkPatterns[right.networkPattern!].r && left.destinationStop!.id === right.destinationStop!.id;
+  }) === i);
+  if (!includeHistory) await enrichJourneyArrivals(unique, now);
   return NextResponse.json({ data: unique.flatMap(r => {
     const leg = r.legs![0];
     const pattern = networkPatterns[leg.networkPattern!], route = networkRoutes[pattern.r];
@@ -135,9 +141,15 @@ export async function GET(request: NextRequest) {
     const previewEnd = Math.max(now.getTime() - 1, ...observed.flatMap(row => [Date.parse(row.time),
       ...(departureType(row) === 'CHANGED' && row.timetableTime ? [Date.parse(row.timetableTime)] : [])]).filter(Number.isFinite));
     const cancelled = new Set((leg.departureNotices ?? []).flatMap(row => row.time ? [Date.parse(row.time)] : []));
-    const estimates = leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? []
+    const observedTimes = new Set(observed.map(row => Date.parse(row.time)).filter(Number.isFinite));
+    const historical = includeHistory && leg.mode !== 'SUBWAY' && leg.mode !== 'LIGHT_RAIL'
+      ? publishedDeparturesAround(leg.networkPattern!, leg.boardingIndex ?? 0, now, 24 * 60, 0)
+        .filter(row => row.pastSchedule && !observedTimes.has(Date.parse(row.time)) && !cancelled.has(Date.parse(row.time)))
+      : [];
+    const upcoming = includeHistory || leg.mode === 'SUBWAY' || leg.mode === 'LIGHT_RAIL' ? []
       : upcomingPublishedDepartures(leg.networkPattern!, leg.boardingIndex ?? 0, now)
         .filter(row => Date.parse(row.time) > previewEnd && !cancelled.has(Date.parse(row.time)));
+    const estimates = [...historical, ...upcoming];
     const departures = [...observed, ...estimates].map((departure, index) => ({ ...base, ...departure,
       company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
       id: `${r.id}:${departure.timetableEstimate ? 'estimate' : 'live'}:${index}`, departureType: departureType(departure), timingType: departureTimingType(departure), status: departureTimingType(departure) === 'SCHEDULED' ? 'TIMETABLE' : 'LIVE' }));

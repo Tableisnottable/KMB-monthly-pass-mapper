@@ -54,7 +54,35 @@ describe('All-network catalogue', () => {
   });
   it('rejects unknown stops and resources', async () => {
     expect((await lookup('resource=departures&stop=unknown')).status).toBe(400);
+    expect((await lookup('resource=departures&stop=mtr%3A18&history=true')).status).toBe(400);
     expect((await lookup('resource=unknown')).status).toBe(400);
+  });
+  it('returns calculated timetable shifts that departed during the previous 24 hours', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T10:25:00+08:00'));
+    const pattern = networkPatterns.find(item => networkRoutes[item.r][1] === 'KMB' && item.s.length > 2 && item.p[0] === 0 && item.w.length > 0)!;
+    const saved = pattern.w;
+    pattern.w = [[127, 600, 640, 10, 20]];
+    try {
+      const params = new URLSearchParams({ resource: 'departures', stop: networkStops[pattern.s[0]][0], route: networkRoutes[pattern.r][0], pattern: pattern.id, board: '0', history: 'true' });
+      const payload = await (await lookup(params.toString())).json();
+      const departed = payload.data.filter((row: { pastSchedule?: boolean }) => row.pastSchedule);
+      expect(departed.map((row: { time: string }) => row.time)).toEqual(['2026-11-12T02:30:00.000Z', '2026-11-13T02:00:00.000Z', '2026-11-13T02:10:00.000Z', '2026-11-13T02:20:00.000Z']);
+      expect(departed.every((row: { timetableEstimate?: boolean; status: string }) => row.timetableEstimate && row.status === 'TIMETABLE')).toBe(true);
+      expect(payload.data.every((row: { pastSchedule?: boolean }) => row.pastSchedule)).toBe(true);
+    } finally { pattern.w = saved; }
+  });
+  it('finds departures leaving from the opposite direction at a route terminal', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T10:25:00+08:00'));
+    const pattern = networkPatterns.find(item => networkRoutes[item.r][1] === 'KMB' && item.s.length === 3 && item.w.length > 0)!;
+    const terminal = pattern.s.at(-1)!;
+    const reverse = { ...pattern, id: 'test-terminal-reverse', s: [...pattern.s].reverse(), t: [0, 10, 20], p: [0, 0, 0], a: [0, 0, 0], w: [[127, 600, 640, 10, 20]] };
+    networkPatterns.push(reverse);
+    try {
+      const params = new URLSearchParams({ resource: 'departures', stop: networkStops[terminal][0], route: networkRoutes[pattern.r][0], history: 'true', terminal: 'true' });
+      const { data } = await (await lookup(params.toString())).json();
+      expect(data.some((row: { patternId: string; pastSchedule?: boolean }) => row.patternId === reverse.id && row.pastSchedule)).toBe(true);
+      expect(data.every((row: { patternId: string }) => row.patternId === reverse.id || networkPatterns.find(candidate => candidate.id === row.patternId)?.s[0] === terminal)).toBe(true);
+    } finally { networkPatterns.pop(); }
   });
   it('returns exactly the requested native stop interval, rejecting invalid boundaries', async () => {
     const pattern = networkPatterns.find(pattern => pattern.s.length >= 5)!;

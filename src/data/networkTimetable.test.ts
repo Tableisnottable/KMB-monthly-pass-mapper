@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { networkPatterns, networkRoutes, networkStops, serviceCalendarStatus, type NetworkPattern } from './transportNetwork';
 import { exceptions } from './transport/snapshot';
-import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, routeTimetable, upcomingPublishedDepartures } from './networkTimetable';
+import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, publishedDeparturesAround, routeTimetable, upcomingPublishedDepartures } from './networkTimetable';
 import { operatorInfo, transportOperators } from './transportOperators';
 
 const day = '2026-11-13';
@@ -47,6 +47,19 @@ describe('Published service timetables', () => {
     expect(rows.at(-1)?.minutes).toBe(180);
     expect(rows.every(row => row.timetableEstimate && row.departureType === 'SCHEDULED' && row.timingType === 'SCHEDULED')).toBe(true);
     expect(rows[0].comparisonBasis).toBe('FREQUENCY');
+  });
+  it('calculates departed and upcoming timetable slots around the current clock', () => {
+    networkPatterns[index].w = [[127, 600, 660, 15, 20]];
+    const rows = publishedDeparturesAround(index, 0, new Date(day + 'T10:30:00+08:00'), 60, 180);
+    expect(rows.map(row => row.minutes)).toEqual([-30, -15, 0, 15]);
+    expect(rows.filter(row => row.pastSchedule).map(row => row.minutes)).toEqual([-30, -15]);
+    expect(rows.filter(row => !row.pastSchedule).every(row => row.minutes >= 0)).toBe(true);
+  });
+  it('calculates overnight departed slots from the previous service date', () => {
+    networkPatterns[index].w = [[127, 1530, 1590, 20, 20]];
+    const rows = publishedDeparturesAround(index, 0, new Date(day + 'T02:15:00+08:00'), 60, 0);
+    expect(rows.map(row => row.time)).toEqual(['2026-11-12T17:30:00.000Z', '2026-11-12T17:50:00.000Z', '2026-11-12T18:10:00.000Z']);
+    expect(rows.every(row => row.pastSchedule)).toBe(true);
   });
   it('deduplicates overlapping windows and respects exclusive ends in the preview', () => {
     networkPatterns[index].w = [[127, 600, 660, 15, 20], [127, 630, 660, 15, 20]];
