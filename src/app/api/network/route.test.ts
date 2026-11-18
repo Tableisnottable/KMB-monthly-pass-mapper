@@ -130,6 +130,45 @@ describe('All-network catalogue', () => {
     const cancelled = data.find((row: { departureType: string }) => row.departureType === 'CANCELLED');
     expect(cancelled).toMatchObject({ time: null, minutes: null, status: 'UNVERIFIED' });
   });
+  it('lists all N241 trips in the selected direction, including estimated arrivals at the final stop', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T23:55:00+08:00'));
+    const route = '1437', pattern = 'td:569', date = '2026-11-14';
+    const first = { route, pattern, stop: '4175', position: '0' };
+    const stopCount = networkPatterns.find(row => row.id === pattern)!.s.length;
+    const last = { route, pattern, stop: '9440', position: String(stopCount - 1) };
+    const timetable = async (stop: typeof first) =>
+      (await lookup(new URLSearchParams({ resource: 'timetable', date, ...stop }).toString())).json();
+    const origin = await timetable(first), terminal = await timetable(last);
+    expect(origin.route[2]).toBe('N241');
+    expect(origin.slots).toHaveLength(11);
+    expect(origin.slots[0]).toEqual({ time: '2026-11-13T16:30:00.000Z', comparisonBasis: 'FREQUENCY' });
+    expect(origin.slots.at(-1).time).toBe('2026-11-13T21:30:00.000Z');
+    expect(terminal.slots).toEqual(origin.slots.map((row: { time: string }) => ({
+      time: new Date(Date.parse(row.time) + 84 * 60000).toISOString(), comparisonBasis: 'INTERPOLATED',
+    })));
+
+    const params = new URLSearchParams({ resource: 'departures', scope: 'route-stop', route, pattern, stop: last.stop, board: last.position });
+    const { data } = await (await lookup(params.toString())).json();
+    expect(data.map((row: { time: string }) => row.time)).toEqual(terminal.slots.map((row: { time: string }) => row.time));
+    expect(data[0]).toMatchObject({ minutes: 119, patternId: pattern, status: 'TIMETABLE', timetableEstimate: true });
+    expect(enrichJourneyArrivals).not.toHaveBeenCalled();
+    params.set('scope', 'stop');
+    expect((await (await lookup(params.toString())).json()).data).toEqual([]);
+    params.set('scope', 'route-stop'); params.set('pattern', 'td:570');
+    expect((await lookup(params.toString())).status).toBe(400);
+
+    params.set('pattern', pattern); params.set('stop', first.stop); params.set('board', '0');
+    const upcoming = await (await lookup(params.toString())).json();
+    expect(upcoming.data.map((row: { time: string }) => row.time)).toEqual(origin.slots.map((row: { time: string }) => row.time));
+    expect(enrichJourneyArrivals).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(new Date('2026-11-14T08:00:00+08:00'));
+    params.set('stop', last.stop); params.set('board', last.position); params.set('history', 'true');
+    const history = await (await lookup(params.toString())).json();
+    expect(history.data).toHaveLength(11);
+    expect(history.data.every((row: { pastSchedule: boolean; timetableEstimate: boolean }) => row.pastSchedule && row.timetableEstimate)).toBe(true);
+    expect(enrichJourneyArrivals).toHaveBeenCalledTimes(1);
+  });
   it('publishes source-provided company names and actual timetable coverage', async () => {
     const { data } = await (await lookup('resource=operators')).json();
     expect(data).toHaveLength(17);

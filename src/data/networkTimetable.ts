@@ -49,9 +49,10 @@ export function hongKongServiceDate(date = new Date()): string {
 }
 
 /** Publish original headway windows; they are not exact departure slots. */
-export function patternTimetable(patternIndex: number, serviceDate: string, boardingIndex = 0): TimetableEntry[] {
+export function patternTimetable(patternIndex: number, serviceDate: string, boardingIndex = 0, everyStop = false): TimetableEntry[] {
   const day = parseServiceDate(serviceDate), pattern = networkPatterns[patternIndex];
-  if (!pattern || !Number.isInteger(boardingIndex) || boardingIndex < 0 || boardingIndex >= pattern.s.length - 1 || pattern.p[boardingIndex] !== 0) return [];
+  if (!pattern || !Number.isInteger(boardingIndex) || boardingIndex < 0 || boardingIndex >= pattern.s.length
+    || (!everyStop && (boardingIndex === pattern.s.length - 1 || pattern.p[boardingIndex] !== 0))) return [];
   const total = pattern.t[pattern.t.length - 1];
   return pattern.w.flatMap(([service, start, end, headway, duration], index) => {
     const calendar = serviceCalendarStatus(service, day);
@@ -82,25 +83,32 @@ export function nextPublishedDeparture(patternIndex: number, boardingIndex: numb
   return result;
 }
 
-/** Calculate published slots around the current clock; frequency rows remain explicit estimates. */
-export function publishedDeparturesAround(patternIndex: number, boardingIndex: number, now: Date, pastMinutes = 0, futureMinutes = 180): LiveDeparture[] {
-  const anchor = now.getTime(), start = anchor - pastMinutes * 60000, end = anchor + futureMinutes * 60000, times = new Map<number, LiveDeparture>();
-  for (const shift of [-1, 0, 1]) {
-    const date = hongKongServiceDate(new Date(anchor + shift * 86400000));
-    for (const entry of patternTimetable(patternIndex, date, boardingIndex)) {
-      const first = Date.parse(entry.start), step = entry.headwayMinutes * 60000;
-      const last = step ? Math.min(end, Date.parse(entry.end) - 1) : first;
-      let time = step ? first + Math.max(0, Math.ceil((start - first) / step)) * step : first;
-      for (; time <= last && time <= end; time += step) {
-        if (time >= start) times.set(time, { time: new Date(time).toISOString(), minutes: Math.ceil((time - now.getTime()) / 60000),
-          departureType: 'SCHEDULED', timingType: 'SCHEDULED', scheduleMatch: 'MATCHED', timetableEstimate: true,
-          pastSchedule: time < now.getTime(), timetableTime: new Date(time).toISOString(), deviationMinutes: 0,
-          comparisonBasis: entry.estimatedStopTime ? 'INTERPOLATED' : step ? 'FREQUENCY' : 'FIXED' });
-        if (!step) break;
-      }
+/** Expand headways into individual estimates. The published end is exclusive. */
+export function publishedTimetableSlots(entries: TimetableEntry[], start = -Infinity, end = Infinity) {
+  const times = new Map<number, { time: string; comparisonBasis: NonNullable<LiveDeparture['comparisonBasis']> }>();
+  for (const entry of entries) {
+    const first = Date.parse(entry.start), step = entry.headwayMinutes * 60000;
+    const last = step > 0 ? Math.min(end, Date.parse(entry.end) - 1) : Math.min(end, first);
+    let time = step > 0 ? first + Math.max(0, Math.ceil((start - first) / step)) * step : first;
+    for (; time <= last; time += step) {
+      if (time >= start) times.set(time, { time: new Date(time).toISOString(),
+        comparisonBasis: entry.estimatedStopTime ? 'INTERPOLATED' : step > 0 ? 'FREQUENCY' : 'FIXED' });
+      if (step <= 0) break;
     }
   }
   return Array.from(times.values()).sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+}
+
+/** Infinity includes every remaining slot through tomorrow's service day. */
+export function publishedDeparturesAround(patternIndex: number, boardingIndex: number, now: Date, pastMinutes = 0, futureMinutes = 180, everyStop = false): LiveDeparture[] {
+  const anchor = now.getTime(), start = anchor - pastMinutes * 60000, end = anchor + futureMinutes * 60000;
+  const shifts = pastMinutes > 0 ? [-2, -1, 0, 1] : [-1, 0, 1];
+  const entries = shifts.flatMap(shift => patternTimetable(patternIndex, hongKongServiceDate(new Date(anchor + shift * 86400000)), boardingIndex, everyStop));
+  return publishedTimetableSlots(entries, start, end).map(slot => ({ ...slot,
+    minutes: Math.ceil((Date.parse(slot.time) - anchor) / 60000),
+    departureType: 'SCHEDULED', timingType: 'SCHEDULED', scheduleMatch: 'MATCHED', timetableEstimate: true,
+    pastSchedule: Date.parse(slot.time) < anchor, timetableTime: slot.time, deviationMinutes: 0,
+  }));
 }
 
 /** A bounded three-hour preview; headway-derived times remain explicit estimates. */
@@ -208,8 +216,8 @@ export function classifyDepartureTypes(patternIndex: number, boarding: number, d
   return classified;
 }
 
-export function routeTimetable(routeId: string, serviceDate: string, patternId?: string, stopId?: string) {
-  parseServiceDate(serviceDate);
+export function routeTimetable(routeId: string, serviceDate: string, patternId?: string, stopId?: string, position?: number) {
+  const day = parseServiceDate(serviceDate);
   const routeIndex = networkRoutes.findIndex(route => route[0] === routeId);
   if (routeIndex < 0) throw new Error('Unknown route.');
   const variants = (routePatterns.get(routeIndex) ?? []).map(index => {
@@ -222,9 +230,10 @@ export function routeTimetable(routeId: string, serviceDate: string, patternId?:
   const selected = patternId ? variants.find(variant => variant.id === patternId) : variants[0];
   if (!selected) throw new Error('Unknown route direction or variant.');
   const index = networkPatterns.findIndex(pattern => pattern.id === selected.id), pattern = networkPatterns[index];
-  const boarding = stopId ? pattern.s.findIndex(stop => networkStops[stop][0] === stopId) : 0;
-  if (boarding < 0 || boarding >= pattern.s.length - 1 || pattern.p[boarding] !== 0) throw new Error('Choose a boarding stop on this variant.');
+  const boarding = position ?? (stopId ? selected.stops.findIndex(stop => stop.id === stopId) : 0);
+  if (!Number.isInteger(boarding) || !selected.stops[boarding] || (stopId && selected.stops[boarding].id !== stopId)) throw new Error('Choose a stop on this variant.');
+  const entries = patternTimetable(index, serviceDate, boarding, true);
   return { route: networkRoutes[routeIndex], serviceDate, variants, selectedPattern: selected.id, boardingIndex: boarding,
-    calendarCovered: pattern.w.some(window => serviceCalendarStatus(window[0], parseServiceDate(serviceDate)).covered),
-    timetablePublished: pattern.w.length > 0, entries: patternTimetable(index, serviceDate, boarding) };
+    calendarCovered: pattern.w.some(window => serviceCalendarStatus(window[0], day).covered),
+    timetablePublished: pattern.w.length > 0, entries };
 }

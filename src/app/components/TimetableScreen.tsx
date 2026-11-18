@@ -10,10 +10,12 @@ export function TimetableScreen() {
   const english = value('lang') === 'en';
   return <main className="timetables-page" lang={english ? 'en' : 'zh-HK'}>
     <header><a href={english ? '/en' : '/'}>← {english ? 'Back to planner' : '返回行程規劃'}</a>
-      <a href={'/timetables?' + new URLSearchParams({ lang: english ? 'zh' : 'en', route: value('route'), pattern: value('pattern'), stop: value('stop'), operator: value('operator') })}>{english ? '繁體中文' : 'English'}</a></header>
+      <a href={'/timetables?' + new URLSearchParams({ lang: english ? 'zh' : 'en', route: value('route'), pattern: value('pattern'), stop: value('stop'), operator: value('operator'),
+        ...(value('position') ? { position: value('position') } : {}) })}>{english ? '繁體中文' : 'English'}</a></header>
     <h1>{english ? 'Companies & timetables' : '營辦商及班次時間表'}</h1>
     <p>{english ? 'Government transport data · full published departures and headways · Hong Kong time' : '政府交通資料 · 全部已公布班次及班距 · 香港時間'}</p>
     {query === null ? <p role="status">正在載入時間表… Loading timetables…</p>
-      : <TimetableBrowser locale={english ? 'en' : 'zh'} initialRoute={value('route')} initialPattern={value('pattern')} initialStop={value('stop')} initialCompany={value('operator')} />}
+      : <TimetableBrowser locale={english ? 'en' : 'zh'} initialRoute={value('route')} initialPattern={value('pattern')} initialStop={value('stop')}
+        initialPosition={value('position')} initialCompany={value('operator')} />}
   </main>;
 }
