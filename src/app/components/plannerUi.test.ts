@@ -117,8 +117,9 @@ describe('Bus display colours', () => {
     const layers = routeLineStyles('KMB+CTB', '914');
     expect(layers).toHaveLength(2); expect(layers[0].dashArray).toBeUndefined();
     expect(layers.slice(1).map(layer => [layer.color, layer.dashArray, layer.dashOffset])).toEqual([
-      ['#f7b500', '12 12', '-12'],
+      ['#f7b500', '14 14', '-14'],
     ]);
+    expect(routeLineColours(' KMB + ctb ', '914')).toEqual(['#e62232', '#f7b500']);
   });
   it('has readable number and icon colours for every imported bus operator', () => {
     const luminance = (hex: string) => hex.slice(1).match(/../g)!.map(part => parseInt(part, 16) / 255)
