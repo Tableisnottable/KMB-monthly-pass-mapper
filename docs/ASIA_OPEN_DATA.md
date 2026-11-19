@@ -15,8 +15,10 @@ complete timetables, real-time arrivals or flights are available.
 - Each user request is limited to a small area, about 670 m north to south. Move
   the map and choose **Load this area** to browse elsewhere. The dashed rectangle
   shows the loaded area, not the complete city or country.
-- The proxy streams the public extract; parsing runs on the device, keeping
-  Cloudflare Worker CPU low. Public extracts are cached for a day. No five-second
+- The browser loads the public CORS extract directly, without credentials, and
+  parses it on the device. A streaming proxy is a fallback; public hosting
+  egress can be unavailable even when the direct endpoint works. Local extracts
+  are cached for a day. No five-second
   polling, bulk country downloads or missing-path straight lines are used.
 - Missing geometry stays missing. The road list excludes indoor footways,
   station stairs, private parking aisles and other non-road features.

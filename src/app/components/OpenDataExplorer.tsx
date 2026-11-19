@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import { regions } from '../../domain/regions';
-import { parseOpenMap, type OpenMapArea, type OpenMapLine, type MapPoint, type MapBounds } from '../../domain/openMap';
+import type { OpenMapArea, OpenMapLine, MapPoint } from '../../domain/openMap';
+import { loadOpenMapArea } from '../../browser/openMapClient';
 import { RegionSwitcher } from './RegionSwitcher';
 import { PaymentControl } from './PaymentControl';
 import { readPaymentPreferences, type OwnedPass, type PaymentChoice } from '../../domain/payment';
@@ -80,13 +81,7 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
             if (snapshot.ok) { const saved = await snapshot.json(); if (saved?.roads && saved?.stops) { if (active) setData(saved); return; } }
           }
         }
-        const response = await fetch('/api/open-map?' + new URLSearchParams({ region: regionId, lat: String(center[0]), lon: String(center[1]) }), { signal: controller.signal });
-        if (!response.ok) throw new Error('Unavailable');
-        const raw = await response.json();
-        const bounds = response.headers.get('X-Open-Map-Bounds')?.split(',').map(Number) as MapBounds | undefined;
-        if (!Array.isArray(raw.elements) || bounds?.length !== 4 || bounds.some(n => !Number.isFinite(n))) throw new Error('Invalid map extract');
-        const [s, w, n, e] = bounds;
-        const next = parseOpenMap(raw.elements, bounds, `https://api.openstreetmap.org/api/0.6/map.json?bbox=${w},${s},${e},${n}`);
+        const next = await loadOpenMapArea(regionId, center, controller.signal);
         if (active) {
           setData(next);
           try {

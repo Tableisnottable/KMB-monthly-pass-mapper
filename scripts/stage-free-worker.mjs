@@ -24,7 +24,7 @@ for (const file of [...manifest.files.roads, ...manifest.files.tracks]) {
   await copyFile(join(root, 'src/data/alignments', file), join(assets, '__alignments', file));
 }
 await writeFile(join(assets, '_headers'), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-src https://www.openstreetmap.org https://www.google.com https://maps.google.com;
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://api.openstreetmap.org; script-src 'self' 'unsafe-inline'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-src https://www.openstreetmap.org https://www.google.com https://maps.google.com;
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
