@@ -9,8 +9,11 @@ await rm(assets, { recursive: true, force: true });
 await mkdir(assets, { recursive: true });
 await cp(join(root, 'public'), assets, { recursive: true });
 await cp(join(root, '.next/static'), join(assets, '_next/static'), { recursive: true });
-const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install', 'routes'];
-for (const page of pages) await copyFile(join(root, '.next/server/app', page + '.html'), join(assets, page + '.html'));
+const pages = ['index', 'en', 'coverage', 'timetables', 'traffic', 'updates', 'install', 'routes', 'taiwan', 'taiwan/en', 'japan', 'japan/en', 'asia', 'asia/en', 'world', 'world/en'];
+for (const page of pages) {
+  await mkdir(dirname(join(assets, page + '.html')), { recursive: true });
+  await copyFile(join(root, '.next/server/app', page + '.html'), join(assets, page + '.html'));
+}
 await copyFile(join(root, '.next/server/app/_not-found.html'), join(assets, '404.html'));
 await mkdir(join(assets, 'api'), { recursive: true });
 await copyFile(join(root, '.next/server/app/api/sources.body'), join(assets, 'api/sources.json'));
@@ -21,7 +24,7 @@ for (const file of [...manifest.files.roads, ...manifest.files.tracks]) {
   await copyFile(join(root, 'src/data/alignments', file), join(assets, '__alignments', file));
 }
 await writeFile(join(assets, '_headers'), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-src https://www.openstreetmap.org https://www.google.com https://maps.google.com;
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://api.openstreetmap.org; script-src 'self' 'unsafe-inline'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-src https://www.openstreetmap.org https://www.google.com https://maps.google.com;
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
