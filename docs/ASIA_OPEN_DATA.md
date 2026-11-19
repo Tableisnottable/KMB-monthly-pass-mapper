@@ -38,9 +38,11 @@ included in each snapshot. Other cities use the public map endpoint on demand.
 
 ## Travel pass catalogue
 
-The current directory has 27 known products across Hong Kong, Taiwan, Japan and
-Singapore. It links to public operator pages and is not an exhaustive list of
-every Asian ticket. Users can record additional passes by name and expiry date.
+The current directory has 69 known products across Hong Kong, Macao, Taiwan,
+Japan, Singapore, South Korea and Thailand. The [complete list](TRAVEL_PASSES.md)
+links to public operator pages and is not an exhaustive list of every Asian
+ticket. Users can record additional passes by name and expiry date. Stored-value
+cards are labelled separately and do not imply unlimited travel.
 
 Only the existing KMB pass fare rules are applied automatically. Other products
 are explicitly marked **Record only**; saving one does not assume free travel,

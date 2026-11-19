@@ -1110,3 +1110,10 @@ button.departure-choice:hover { background: #e5edf3; }
 .open-data-app .app-header .app-brand, .open-data-app .app-header .language-button { color: #fff; }
 .open-data-app .open-data-layout { height: calc(100dvh - 56px); }
 @media (max-width: 700px) { .open-data-app .open-data-layout { height: auto; } .open-data-app .open-area-map { height: 30dvh; min-height: 220px; } }
+.pass-catalog-count { display: inline-block; padding: 3px 7px; margin-left: 5px; border-radius: 7px; background: #e9f3ec; color: #276d46; font-size: 12px; }
+.pass-catalog-region { margin: 10px 0; border: 1px solid #dce6df; border-radius: 12px; padding: 0 12px; }
+.pass-catalog-region > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; cursor: pointer; color: #294f40; font-weight: 700; list-style: none; }
+.pass-catalog-region > summary::before { content: '›'; display: inline-block; font-size: 22px; line-height: 1; transition: transform .15s; }
+.pass-catalog-region[open] > summary::before { transform: rotate(90deg); }
+.pass-catalog-region > summary > span { margin-left: auto; font-size: 11px; color: #607b6c; }
+.pass-catalog-region .pass-catalog-item:last-child { border-bottom: 0; }

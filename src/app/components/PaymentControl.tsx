@@ -18,15 +18,15 @@ export function PaymentControl({ value, onChange, passes, onPasses, locale, cata
         {choices.map(([id, zh, en]) => <button className="payment-option" type="button" key={id} disabled={id === 'kmb-pass' && !hasKmb}
           aria-pressed={value === id} onClick={() => { onChange(id); close(); }}>
           <span className="choice-radio" aria-hidden="true">{value === id ? '●' : ''}</span><span>{copy(locale, zh, en)}
-            {id === 'kmb-pass' && !hasKmb && <small>{copy(locale, '先在「我的月票」加入有效月票', 'Add an active pass in My passes first')}</small>}
+            {id === 'kmb-pass' && !hasKmb && <small>{copy(locale, '先在「票券」加入有效月票', 'Add an active pass in My passes first')}</small>}
             {['cash', 'bank-card', 'mobile-wallet', 'qr'].includes(id) && <small>{copy(locale, '車費及接受方式按路線確認', 'Fare and acceptance vary by route')}</small>}
           </span>
         </button>)}
       </section>)}
     </div>}
   </ChoiceDialog>}
-  <ChoiceDialog className="pass-choice" title={copy(locale, '我的月票', 'My passes')} closeLabel={copy(locale, '關閉月票', 'Close passes')}
-    label={<span>{copy(locale, '月票', 'Passes')} <b>{passes.length}</b></span>}>
+  <ChoiceDialog className="pass-choice" title={copy(locale, '我的票券', 'My passes & cards')} closeLabel={copy(locale, '關閉票券', 'Close passes')}
+    label={<span>{copy(locale, '票券', 'Passes')} <b>{passes.length}</b></span>}>
     {() => <div className="pass-manager">
     {!catalogOnly && <label className="owned-kmb-pass"><input type="checkbox" checked={passes.some(pass => pass.id === 'kmb')} onChange={event => {
       if (event.target.checked) { onPasses([...passes, { id: 'kmb', name: 'KMB Monthly Pass' }]); onChange('kmb-pass'); }
