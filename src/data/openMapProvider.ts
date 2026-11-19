@@ -7,7 +7,7 @@ export async function openMapResponse(request: Request, fetcher: typeof fetch = 
   const url = new URL(request.url), region = regions.find(r => r.id === url.searchParams.get('region'));
   const rawLat = url.searchParams.get('lat'), rawLon = url.searchParams.get('lon');
   const lat = Number(rawLat), lon = Number(rawLon);
-  if (!region || !rawLat || !rawLon || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -12 || lat > 77 || lon < 25 || lon > 180) return Response.json({ error: 'Choose an Asian region and a valid map location.' }, { status: 400 });
+  if (!region || !rawLat || !rawLon || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return Response.json({ error: 'Choose a country or region and a valid map location.' }, { status: 400 });
   const bounds = localMapBounds(lat, lon), [s, w, n, e] = bounds;
   try {
     const response = await fetcher(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${w},${s},${e},${n}`, {

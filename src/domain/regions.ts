@@ -1,8 +1,9 @@
+import worldRegions from './worldRegions.json';
 /** Geographic browsing regions. An entry never implies nationwide routing coverage. */
 export type BrowseCity = { name: string; en: string; lat: number; lon: number };
 export type BrowseRegion = { id: string; code: string; zh: string; en: string; group: string; cities: BrowseCity[]; planner?: string };
 const city = (name: string, en: string, lat: number, lon: number): BrowseCity => ({ name, en, lat, lon });
-export const regions: BrowseRegion[] = [
+const asianRegions: BrowseRegion[] = [
   { id: 'hong-kong', code: 'HK', zh: '香港', en: 'Hong Kong', group: 'east', planner: '/', cities: [city('中環', 'Central', 22.282, 114.158)] },
   { id: 'macau', code: 'MO', zh: '澳門', en: 'Macao', group: 'east', planner: '/macau', cities: [city('澳門', 'Macao', 22.194, 113.541)] },
   { id: 'taiwan', code: 'TW', zh: '台灣', en: 'Taiwan', group: 'east', cities: [city('台北', 'Taipei', 25.0478, 121.517), city('新北', 'New Taipei', 25.014, 121.463), city('桃園', 'Taoyuan', 24.989, 121.314), city('台中', 'Taichung', 24.137, 120.686), city('台南', 'Tainan', 22.997, 120.212), city('高雄', 'Kaohsiung', 22.639, 120.302), city('花蓮', 'Hualien', 23.993, 121.601)] },
@@ -56,8 +57,13 @@ export const regions: BrowseRegion[] = [
   { id: 'azerbaijan', code: 'AZ', zh: '阿塞拜疆', en: 'Azerbaijan', group: 'west', cities: [city('巴庫', 'Baku', 40.372, 49.839)] },
   { id: 'russia', code: 'RU', zh: '俄羅斯', en: 'Russia', group: 'north', cities: [city('海參崴', 'Vladivostok', 43.115, 131.886), city('新西伯利亞', 'Novosibirsk', 55.031, 82.921)] },
 ];
-export const regionGroups = [['east', '東亞', 'East Asia'], ['southeast', '東南亞', 'Southeast Asia'], ['south', '南亞', 'South Asia'], ['central', '中亞', 'Central Asia'], ['west', '西亞', 'West Asia'], ['north', '北亞', 'North Asia']] as const;
+/** Country centres are labelled honestly; existing city shortcuts and IDs stay stable. */
+export const regions: BrowseRegion[] = [...asianRegions, ...worldRegions.filter(r => !asianRegions.some(a => a.code === r.code)).map(r => ({
+  id: r.code.toLowerCase(), code: r.code, zh: r.zh, en: r.en, group: r.group,
+  cities: [city('國家／地區中心', 'Country / territory centre', r.lat, r.lon)],
+}))];
+export const regionGroups = [['east', '東亞', 'East Asia'], ['southeast', '東南亞', 'Southeast Asia'], ['south', '南亞', 'South Asia'], ['central', '中亞', 'Central Asia'], ['west', '西亞', 'West Asia'], ['north', '北亞', 'North Asia'], ['europe', '歐洲', 'Europe'], ['africa', '非洲', 'Africa'], ['americas', '美洲', 'Americas'], ['oceania', '大洋洲', 'Oceania'], ['antarctic', '南極洲', 'Antarctica']] as const;
 export function regionHref(region: BrowseRegion, locale: 'zh' | 'en') {
-  const path = region.planner ?? (['taiwan', 'japan'].includes(region.id) ? '/' + region.id : '/asia');
-  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (path === '/asia' ? '?region=' + region.id : '');
+  const path = region.planner ?? (['taiwan', 'japan'].includes(region.id) ? '/' + region.id : '/world');
+  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (path === '/world' ? '?region=' + region.id : '');
 }

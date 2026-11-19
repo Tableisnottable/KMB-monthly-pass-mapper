@@ -47,7 +47,7 @@ function AreaMap({ center, data, selected, onArea, locale }: { center: MapPoint;
     }
   }, [data, selected, ready, locale]);
   return <section className="open-area-map" aria-label={locale === 'en' ? 'Open data map' : '開放資料地圖'}><div ref={element} className="map-canvas" />
-    <button type="button" className="load-map-area" onClick={() => { const p = state.current?.map.getCenter(); if (p) onArea([p.lat, p.lng]); }}><PlannerIcon name="locate" size={18} />{locale === 'en' ? 'Load this area' : '載入此處道路及交通'}</button>
+    <button type="button" className="load-map-area" onClick={() => { const p = state.current?.map.getCenter(); if (p) onArea([Math.max(-90, Math.min(90, p.lat)), ((p.lng + 180) % 360 + 360) % 360 - 180]); }}><PlannerIcon name="locate" size={18} />{locale === 'en' ? 'Load this area' : '載入此處道路及交通'}</button>
     {tileError && <p className="open-map-error" role="status">{locale === 'en' ? 'Base map unavailable; the data list is still usable.' : '底圖暫時無法載入，仍可使用資料清單。'}</p>}
   </section>;
 }
@@ -100,7 +100,7 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
   const filtered = lines.filter(r => (category === 'all' || tab !== 'roads' || r.kind === category) && [r.name, r.en, r.ref, r.operator ?? ''].join(' ').toLowerCase().includes(query));
   const stops = data?.stops.filter(s => [s.name, s.en].join(' ').toLowerCase().includes(query)) ?? [];
   return <main className="open-data-app" lang={en ? 'en' : 'zh-Hant'}>
-    <header className="app-header"><a className="app-brand" href={en ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a><a className="language-button" href={(regionId === 'taiwan' || regionId === 'japan' ? '/' + regionId : '/asia') + (en ? '' : '/en') + '?region=' + regionId}>{en ? '中' : 'EN'}</a></header>
+    <header className="app-header"><a className="app-brand" href={en ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a><a className="language-button" href={(regionId === 'taiwan' || regionId === 'japan' ? '/' + regionId : '/world') + (en ? '' : '/en') + '?region=' + regionId}>{en ? '中' : 'EN'}</a></header>
     <div className="open-data-layout"><aside className="open-data-sidebar">
       <div className="open-data-controls"><div className="open-region-row"><RegionSwitcher current={regionId} locale={locale} /><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} catalogOnly regionId={regionId} /></div><span className="open-data-badge">{t('開放地圖', 'Open map')}</span>
         <h1>{t(region.zh, region.en)}<span>{t('道路及交通', 'Roads & transport')}</span></h1>
@@ -119,7 +119,7 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
           {!(tab === 'stops' ? stops.length : filtered.length) && <p>{t('此範圍未找到相符資料。移動地圖，再按「載入此處」。', 'No matching mapped data here. Move the map and choose Load this area.')}</p>}
         </>}
       </div>
-      <footer className="open-data-source"><details><summary>{t('資料來源及涵蓋範圍', 'Sources & coverage')}</summary><p>{t('只顯示載入範圍內已繪製的路段，並非全國完整路線。地圖資料不代表即時車輛位置或完整時間表。', 'Shows mapped local segments, not complete national networks. Map records are not live vehicles or complete timetables.')}</p>{data && <p>{t('資料擷取：', 'Retrieved: ')}{new Date(data.fetchedAt).toLocaleDateString(en ? 'en-GB' : 'zh-HK', { timeZone: 'Asia/Hong_Kong' })}</p>}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors · ODbL 1.0</a></details></footer>
+      <footer className="open-data-source"><details><summary>{t('資料來源及涵蓋範圍', 'Sources & coverage')}</summary><p>{t('只顯示載入範圍內已繪製的路段，並非全國完整路線。地圖資料不代表即時車輛位置或完整時間表。', 'Shows mapped local segments, not complete national networks. Map records are not live vehicles or complete timetables.')}</p>{data && <p>{t('資料擷取：', 'Retrieved: ')}{new Date(data.fetchedAt).toLocaleDateString(en ? 'en-GB' : 'zh-HK', { timeZone: 'Asia/Hong_Kong' })}</p>}<a href="https://github.com/mledoze/countries" target="_blank" rel="noreferrer">Countries · ODbL 1.0</a><br /><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors · ODbL 1.0</a></details></footer>
     </aside><AreaMap center={center} data={data} selected={selected} locale={locale} onArea={point => { setCenter(point); setReload(0); }} /></div>
   </main>;
 }

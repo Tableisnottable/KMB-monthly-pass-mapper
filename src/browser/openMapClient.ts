@@ -3,7 +3,7 @@ import { localMapBounds, parseOpenMap, type MapPoint, type OpenMapArea } from '.
 /** Public OSM CORS endpoint avoids depending on shared hosting egress. */
 export async function loadOpenMapArea(region: string, center: MapPoint, signal: AbortSignal, fetcher: typeof fetch = fetch): Promise<OpenMapArea> {
   const [lat, lon] = center;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -12 || lat > 77 || lon < 25 || lon > 180) throw new Error('Outside the Asian map directory');
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) throw new Error('Invalid map coordinates');
   const bounds = localMapBounds(lat, lon), [s, w, n, e] = bounds;
   const source = `https://api.openstreetmap.org/api/0.6/map.json?bbox=${w},${s},${e},${n}`;
   const proxy = '/api/open-map?' + new URLSearchParams({ region, lat: String(lat), lon: String(lon) });

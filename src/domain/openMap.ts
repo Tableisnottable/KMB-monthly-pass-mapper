@@ -8,7 +8,7 @@ export type OpenMapArea = { roads: OpenMapLine[]; routes: OpenMapLine[]; stops: 
 export function localMapBounds(lat: number, lon: number): MapBounds {
   // A deliberately small map extract, not a country-wide bulk download.
   const halfLat = .003, halfLon = Math.min(.012, halfLat / Math.max(.25, Math.cos(lat * Math.PI / 180)));
-  return [lat - halfLat, lon - halfLon, lat + halfLat, lon + halfLon].map(n => Number(n.toFixed(5))) as MapBounds;
+  return [Math.max(-90, lat - halfLat), Math.max(-180, lon - halfLon), Math.min(90, lat + halfLat), Math.min(180, lon + halfLon)].map(n => Number(n.toFixed(5))) as MapBounds;
 }
 export function parseOpenMap(elements: OpenMapElement[], bounds: MapBounds, sourceUrl: string, fetchedAt = new Date().toISOString()): OpenMapArea {
   const [south, west, north, east] = bounds;
