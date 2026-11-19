@@ -18,10 +18,10 @@ export function RouteWeightSettings({ value: draft, onChange: setDraft, locale, 
         onChange={event => setDraft({ ...draft, [key]: percent ? weightFromPercent(key as ImportanceKey, Number(event.target.value)) : Number(event.target.value) })} /><small>{min < 0 ? copy(locale, '較喜歡 ← → 較避免', 'Prefer ← → Avoid') : percent ? copy(locale, '0% 不計入 · 100% 正常 · 200% 雙倍', '0% Off · 100% Normal · 200% Double') : copy(locale, '較低 ← 重要性 → 較高', 'Lower ← Importance → Higher')}</small></label>;
   }
   return <section className="route-weight-settings" aria-label={copy(locale, '路線重要性設定', 'Route importance settings')}>
-    <h3>{copy(locale, '各部分重要性', 'Importance of each part')}</h3>
-    <p className="weight-warning" role="note">{copy(locale, '注意：調整權重會改變推薦結果，可能推薦較慢、較貴、步行更多或轉乘較多的行程。分數不是行程分鐘；票價及時間本身不會因此改變。', 'Warning: changing importance changes recommendations and may favour slower, more expensive journeys with more walking or transfers. Scores are not journey minutes; actual fare and time estimates do not change.')}</p>
-    <p>{copy(locale, '每項正常值為 100%，可獨立調整至 0–200%。0% 不計入該項成本，200% 為原有權重的兩倍；總和毋須為 100%。不會改變實際車費、時間或交通限制。', 'Normal is 100% for every factor. Adjust each independently from 0–200%: 0% removes its weighted cost; 200% doubles its original weight. They do not need to total 100%. Actual fares, times and transport restrictions stay unchanged.')}</p>
-    {main.map(row => input(row, true))}
+    <h3>{copy(locale, '你最在意什麼？', 'What matters to you?')}</h3>
+    <p className="weight-warning" role="note">{copy(locale, '調整會改變路線排序，可能增加車費、步行或轉乘。', 'Changes can favour journeys with higher fares, more walking or more transfers.')}</p>
+    <p>{copy(locale, '每項獨立設定：100% 正常，0% 不計，200% 雙倍。', 'Set each independently: 100% Normal, 0% Off, 200% Double.')}</p>
+    <div className="weight-grid">{main.map(row => input(row, true))}</div>
     <details><summary>{companyAdjustments ? copy(locale, '進階倍率及公司調整（原始數值）', 'Advanced multipliers & company adjustments (raw values)') : copy(locale, '進階候車倍率', 'Advanced waiting multipliers')}</summary>{advanced.filter(([key]) => companyAdjustments || key.startsWith('wait')).map(row => input(row))}</details>
     <p>{copy(locale, '公司必須／正常／禁止於行程搜尋設定選擇。權重只影響已允許公司的排序。', 'Choose Must / Normal / Ban in the journey search settings. Weights only rank services from allowed companies.')}</p>
     <div className="weight-actions"><button type="button" onClick={() => setDraft({ ...DEFAULT_WEIGHTS })}>{copy(locale, '還原重要性', 'Reset importance')}</button></div>

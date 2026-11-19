@@ -4,9 +4,11 @@ import { transportFetch } from '../../browser/transportClient';
 import { inMacau, macauColour, macauTimetableUrl, macauMoney, macauOperators, macauTime, type MacauJourney, type MacauPattern, type MacauPayment, type MacauStop } from '../../domain/macau';
 import { DEFAULT_WEIGHTS } from '../../engine/routeWeights';
 import { DEFAULT_LIMITS, type JourneyLimits } from '../../domain/journeyLimits';
-import { supportedCities } from '../../domain/cities';
 import { PlaceAutocomplete, type PlaceResult } from '../components/PlaceAutocomplete';
 import { PlannerIcon } from '../components/PlannerIcon';
+import { RegionSwitcher } from '../components/RegionSwitcher';
+import { PaymentControl } from '../components/PaymentControl';
+import { readPaymentPreferences, type OwnedPass, type PaymentChoice } from '../../domain/payment';
 import { RouteWeightSettings } from '../components/RouteWeightSettings';
 import { useLiveLocation } from '../components/useLiveLocation';
 import { MacauMap, type MapPiece } from './MacauMap';
@@ -24,6 +26,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   const [from, setFrom] = useState<PlaceResult | null>(null), [to, setTo] = useState<PlaceResult | null>(null);
   const [fromText, setFromText] = useState(''), [toText, setToText] = useState('');
   const [active, setActive] = useState<'from' | 'to'>('from'), [payment, setPayment] = useState<MacauPayment>('cash');
+  const [walletPayment, setWalletPayment] = useState<PaymentChoice>('adult-octopus'), [passes, setPasses] = useState<OwnedPass[]>([]), [walletReady, setWalletReady] = useState(false);
   const [timeMode, setTimeMode] = useState('depart'), [time, setTime] = useState('');
   const [companies, setCompanies] = useState(defaultCompanies), [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS });
   const [limits, setLimits] = useState<JourneyLimits>({ ...DEFAULT_LIMITS }), [change, setChange] = useState(5), [busEstimates, setBusEstimates] = useState(false);
@@ -44,6 +47,8 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   function choose(field: 'from' | 'to', place: PlaceResult) {
     invalidate(); if (field === 'from') { setFrom(place); setFromText(place.name); setActive('to'); } else { setTo(place); setToText(place.name); }
   }
+  useEffect(() => { try { const saved = readPaymentPreferences(localStorage.getItem('compass-payment-v1')); setPasses(saved.passes); setWalletPayment(saved.payment); } catch { /* optional storage */ } setWalletReady(true); }, []);
+  useEffect(() => { if (walletReady) try { localStorage.setItem('compass-payment-v1', JSON.stringify({ payment: walletPayment, passes })); } catch { /* optional storage */ } }, [walletReady, walletPayment, passes]);
   useEffect(() => { setTime(dateInput()); const controller = new AbortController();
     transportFetch('/api/macau?resource=routes', { signal: controller.signal }).then(async r => {
       if (!r.ok) throw new Error('Catalogue unavailable'); const data = await r.json(); setCatalogue(data.data); setImported(data.coverage.importedOn.slice(0, 10));
@@ -118,7 +123,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
     <header className="app-header"><a className="app-brand" href={locale === 'en' ? '/macau/en' : '/macau'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a>
       <nav className="header-actions"><a href={'/macau/install?lang=' + locale}>{t('安裝 App', 'Install app')}</a><a href={locale === 'en' ? '/macau' : '/macau/en'}>{locale === 'en' ? '中' : 'EN'}</a></nav></header>
     <div className="mo-layout"><aside className="mo-sidebar">
-      <section className="mo-controls"><div className="mo-title"><label><span className="sr-only">{t('選擇城市', 'Choose city')}</span><select aria-label={t('選擇城市', 'Choose city')} value="macau" onChange={e => { if (e.target.value === 'hong-kong') window.location.assign(locale === 'en' ? '/en' : '/'); }}>{supportedCities.map(city => <option key={city.id} value={city.id}>{city[locale === 'en' ? 'nameEn' : 'nameTc']}</option>)}</select></label><span className="mo-preview">{t('下一版本預覽', 'NEXT VERSION')}</span></div>
+      <section className="mo-controls"><div className="mo-title"><RegionSwitcher current="macau" locale={locale} /><PaymentControl value={walletPayment} onChange={setWalletPayment} passes={passes} onPasses={setPasses} locale={locale} catalogOnly regionId="macau" /><span className="mo-preview">{t('預覽', 'PREVIEW')}</span></div>
         <div className="mo-tabs" role="tablist" aria-label={t('澳門工具', 'Macao tools')}>{(['plan', 'directory'] as const).map(id => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{id === 'plan' ? t('規劃行程', 'Plan a journey') : t('巴士及輕軌路線', 'Bus & LRT routes')}</button>)}</div>
         {tab === 'plan' && <form id="macau-search" onSubmit={search}>
           <label className="mo-payment">{t('付款方式', 'Payment')}<select aria-label={t('付款方式', 'Payment')} value={payment} onChange={e => { invalidate(); setPayment(e.target.value as MacauPayment); }}><option value="cash">{t('普通成人現金／單程票', 'Adult cash / single ticket')}</option><option value="macau-pass">{t('澳門通／輕軌通', 'Macau Pass / LRT card')}</option><option value="student">{t('合資格學生卡', 'Eligible student card')}</option></select></label>

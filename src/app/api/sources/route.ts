@@ -11,6 +11,7 @@ export function GET() {
   return NextResponse.json(
     {
       sources: getTrafficSourceCatalog(),
+      asia: { source: 'OpenStreetMap contributors', license: 'ODbL 1.0', url: 'https://www.openstreetmap.org/copyright', access: 'Public map extracts; no account, API key or paid feed. Local mapped roads, route segments and stops only; no nationwide journey planning, live arrivals or fares.' },
       coverage,
       alignments,
       schoolPlaces: schoolPlacesMeta,

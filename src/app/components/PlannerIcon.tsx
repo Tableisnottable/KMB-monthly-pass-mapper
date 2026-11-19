@@ -9,6 +9,7 @@ const paths: Record<string, React.ReactNode> = {
   signal: <><path d="M4 13a9 9 0 0 1 9-9M4 18A14 14 0 0 1 18 4M9 13a4 4 0 0 1 4-4"/><circle cx="13" cy="13" r="1" fill="currentColor"/></>,
   compass: <><circle cx="12" cy="12" r="9"/><path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8Z"/></>,
   arrow: <><path d="M5 12h14m-6-6 6 6-6 6"/></>,
+  check: <path d="m5 12 4 4L19 6"/>,
   swap: <><path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4"/></>,
   pin: <><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></>,
   bus: <><rect x="5" y="3" width="14" height="16" rx="3"/><path d="M5 11h14M8 19v2m8-2v2M8 15h1m6 0h1M9 6h6"/></>,

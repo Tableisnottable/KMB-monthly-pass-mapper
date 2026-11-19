@@ -1,0 +1,63 @@
+/** Geographic browsing regions. An entry never implies nationwide routing coverage. */
+export type BrowseCity = { name: string; en: string; lat: number; lon: number };
+export type BrowseRegion = { id: string; code: string; zh: string; en: string; group: string; cities: BrowseCity[]; planner?: string };
+const city = (name: string, en: string, lat: number, lon: number): BrowseCity => ({ name, en, lat, lon });
+export const regions: BrowseRegion[] = [
+  { id: 'hong-kong', code: 'HK', zh: '香港', en: 'Hong Kong', group: 'east', planner: '/', cities: [city('中環', 'Central', 22.282, 114.158)] },
+  { id: 'macau', code: 'MO', zh: '澳門', en: 'Macao', group: 'east', planner: '/macau', cities: [city('澳門', 'Macao', 22.194, 113.541)] },
+  { id: 'taiwan', code: 'TW', zh: '台灣', en: 'Taiwan', group: 'east', cities: [city('台北', 'Taipei', 25.0478, 121.517), city('新北', 'New Taipei', 25.014, 121.463), city('桃園', 'Taoyuan', 24.989, 121.314), city('台中', 'Taichung', 24.137, 120.686), city('台南', 'Tainan', 22.997, 120.212), city('高雄', 'Kaohsiung', 22.639, 120.302), city('花蓮', 'Hualien', 23.993, 121.601)] },
+  { id: 'japan', code: 'JP', zh: '日本', en: 'Japan', group: 'east', cities: [city('東京', 'Tokyo', 35.6812, 139.7671), city('大阪', 'Osaka', 34.702, 135.496), city('京都', 'Kyoto', 34.986, 135.759), city('福岡', 'Fukuoka', 33.59, 130.42), city('札幌', 'Sapporo', 43.068, 141.35), city('名古屋', 'Nagoya', 35.17, 136.882), city('沖繩那霸', 'Naha', 26.212, 127.68)] },
+  { id: 'china', code: 'CN', zh: '中國內地', en: 'Mainland China', group: 'east', cities: [city('北京', 'Beijing', 39.905, 116.391), city('上海', 'Shanghai', 31.23, 121.473), city('廣州', 'Guangzhou', 23.129, 113.264), city('深圳', 'Shenzhen', 22.547, 114.063)] },
+  { id: 'south-korea', code: 'KR', zh: '韓國', en: 'South Korea', group: 'east', cities: [city('首爾', 'Seoul', 37.555, 126.972), city('釜山', 'Busan', 35.115, 129.042)] },
+  { id: 'north-korea', code: 'KP', zh: '朝鮮', en: 'North Korea', group: 'east', cities: [city('平壤', 'Pyongyang', 39.019, 125.738)] },
+  { id: 'mongolia', code: 'MN', zh: '蒙古', en: 'Mongolia', group: 'east', cities: [city('烏蘭巴托', 'Ulaanbaatar', 47.918, 106.917)] },
+  { id: 'singapore', code: 'SG', zh: '新加坡', en: 'Singapore', group: 'southeast', cities: [city('市中心', 'Downtown', 1.284, 103.852)] },
+  { id: 'thailand', code: 'TH', zh: '泰國', en: 'Thailand', group: 'southeast', cities: [city('曼谷', 'Bangkok', 13.746, 100.534), city('清邁', 'Chiang Mai', 18.788, 98.986)] },
+  { id: 'malaysia', code: 'MY', zh: '馬來西亞', en: 'Malaysia', group: 'southeast', cities: [city('吉隆坡', 'Kuala Lumpur', 3.134, 101.686), city('檳城', 'George Town', 5.414, 100.329)] },
+  { id: 'indonesia', code: 'ID', zh: '印尼', en: 'Indonesia', group: 'southeast', cities: [city('雅加達', 'Jakarta', -6.175, 106.827), city('登巴薩', 'Denpasar', -8.658, 115.216)] },
+  { id: 'philippines', code: 'PH', zh: '菲律賓', en: 'Philippines', group: 'southeast', cities: [city('馬尼拉', 'Manila', 14.60, 120.982)] },
+  { id: 'vietnam', code: 'VN', zh: '越南', en: 'Vietnam', group: 'southeast', cities: [city('河內', 'Hanoi', 21.029, 105.853), city('胡志明市', 'Ho Chi Minh City', 10.776, 106.701)] },
+  { id: 'cambodia', code: 'KH', zh: '柬埔寨', en: 'Cambodia', group: 'southeast', cities: [city('金邊', 'Phnom Penh', 11.563, 104.928)] },
+  { id: 'laos', code: 'LA', zh: '老撾', en: 'Laos', group: 'southeast', cities: [city('萬象', 'Vientiane', 17.965, 102.609)] },
+  { id: 'myanmar', code: 'MM', zh: '緬甸', en: 'Myanmar', group: 'southeast', cities: [city('仰光', 'Yangon', 16.775, 96.159)] },
+  { id: 'brunei', code: 'BN', zh: '汶萊', en: 'Brunei', group: 'southeast', cities: [city('斯里巴加灣', 'Bandar Seri Begawan', 4.89, 114.942)] },
+  { id: 'timor-leste', code: 'TL', zh: '東帝汶', en: 'Timor-Leste', group: 'southeast', cities: [city('帝力', 'Dili', -8.555, 125.579)] },
+  { id: 'india', code: 'IN', zh: '印度', en: 'India', group: 'south', cities: [city('新德里', 'New Delhi', 28.632, 77.219), city('孟買', 'Mumbai', 18.94, 72.835)] },
+  { id: 'pakistan', code: 'PK', zh: '巴基斯坦', en: 'Pakistan', group: 'south', cities: [city('伊斯蘭堡', 'Islamabad', 33.698, 73.064)] },
+  { id: 'bangladesh', code: 'BD', zh: '孟加拉', en: 'Bangladesh', group: 'south', cities: [city('達卡', 'Dhaka', 23.733, 90.418)] },
+  { id: 'sri-lanka', code: 'LK', zh: '斯里蘭卡', en: 'Sri Lanka', group: 'south', cities: [city('科倫坡', 'Colombo', 6.934, 79.852)] },
+  { id: 'nepal', code: 'NP', zh: '尼泊爾', en: 'Nepal', group: 'south', cities: [city('加德滿都', 'Kathmandu', 27.709, 85.315)] },
+  { id: 'bhutan', code: 'BT', zh: '不丹', en: 'Bhutan', group: 'south', cities: [city('廷布', 'Thimphu', 27.472, 89.639)] },
+  { id: 'maldives', code: 'MV', zh: '馬爾代夫', en: 'Maldives', group: 'south', cities: [city('馬累', 'Malé', 4.175, 73.509)] },
+  { id: 'afghanistan', code: 'AF', zh: '阿富汗', en: 'Afghanistan', group: 'south', cities: [city('喀布爾', 'Kabul', 34.516, 69.177)] },
+  { id: 'kazakhstan', code: 'KZ', zh: '哈薩克', en: 'Kazakhstan', group: 'central', cities: [city('阿斯塔納', 'Astana', 51.128, 71.43), city('阿拉木圖', 'Almaty', 43.253, 76.947)] },
+  { id: 'kyrgyzstan', code: 'KG', zh: '吉爾吉斯', en: 'Kyrgyzstan', group: 'central', cities: [city('比什凱克', 'Bishkek', 42.876, 74.604)] },
+  { id: 'tajikistan', code: 'TJ', zh: '塔吉克', en: 'Tajikistan', group: 'central', cities: [city('杜尚別', 'Dushanbe', 38.574, 68.786)] },
+  { id: 'turkmenistan', code: 'TM', zh: '土庫曼', en: 'Turkmenistan', group: 'central', cities: [city('阿什哈巴德', 'Ashgabat', 37.936, 58.38)] },
+  { id: 'uzbekistan', code: 'UZ', zh: '烏茲別克', en: 'Uzbekistan', group: 'central', cities: [city('塔什干', 'Tashkent', 41.312, 69.28)] },
+  { id: 'uae', code: 'AE', zh: '阿聯酋', en: 'United Arab Emirates', group: 'west', cities: [city('杜拜', 'Dubai', 25.201, 55.274), city('阿布扎比', 'Abu Dhabi', 24.489, 54.362)] },
+  { id: 'saudi-arabia', code: 'SA', zh: '沙特阿拉伯', en: 'Saudi Arabia', group: 'west', cities: [city('利雅得', 'Riyadh', 24.686, 46.685)] },
+  { id: 'qatar', code: 'QA', zh: '卡塔爾', en: 'Qatar', group: 'west', cities: [city('多哈', 'Doha', 25.286, 51.534)] },
+  { id: 'bahrain', code: 'BH', zh: '巴林', en: 'Bahrain', group: 'west', cities: [city('麥納麥', 'Manama', 26.235, 50.577)] },
+  { id: 'kuwait', code: 'KW', zh: '科威特', en: 'Kuwait', group: 'west', cities: [city('科威特城', 'Kuwait City', 29.375, 47.978)] },
+  { id: 'oman', code: 'OM', zh: '阿曼', en: 'Oman', group: 'west', cities: [city('馬斯喀特', 'Muscat', 23.612, 58.592)] },
+  { id: 'yemen', code: 'YE', zh: '也門', en: 'Yemen', group: 'west', cities: [city('薩那', 'Sanaa', 15.353, 44.207)] },
+  { id: 'iran', code: 'IR', zh: '伊朗', en: 'Iran', group: 'west', cities: [city('德黑蘭', 'Tehran', 35.7, 51.401)] },
+  { id: 'iraq', code: 'IQ', zh: '伊拉克', en: 'Iraq', group: 'west', cities: [city('巴格達', 'Baghdad', 33.329, 44.401)] },
+  { id: 'jordan', code: 'JO', zh: '約旦', en: 'Jordan', group: 'west', cities: [city('安曼', 'Amman', 31.952, 35.933)] },
+  { id: 'israel', code: 'IL', zh: '以色列', en: 'Israel', group: 'west', cities: [city('特拉維夫', 'Tel Aviv', 32.074, 34.781)] },
+  { id: 'palestine', code: 'PS', zh: '巴勒斯坦', en: 'Palestine', group: 'west', cities: [city('拉姆安拉', 'Ramallah', 31.904, 35.204)] },
+  { id: 'lebanon', code: 'LB', zh: '黎巴嫩', en: 'Lebanon', group: 'west', cities: [city('貝魯特', 'Beirut', 33.896, 35.506)] },
+  { id: 'syria', code: 'SY', zh: '敘利亞', en: 'Syria', group: 'west', cities: [city('大馬士革', 'Damascus', 33.513, 36.306)] },
+  { id: 'turkey', code: 'TR', zh: '土耳其', en: 'Türkiye', group: 'west', cities: [city('伊斯坦堡', 'Istanbul', 41.008, 28.978), city('安卡拉', 'Ankara', 39.934, 32.859)] },
+  { id: 'cyprus', code: 'CY', zh: '塞浦路斯', en: 'Cyprus', group: 'west', cities: [city('尼科西亞', 'Nicosia', 35.173, 33.362)] },
+  { id: 'georgia', code: 'GE', zh: '格魯吉亞', en: 'Georgia', group: 'west', cities: [city('第比利斯', 'Tbilisi', 41.696, 44.801)] },
+  { id: 'armenia', code: 'AM', zh: '亞美尼亞', en: 'Armenia', group: 'west', cities: [city('埃里溫', 'Yerevan', 40.181, 44.513)] },
+  { id: 'azerbaijan', code: 'AZ', zh: '阿塞拜疆', en: 'Azerbaijan', group: 'west', cities: [city('巴庫', 'Baku', 40.372, 49.839)] },
+  { id: 'russia', code: 'RU', zh: '俄羅斯', en: 'Russia', group: 'north', cities: [city('海參崴', 'Vladivostok', 43.115, 131.886), city('新西伯利亞', 'Novosibirsk', 55.031, 82.921)] },
+];
+export const regionGroups = [['east', '東亞', 'East Asia'], ['southeast', '東南亞', 'Southeast Asia'], ['south', '南亞', 'South Asia'], ['central', '中亞', 'Central Asia'], ['west', '西亞', 'West Asia'], ['north', '北亞', 'North Asia']] as const;
+export function regionHref(region: BrowseRegion, locale: 'zh' | 'en') {
+  const path = region.planner ?? (['taiwan', 'japan'].includes(region.id) ? '/' + region.id : '/asia');
+  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (path === '/asia' ? '?region=' + region.id : '');
+}

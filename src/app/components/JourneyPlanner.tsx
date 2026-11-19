@@ -8,6 +8,7 @@ import type { PlaceResult } from './PlaceAutocomplete';
 import { JourneyPlaceSearch } from './JourneyPlaceSearch';
 import { PlannerBoard } from './PlannerBoard';
 import { PlannerIcon } from './PlannerIcon';
+import { RegionSwitcher } from './RegionSwitcher';
 import { LiveTransitSearch } from './LiveTransitSearch';
 import { appendJourneyVias } from '../../domain/journeyVia';
 import { copy, readyJourney, locationVias, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
@@ -18,7 +19,7 @@ import { DEFAULT_PREFERENCES, corridorIds, roadLevel, type RoutePreferences } fr
 import { DEFAULT_WEIGHTS, customWeights, type RouteWeights } from '../../engine/routeWeights';
 import { RouteWeightSettings } from './RouteWeightSettings';
 import { DEFAULT_CHANGE_MINUTES, defaultComparisons, defaultTransport, type ComparisonPreferences, type TransportPreferences } from '../../domain/transportSelection';
-import { activeCity, supportedCities } from '../../domain/cities';
+import { activeCity } from '../../domain/cities';
 import { useAutoRefresh } from './useAutoRefresh';
 import { DEFAULT_LIMITS, type JourneyLimits } from '../../domain/journeyLimits';
 import { journeyMatchesEndpoints } from '../../domain/journeyEndpointMatch';
@@ -252,10 +253,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const settingsChanged = filterSections.some(([, , , count]) => Boolean(count));
   const searchPanel = <section className="planner-toolbar" id="journey" aria-label={copy(locale, '規劃行程', 'Plan a journey')}>
     <div className="planner-toolbar-top"><h1 className="sr-only">{copy(locale, activeCity.nameTc, activeCity.nameEn)}</h1>
-      <label className="city-control"><span className="sr-only">{copy(locale, '選擇城市', 'Choose city')}</span>
-        <select defaultValue={activeCity.id} onChange={event => { if (event.target.value === 'macau') window.location.assign(locale === 'en' ? '/macau/en' : '/macau'); }} title={copy(locale, '切換城市；澳門版本為預覽。', 'Switch city; Macao is a preview.')}>
-          {supportedCities.map(city => <option key={city.id} value={city.id}>{copy(locale, city.nameTc, city.nameEn)}</option>)}
-        </select></label><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} /></div>
+      <RegionSwitcher current="hong-kong" locale={locale} /><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} /></div>
     <JourneyPlaceSearch places={places} viaKeys={viaKeys} onViaAdd={addVia} onViaRemove={removeVia} onViaMove={moveVia} onInput={editPlace} onSelect={selectPlace} onFocus={setActiveField}
       onSwap={swap} onSearch={() => { if (places.origin && places.destination && readyJourney(places)) void handleSearch(places.origin, places.destination); }}
       searching={searching} locale={locale} time={time} onTimeChange={value => { resetJourney(); setTime(value); }} />
@@ -294,7 +292,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     </dialog>
     <dialog className="settings-dialog" ref={settingsDialog} aria-labelledby="journey-settings-title" onCancel={() => setSettingsSection(null)} onClose={() => setSettingsSection(null)}>
       <div className="dialog-heading"><h2 id="journey-settings-title">{copy(locale, '行程設定', 'Journey settings')}</h2><button type="button" onClick={() => setSettingsSection(null)} aria-label={copy(locale, '取消並關閉設定', 'Cancel and close settings')}><PlannerIcon name="close" size={22} /></button></div>
-      <nav className="settings-sections" aria-label={copy(locale, '設定類別', 'Settings sections')}>{filterSections.map(([id, zh, en]) => <button type="button" key={id} aria-pressed={settingsSection === id} onClick={() => { setSettingsSection(id); settingsDialog.current?.querySelector('.settings-content')?.scrollTo({ top: 0 }); }}>{copy(locale, zh, en)}</button>)}</nav>
+      <nav className="settings-sections" aria-label={copy(locale, '設定類別', 'Settings sections')}>{filterSections.map(([id, zh, en]) => <button type="button" key={id} aria-pressed={settingsSection === id} onClick={() => { setSettingsSection(id); settingsDialog.current?.querySelector('.settings-content')?.scrollTo({ top: 0 }); }}><PlannerIcon name={id === 'companies' ? 'bus' : id === 'roads' ? 'layers' : id === 'changes' ? 'clock' : 'signal'} size={18} />{copy(locale, zh, en)}</button>)}</nav>
       <div className="settings-content">{settingsSection === 'importance' ? <RouteWeightSettings value={draft.weights} onChange={value => setDraft({ ...draft, weights: value })} locale={locale} />
         : settingsSection && <JourneyPreferences section={settingsSection} companies={draft.companies} onCompanies={value => setDraft({ ...draft, companies: value })}
           transport={draft.transport} onTransport={value => setDraft({ ...draft, transport: value })}

@@ -1,4 +1,5 @@
 import { proxyProvider, safeProviderUrl } from './upstreamProxy';
+import { openMapResponse } from '../data/openMapProvider';
 export { JourneyNotifications } from './journeyNotifications';
 interface Environment {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -10,6 +11,14 @@ type WorkerCache = { match(request: Request): Promise<Response | undefined>; put
 export default {
   async fetch(request: Request, env: Environment, ctx: Execution): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/api/open-map') {
+      if (env.RATE_LIMITER && !(await env.RATE_LIMITER.limit({ key: 'open-map:' + (request.headers.get('cf-connecting-ip') ?? 'unknown') })).success) return Response.json({ error: 'Please try again shortly.' }, { status: 429, headers: { 'Retry-After': '60' } });
+      const cache = (caches as unknown as { default: WorkerCache }).default;
+      const cached = await cache.match(request); if (cached) return cached;
+      const response = await openMapResponse(request);
+      if (response.ok) ctx.waitUntil(cache.put(request, response.clone()).catch(() => undefined));
+      return response;
+    }
     if (url.pathname === '/api/notifications') {
       if (!env.JOURNEY_NOTIFICATIONS) return Response.json({ error: 'Background notifications are not configured.' }, { status: 503 });
       if (request.method !== 'GET' && request.headers.get('Origin') !== url.origin) return Response.json({ error: 'Same-origin request required' }, { status: 403 });
