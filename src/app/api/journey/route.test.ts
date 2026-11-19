@@ -30,6 +30,24 @@ describe('Multimodal journey API', () => {
     expect(meta.phase).toBe('preview'); expect(data.length).toBeGreaterThan(0);
     expect(enrichJourneyArrivals).not.toHaveBeenCalled(); expect(routeOnStreets).not.toHaveBeenCalled();
   });
+  it.each(['depart', 'arrive'])('keeps company, mode, transfer and time restrictions in the fast %s preview', async timeMode => {
+    const time = '2026-11-14T14:00:00+08:00';
+    const { data } = await journey(cheungShaWan, airport, { phase: 'preview', timeMode, time,
+      operators: 'CTB', requiredOperators: 'CTB', modes: 'BUS', requiredModes: 'BUS', limits: JSON.stringify({ transfers: 0, walk: 30, wait: 120, ride: 180 }) });
+    expect(data.length).toBeGreaterThan(0);
+    for (const route of data) {
+      expect(route.legs).toHaveLength(1);
+      expect(route.legs[0].networkOperator).toBe('CTB'); expect(route.legs[0].mode).toBe('BUS');
+      expect(journeyMatchesEndpoints(route, cheungShaWan, airport)).toBe(true);
+      if (timeMode === 'arrive') expect(Date.parse(route.arrivalTime)).toBeLessThanOrEqual(Date.parse(time));
+      else expect(route.departureTime).toBe(new Date(time).toISOString());
+    }
+  });
+  it('keeps banned roads out of the fast preview', async () => {
+    const { data } = await journey(cheungShaWan, airport, { phase: 'preview', timeMode: 'depart', time: '2026-11-14T10:00:00+08:00',
+      preferences: JSON.stringify({ roads: { lantau: 'ban' } }) });
+    for (const route of data) expect(routeCorridors(route)).not.toContain('lantau');
+  });
   it('retimes a selected published departure through the browser API', async () => {
     const { data } = await journey(cheungShaWan, airport, { phase: 'preview', timeMode: 'depart', time: '2026-11-14T10:00:00+08:00' });
     const route = data.find((r: { legs: unknown[] }) => r.legs.length === 1);

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { passCatalog } from '../../domain/passCatalog';
 import type { OwnedPass } from '../../domain/payment';
-import { regions } from '../../domain/regions';
+import { regions, matchingRegions } from '../../domain/regions';
 import { PlannerIcon } from './PlannerIcon';
 import { ChoiceDialog } from './ChoiceDialog';
 
@@ -16,7 +16,7 @@ export function PassCatalog({ passes, onAdd, locale, initialRegion = 'all' }: { 
     <label className="choice-search"><PlannerIcon name="pin" size={17} /><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={en ? 'Pass name or region' : '搜尋票券或地區'} aria-label={en ? 'Search passes' : '搜尋月票及通行證'} /></label>
     <ChoiceDialog title={en ? 'Pass country / region' : '票券國家／地區'} closeLabel={en ? 'Close pass countries' : '關閉票券地區'} label={<span>{region === 'all' ? (en ? 'All countries / regions' : '所有國家／地區') : regions.find(r => r.id === region)?.[en ? 'en' : 'zh']}</span>}>
       {close => <><label className="choice-search"><input type="search" aria-label={en ? 'Search pass countries' : '搜尋票券國家'} placeholder={en ? 'Country or region' : '搜尋國家／地區'} value={countrySearch} onChange={e => setCountrySearch(e.target.value)} /></label><div className="payment-options">
-        {[{ id: 'all', zh: '所有國家／地區', en: 'All countries / regions', code: '' }, ...regions].filter(r => [r.zh, r.en, r.code].join(' ').toLowerCase().includes(countrySearch.trim().toLowerCase())).map(r => <button className="payment-option" type="button" key={r.id} aria-pressed={region === r.id} onClick={() => { setRegion(r.id); close(); }}>{en ? r.en : r.zh}</button>)}
+        {(!countrySearch.trim() ? [{ id: 'all', zh: '所有國家／地區', en: 'All countries / regions' }, ...matchingRegions(countrySearch)] : matchingRegions(countrySearch)).map(r => <button className="payment-option" type="button" key={r.id} aria-pressed={region === r.id} onClick={() => { setRegion(r.id); close(); }}>{en ? r.en : r.zh}</button>)}
       </div></>}
     </ChoiceDialog>
     <p>{en ? 'KMB fare rules supported; other tickets are record only. Stored-value cards are not unlimited passes. Check eligibility and sales in Official details.' : '九巴支援計價，其餘只作記錄。儲值卡並非任搭票；適用資格及發售情況請看官方資料。'}</p>

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
-import { regions } from '../../domain/regions';
+import { regions, browseLocation, regionHref } from '../../domain/regions';
 import type { OpenMapArea, OpenMapLine, MapPoint } from '../../domain/openMap';
 import { loadOpenMapArea } from '../../browser/openMapClient';
 import { RegionSwitcher } from './RegionSwitcher';
@@ -54,6 +54,7 @@ function AreaMap({ center, data, selected, onArea, locale }: { center: MapPoint;
 
 export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialRegion?: string; locale: 'zh' | 'en' }) {
   const [regionId, setRegionId] = useState(initialRegion);
+  const [locationReady, setLocationReady] = useState(false);
   const [passes, setPasses] = useState<OwnedPass[]>([]), [payment, setPayment] = useState<PaymentChoice>('adult-octopus'), [paymentReady, setPaymentReady] = useState(false);
   useEffect(() => { try { const saved = readPaymentPreferences(localStorage.getItem('compass-payment-v1')); setPasses(saved.passes); setPayment(saved.payment); } catch { /* optional storage */ } setPaymentReady(true); }, []);
   useEffect(() => { if (paymentReady) try { localStorage.setItem('compass-payment-v1', JSON.stringify({ payment, passes })); } catch { /* optional storage */ } }, [paymentReady, payment, passes]);
@@ -64,11 +65,11 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
   const [busy, setBusy] = useState(false), [error, setError] = useState(false), [reload, setReload] = useState(0);
   const en = locale === 'en', t = (zh: string, english: string) => en ? english : zh;
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get('region');
-    const found = regions.find(r => r.id === requested);
-    if (found) { setRegionId(found.id); setCenter([found.cities[0].lat, found.cities[0].lon]); }
-  }, []);
+    const found = browseLocation(new URLSearchParams(window.location.search), initialRegion);
+    setRegionId(found.region.id); setCenter([found.city.lat, found.city.lon]); setLocationReady(true);
+  }, [initialRegion]);
   useEffect(() => {
+    if (!locationReady) return;
     const controller = new AbortController(), key = `open-area:${regionId}:${center.map(n => n.toFixed(5)).join(',')}`;
     let active = true; setSelected(null); setError(false); setData(null); setBusy(true);
     void (async () => {
@@ -77,8 +78,10 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
           try { const saved = JSON.parse(localStorage.getItem(key) ?? 'null'); if (saved?.roads && saved?.routes && saved?.stops && Date.now() - Date.parse(saved.fetchedAt) < 86400000) { if (active) { setData(saved); setBusy(false); } return; } } catch { /* storage optional */ }
           const firstCity = region.cities[0];
           if (['taiwan', 'japan'].includes(regionId) && center[0] === firstCity.lat && center[1] === firstCity.lon) {
-            const snapshot = await fetch(`/open-data/${regionId}.json`, { signal: controller.signal });
-            if (snapshot.ok) { const saved = await snapshot.json(); if (saved?.roads && saved?.stops) { if (active) setData(saved); return; } }
+            try {
+              const snapshot = await fetch(`/open-data/${regionId}.json`, { signal: controller.signal });
+              if (snapshot.ok) { const saved = await snapshot.json(); if (saved?.roads && saved?.stops) { if (active) setData(saved); return; } }
+            } catch { controller.signal.throwIfAborted(); /* Try the public map when the landing snapshot fails. */ }
           }
         }
         const next = await loadOpenMapArea(regionId, center, controller.signal);
@@ -94,17 +97,18 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
     return () => { active = false; controller.abort(); };
   // region is derived from regionId; using the stable id avoids repeat loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regionId, center, reload]);
+  }, [regionId, center, reload, locationReady]);
+  const currentCity = region.cities.find(c => c.lat === center[0] && c.lon === center[1]);
   const query = search.trim().toLowerCase();
   const lines = (tab === 'roads' ? data?.roads : data?.routes) ?? [];
   const filtered = lines.filter(r => (category === 'all' || tab !== 'roads' || r.kind === category) && [r.name, r.en, r.ref, r.operator ?? ''].join(' ').toLowerCase().includes(query));
   const stops = data?.stops.filter(s => [s.name, s.en].join(' ').toLowerCase().includes(query)) ?? [];
   return <main className="open-data-app" lang={en ? 'en' : 'zh-Hant'}>
-    <header className="app-header"><a className="app-brand" href={en ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a><a className="language-button" href={(regionId === 'taiwan' || regionId === 'japan' ? '/' + regionId : '/world') + (en ? '' : '/en') + '?region=' + regionId}>{en ? '中' : 'EN'}</a></header>
+    <header className="app-header"><a className="app-brand" href={en ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a><a className="language-button" href={regionHref(region, en ? 'zh' : 'en', currentCity)}>{en ? '中' : 'EN'}</a></header>
     <div className="open-data-layout"><aside className="open-data-sidebar">
       <div className="open-data-controls"><div className="open-region-row"><RegionSwitcher current={regionId} locale={locale} /><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} catalogOnly regionId={regionId} /></div><span className="open-data-badge">{t('開放地圖', 'Open map')}</span>
         <h1>{t(region.zh, region.en)}<span>{t('道路及交通', 'Roads & transport')}</span></h1>
-        <div className="open-city-list" aria-label={t('選擇城市', 'Choose city')}>{region.cities.map(c => <button type="button" key={c.en} aria-pressed={center[0] === c.lat && center[1] === c.lon} onClick={() => { setCenter([c.lat, c.lon]); setReload(0); }}>{t(c.name, c.en)}</button>)}</div>
+        <div className="open-city-list" aria-label={t('選擇城市', 'Choose city')}>{region.cities.map(c => <button type="button" key={c.en} aria-pressed={center[0] === c.lat && center[1] === c.lon} onClick={() => { setCenter([c.lat, c.lon]); setReload(0); window.history.replaceState(window.history.state, '', regionHref(region, locale, c)); }}>{t(c.name, c.en)}</button>)}</div>
         <p className="open-coverage-note">{t('附近道路及已繪製交通。尚未支援行程、班次及票價。', 'Local mapped roads & transport. Journey planning, timetables and fares are not available yet.')}</p>
         <nav className="open-data-tabs" aria-label={t('資料種類', 'Data type')}>{(['roads', 'routes', 'stops'] as const).map(id => <button type="button" key={id} aria-pressed={tab === id} onClick={() => { setTab(id); setCategory('all'); setSearch(''); }}><PlannerIcon name={id === 'roads' ? 'layers' : id === 'routes' ? 'bus' : 'pin'} size={17} />{id === 'roads' ? t('道路', 'Roads') : id === 'routes' ? t('路線', 'Routes') : t('站點', 'Stops')}</button>)}</nav>
         <label className="choice-search"><PlannerIcon name="pin" size={17} /><input type="search" value={search} onChange={e => setSearch(e.target.value)} aria-label={t('搜尋此清單', 'Search this list')} placeholder={t('搜尋名稱或編號', 'Name or number')} /></label>
@@ -120,6 +124,6 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
         </>}
       </div>
       <footer className="open-data-source"><details><summary>{t('資料來源及涵蓋範圍', 'Sources & coverage')}</summary><p>{t('只顯示載入範圍內已繪製的路段，並非全國完整路線。地圖資料不代表即時車輛位置或完整時間表。', 'Shows mapped local segments, not complete national networks. Map records are not live vehicles or complete timetables.')}</p>{data && <p>{t('資料擷取：', 'Retrieved: ')}{new Date(data.fetchedAt).toLocaleDateString(en ? 'en-GB' : 'zh-HK', { timeZone: 'Asia/Hong_Kong' })}</p>}<a href="https://github.com/mledoze/countries" target="_blank" rel="noreferrer">Countries · ODbL 1.0</a><br /><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors · ODbL 1.0</a></details></footer>
-    </aside><AreaMap center={center} data={data} selected={selected} locale={locale} onArea={point => { setCenter(point); setReload(0); }} /></div>
+    </aside>{locationReady ? <AreaMap center={center} data={data} selected={selected} locale={locale} onArea={point => { setCenter(point); setReload(0); }} /> : <section className="open-area-map" aria-busy="true" aria-label={t('載入地圖', 'Loading map')} />}</div>
   </main>;
 }

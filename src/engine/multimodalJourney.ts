@@ -231,11 +231,15 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
   const scoreDate = weightingDate(date), originStops = journeyAccessStops(from), destinationStops = journeyAccessStops(to);
   if (!originStops.length || !destinationStops.length) return { routes: [], originStops, destinationStops, candidates: 0 };
   const endings = new Map((reverse ? originStops : destinationStops).map(s => [s.index, s.walk]));
-  const reachable = stopsThatCanReach(endings, reverse, options);
+  // A two-ride preview does not need an unlimited-network reachability sweep.
+  // Each returned leg still goes through the usual timetable and hard filters.
+  // The full search retains its topology preflight for deep transfer searches.
+  const reachable = simpleOnly ? undefined : stopsThatCanReach(endings, reverse, options);
   const rounds = Math.min(simpleOnly ? 2 : networkRoutes.length, (limits.transfers ?? networkRoutes.length - 1) + 1);
-  const finishing = new Set(networkPatterns.map((p, i) => p.s.some((s, j) => endings.has(s) && (reverse ? p.p : p.a)[j] === 0) ? i : -1));
+  const finishing = new Set<number>();
+  endings.forEach((_, stop) => (boardingPatterns[reverse ? 0 : 1].get(stop) ?? []).forEach(index => finishing.add(index)));
   let frontier = new Map<number, Label[]>();
-  for (const { index, walk } of reverse ? destinationStops : originStops) if (reachable.has(index) && limitAllows(limits.walk, walk)) addLabel(frontier, {
+  for (const { index, walk } of reverse ? destinationStops : originStops) if ((!reachable || reachable.has(index)) && limitAllows(limits.walk, walk)) addLabel(frontier, {
     stop: index, elapsed: walk, cost: walk * weights.walk, legs: [], walk, pendingWalk: walk, originWalk: walk, used: [], visited: [index], family: '', readyDelay: 0,
   });
   if (!frontier.size) return { routes: [], originStops, destinationStops, candidates: 0 };
@@ -264,9 +268,8 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
     }
     return directOptions.get(prefix.family)?.some(direct => elapsed >= direct.duration + 5 && prefix!.fare >= direct.fare) ?? false;
   };
-  // The first topology preflight can be slower on a cold device. Give the
-  // actual scan its budget too, rather than returning an empty preview before
-  // even examining a service. Repeated searches reuse that preflight.
+  // Bound the route scan itself; data initialization and result scoring are
+  // measured separately by the browser-worker benchmark.
   const previewDeadline = options.previewBudgetMs === undefined ? Infinity : performance.now() + options.previewBudgetMs;
   let bestCompleteCost = Infinity;
   for (let round = 0; round < rounds && frontier.size; round++) {
@@ -289,6 +292,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
       const operator = route[1] === 'KMB+CTB' ? 'KMB' : route[1] === 'LWB+CTB' ? 'LWB' : route[1];
       const boardings: { label: Label; position: number; wait: number; duration: number; interval: number; publishedHeadway?: number }[] = [];
       for (let step = 0; step < pattern.s.length; step++) {
+        if (options.previewBudgetMs !== undefined && performance.now() > previewDeadline) { previewComplete = false; return; }
         const position = reverse ? pattern.s.length - 1 - step : step, index = pattern.s[position];
         if ((reverse ? pattern.p : pattern.a)[position] === 0) for (const boarding of boardings) {
           const { label, wait, duration, interval } = boarding;
@@ -317,7 +321,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
           const cost = label.cost + ride * weights.ride + waitCost + UpgradedScoringEngine.getOperatorAdjustment(operator, weights)
             + adult.fare * weights.fare + (rail ? weights.unverified : 0) + (round ? weights.transfer : 0);
           if (cost > bestCompleteCost * 1.9 + 30) continue;
-          if (reachable.has(index)) addLabel(arrivals, { stop: index, cost, elapsed, legs, walk: label.walk, pendingWalk: 0,
+          if (!reachable || reachable.has(index)) addLabel(arrivals, { stop: index, cost, elapsed, legs, walk: label.walk, pendingWalk: 0,
             originWalk: label.originWalk, used: reverse ? [pattern.r, ...label.used] : [...label.used, pattern.r],
             visited: [...label.visited, index],
             family: reverse ? pattern.r + ',' + label.family : label.family + ',' + pattern.r, readyDelay: 0 }, simpleOnly && round === 0 ? 48 : 4);
@@ -374,10 +378,11 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
       && selectJourneyAlternatives(scoreRoutes(results, scoreDate, weights), 40, options.preferences).length >= 40) break;
     if (round === rounds - 1) break;
     frontier = new Map();
-    for (const [stop, labels] of Array.from(arrivals)) for (const label of labels) {
+    expandTransfers: for (const [stop, labels] of Array.from(arrivals)) for (const label of labels) {
+      if (options.previewBudgetMs !== undefined && performance.now() > previewDeadline) { previewComplete = false; break expandTransfers; }
       if (discardedByDirect(label, label.elapsed)) continue;
       if (limitAllows(limits.walk, label.walk + 3)) addLabel(frontier, { ...label, elapsed: label.elapsed + 3, cost: label.cost + 3 * weights.walk, walk: label.walk + 3, pendingWalk: 3, readyDelay: Math.max(0, minimumChange - 3) }, simpleOnly ? 48 : 4);
-      for (const t of transfers(stop)) if (reachable.has(t.index) && !label.visited.includes(t.index) && limitAllows(limits.walk, label.walk + t.walk)) addLabel(frontier, { ...label, stop: t.index, elapsed: label.elapsed + t.walk,
+      for (const t of transfers(stop)) if ((!reachable || reachable.has(t.index)) && !label.visited.includes(t.index) && limitAllows(limits.walk, label.walk + t.walk)) addLabel(frontier, { ...label, stop: t.index, elapsed: label.elapsed + t.walk,
         cost: label.cost + t.walk * weights.walk, walk: label.walk + t.walk, pendingWalk: t.walk, readyDelay: Math.max(0, minimumChange - t.walk) }, simpleOnly ? 48 : 4);
     }
   }

@@ -63,8 +63,30 @@ export const regions: BrowseRegion[] = [...asianRegions, ...worldRegions.filter(
   cities: [city('國家／地區中心', 'Country / territory centre', r.lat, r.lon)],
 }))];
 export const regionGroups = [['east', '東亞', 'East Asia'], ['southeast', '東南亞', 'Southeast Asia'], ['south', '南亞', 'South Asia'], ['central', '中亞', 'Central Asia'], ['west', '西亞', 'West Asia'], ['north', '北亞', 'North Asia'], ['europe', '歐洲', 'Europe'], ['africa', '非洲', 'Africa'], ['americas', '美洲', 'Americas'], ['oceania', '大洋洲', 'Oceania'], ['antarctic', '南極洲', 'Antarctica']] as const;
-export function regionHref(region: BrowseRegion, locale: 'zh' | 'en') {
+export function regionHref(region: BrowseRegion, locale: 'zh' | 'en', selectedCity?: BrowseCity) {
   if (region.id === 'macau') return 'https://kmb-monthly-pass-mapper-macau-v2-preview.tableisnottable.workers.dev/macau' + (locale === 'en' ? '/en' : '');
   const path = region.planner ?? (['taiwan', 'japan'].includes(region.id) ? '/' + region.id : '/world');
-  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (path === '/world' ? '?region=' + region.id : '');
+  const params = new URLSearchParams();
+  if (path === '/world') params.set('region', region.id);
+  if (!region.planner && selectedCity && region.cities.includes(selectedCity)) params.set('city', selectedCity.en);
+  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (params.size ? '?' + params : '');
+}
+
+const aliases: Record<string, string[]> = { 'hong-kong': ['香港', 'hongkong'], macau: ['澳门', '澳門', 'macao', 'macau'], taiwan: ['台湾', '台灣'], japan: ['日本'],
+  gb: ['UK', 'Britain', '英国'], us: ['USA', 'America', '美国'], 'south-korea': ['Korea', '韩国'], china: ['中国', '中國'], uae: ['UAE'], au: ['Australia', '澳大利亚'], nz: ['New Zealand', '新西蘭'] };
+export const regionSearchText = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\s.'’_-]+/g, '');
+export function matchingRegions(search: string) {
+  const query = regionSearchText(search);
+  const exact = query && regions.filter(r => [r.code, ...(aliases[r.id] ?? [])].some(text => regionSearchText(text) === query));
+  if (exact && exact.length) return exact;
+  return regions.filter(r => [r.zh, r.en, r.code, ...(aliases[r.id] ?? []), ...r.cities.flatMap(c => [c.name, c.en])].some(text => regionSearchText(text).includes(query)));
+}
+export function matchingRegionCity(region: BrowseRegion, search: string) {
+  const query = regionSearchText(search);
+  return query ? region.cities.find(c => [c.name, c.en].some(text => regionSearchText(text).includes(query))) : undefined;
+}
+export function browseLocation(params: URLSearchParams, fallback: string) {
+  const region = regions.find(r => r.id === params.get('region')) ?? regions.find(r => r.id === fallback) ?? regions[0];
+  const selectedCity = region.cities.find(c => c.en === params.get('city')) ?? region.cities[0];
+  return { region, city: selectedCity };
 }

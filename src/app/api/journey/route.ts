@@ -98,7 +98,7 @@ async function planJourney(params: URLSearchParams, now = new Date(), responseDe
   const walkingRoute = !preview && !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false'
     && limits.walk !== 0 && withinRoutingArea(fromLat, fromLon) && withinRoutingArea(toLat, toLon)
     ? routeOnStreets([[fromLat, fromLon], [toLat, toLon]], 'foot', preferences) : undefined;
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', preview, { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits, ...(preview ? { previewBudgetMs: 1000 } : {}) });
+  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', preview, { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits, ...(preview ? { previewBudgetMs: 100 } : {}) });
   const candidates: Route[] = selectJourneyAlternatives(result.routes.filter(route => (!requiredOperators?.length
     || requiredOperators.every(id => route.legs.some(leg => (leg.networkOperator ?? leg.operator).split('+').includes(id))))
     && (!requiredModes?.length || requiredModes.every(id => route.legs.some(leg => leg.mode === id)))), 64, preferences);
