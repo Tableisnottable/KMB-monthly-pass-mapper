@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -46,7 +46,7 @@ async function runPool(items, worker) {
 
 export async function main({
   fetchData = fetchJson,
-  outputPath = new URL('../src/data/kmbRouteStops.json', import.meta.url),
+  outputPath = new URL('../src/data/kmbRouteStops/manifest.json', import.meta.url),
   log = console.log,
   warn = console.warn,
 } = {}) {
@@ -87,16 +87,26 @@ export async function main({
     routes: fetched.filter(Boolean),
   };
   if (fetched.some(row => row === null)) throw new Error('Incomplete KMB download; keeping the previous snapshot.');
-  const json = JSON.stringify(output);
-  if (Buffer.byteLength(json) >= 1_000_000) throw new Error('KMB snapshot exceeds the small-source-file limit.');
-  writeFileSync(
-    outputPath,
-    json,
-    'utf8',
-  );
+  writeSnapshot(output, outputPath);
   log(
-    `Wrote ${output.routes.length}/${requests.length} route-stop sequences to src/data/kmbRouteStops.json`,
+    `Wrote ${output.routes.length}/${requests.length} route-stop sequences in four small source files`,
   );
+}
+
+export function writeSnapshot(output, outputPath) {
+  const target = outputPath instanceof URL ? outputPath : pathToFileURL(resolve(outputPath));
+  const files = Array.from({ length: 4 }, (_, index) => {
+    const routes = output.routes.filter((_row, position) => position % 4 === index);
+    return { name: `routes-${index}.json`, text: JSON.stringify({ generatedAt: output.generatedAt, routes }) };
+  });
+  // Validate every part before touching any previous snapshot.
+  if (files.some(file => Buffer.byteLength(file.text) >= 1_000_000)) {
+    throw new Error('KMB snapshot part exceeds the small-source-file limit.');
+  }
+  mkdirSync(new URL('.', target), { recursive: true });
+  for (const file of files) writeFileSync(new URL(file.name, target), file.text, 'utf8');
+  writeFileSync(target, JSON.stringify({ generatedAt: output.generatedAt, count: output.routes.length,
+    files: files.map(file => file.name) }), 'utf8');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

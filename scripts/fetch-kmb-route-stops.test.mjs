@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { fetchJson, main } from './fetch-kmb-route-stops.mjs';
+import { fetchJson, main, writeSnapshot } from './fetch-kmb-route-stops.mjs';
 
 const response = data => ({ ok: true, json: async () => ({ data }) });
 const noDelay = async () => {};
@@ -94,8 +94,25 @@ test('writes a complete snapshot after a transient failure, retaining empty loop
       return response([{ seq: '2', stop: 'B' }, { seq: '1', stop: 'A' }]);
     },
   }) });
-  const output = JSON.parse(readFileSync(outputPath, 'utf8'));
-  assert.equal(output.routes.length, 2);
-  assert.deepEqual(output.routes[0].stops, [{ seq: 1, stop: 'A' }, { seq: 2, stop: 'B' }]);
-  assert.deepEqual(output.routes[1].stops, []);
+  const manifest = JSON.parse(readFileSync(outputPath, 'utf8'));
+  const routes = manifest.files.flatMap(name => JSON.parse(readFileSync(join(directory, name), 'utf8')).routes);
+  assert.equal(routes.length, 2);
+  assert.deepEqual(routes[0].stops, [{ seq: 1, stop: 'A' }, { seq: 2, stop: 'B' }]);
+  assert.deepEqual(routes[1].stops, []);
+});
+
+test('splits a complete snapshot larger than 1 MB into small source files without losing routes', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'kmb-fetch-test-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const routes = Array.from({ length: 1000 }, (_, i) => ({ route: String(i), stops: [{ stop: 'A'.repeat(1500) }] }));
+  const outputPath = join(directory, 'manifest.json');
+  writeSnapshot({ generatedAt: 'test', routes }, outputPath);
+  const manifest = JSON.parse(readFileSync(outputPath, 'utf8'));
+  const restored = manifest.files.flatMap(name => {
+    const bytes = readFileSync(join(directory, name));
+    assert.ok(bytes.byteLength < 1_000_000);
+    return JSON.parse(bytes).routes;
+  });
+  assert.equal(restored.length, routes.length);
+  assert.equal(new Set(restored.map(row => row.route)).size, routes.length);
 });

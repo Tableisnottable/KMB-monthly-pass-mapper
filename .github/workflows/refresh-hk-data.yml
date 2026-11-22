@@ -56,7 +56,7 @@ jobs:
           node scripts/test-browser-worker.mjs
       - name: Commit only small verified source snapshots
         run: |
-          git add src/data/transport src/data/alignments src/data/places src/data/studentFares.json src/data/residentsDirectory.json src/data/corridorSegments.json src/data/kmbRouteStops.json src/data/citybusRouteStops.json src/data/citybusStops.json
+          git add src/data/transport src/data/alignments src/data/places src/data/studentFares.json src/data/residentsDirectory.json src/data/corridorSegments.json src/data/kmbRouteStops src/data/citybusRouteStops.json src/data/citybusStops.json
           node scripts/check-staged-sizes.mjs
           if git diff --cached --quiet; then exit 0; fi
           git config user.name 'github-actions[bot]'
