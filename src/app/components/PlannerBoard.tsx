@@ -175,7 +175,7 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
   const selectedTravel = travelChoices[travelAlternative] ?? baseTravel;
   const fasterWalk = travel.options.find(option => option.mode === 'walk' && option.available
     && routes.some(route => route.legs.some(leg => leg.mode !== 'WALK'))
-    && routes.filter(route => route.legs.some(leg => leg.mode !== 'WALK')).every(route => option.minutes < journeyMinutes(route)));
+    && routes.filter(route => route.legs.some(leg => leg.mode !== 'WALK')).every(route => (option.minutes ?? Infinity) < journeyMinutes(route)));
   const sidebar = useRef<HTMLDivElement>(null);
   useEffect(() => { setSelectedId(current => routes.some(route => route.id === current) ? current : routes.find(route => route.legs.some(leg => leg.mode !== 'WALK'))?.id ?? ''); }, [sourceRoutes]);
   const previousTravelKey = useRef('');
