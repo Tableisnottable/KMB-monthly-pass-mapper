@@ -9,7 +9,7 @@ describe('Optional hard journey limits', () => {
   it('keeps default behaviour and accepts zero plus exact boundaries', () => {
     expect(parseJourneyLimits(null)).toEqual(DEFAULT_LIMITS);
     expect(parseJourneyLimits('{"ride":0,"transfers":0}')).toEqual({ ...DEFAULT_LIMITS, ride: 0, transfers: 0 });
-    expect(withinJourneyLimits(route, { transfers: 1, walk: 10, wait: 7, ride: 35, change: 10 })).toBe(true);
+    expect(withinJourneyLimits(route, { transfers: 1, walk: 10, wait: 12, ride: 35, change: 10 })).toBe(true);
     for (const [key, value] of Object.entries({ transfers: 0, walk: 9, wait: 6, ride: 34, change: 9 })) expect(withinJourneyLimits(route, { ...DEFAULT_LIMITS, [key]: value })).toBe(false);
   });
   it('allows journey limits above the former 240-minute cap while blank means unlimited', () => {
@@ -24,6 +24,16 @@ describe('Optional hard journey limits', () => {
   });
   it('caps walking comparisons by their actual walk duration', () => {
     expect(withinJourneyLimits({ id: 'walk', legs: [{ mode: 'WALK', operator: 'WALK', journeyTimeMinutes: 12 }] }, { ...DEFAULT_LIMITS, walk: 11 })).toBe(false);
+  });
+  it('rejects over two hours of waiting by default, including cumulative transfer waits', () => {
+    const longWait: Route = { id: 'overnight', legs: [{ operator: 'KMB', mode: 'BUS', scheduledWaitMinutes: 121 }] };
+    expect(DEFAULT_LIMITS.wait).toBe(120);
+    expect(withinJourneyLimits(longWait, DEFAULT_LIMITS)).toBe(false);
+    expect(withinJourneyLimits({ id: 'changes', legs: [
+      { operator: 'KMB', mode: 'BUS', scheduledWaitMinutes: 70 },
+      { operator: 'CTB', mode: 'BUS', scheduledWaitMinutes: 70 },
+    ] }, DEFAULT_LIMITS)).toBe(false);
+    expect(withinJourneyLimits(longWait, { ...DEFAULT_LIMITS, wait: null })).toBe(true);
   });
   it.each(['[]', '{"ride":-1}', '{"walk":1.5}', '{"ride":9007199254740992}', '{"wait":"5"}', '{"unknown":1}', '{"__proto__":0}'])('rejects malformed caps %s', raw => expect(() => parseJourneyLimits(raw)).toThrow());
 });

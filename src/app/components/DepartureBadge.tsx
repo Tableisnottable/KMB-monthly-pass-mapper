@@ -15,7 +15,7 @@ export function DepartureBadge({ departure, locale, showTiming = true }: { depar
       {timing === 'LIVE' ? copy(locale, '即時', 'Live') : copy(locale, '原定班次', 'Scheduled')}
     </span>}
     {service && <span className={'departure-type departure-' + service.toLowerCase()} data-departure-type={service}
-      title={inferred ? copy(locale, '未符合已匯入時間表；可能是加班、延誤或資料更新，未獲確認。', 'Outside the imported timetable; possibly an extra, delay or schedule update. Unconfirmed.')
+      title={inferred ? copy(locale, '同時段預測班數多於時間表，或總站原定時間不符；可能為額外班次，未獲營辦商確認。', 'More predicted trips than timetable slots in the same window, or a terminal scheduled-time mismatch. Possible extra; not operator-confirmed.')
         : copy(locale, '營辦商明確提供的班次狀態。', 'Service status explicitly supplied by the operator.')}>
       {service === 'ADDITIONAL' ? copy(locale, '加班', 'Additional') + (inferred ? '?' : '') : service === 'MISSED' ? copy(locale, '脫班', 'Missed') : copy(locale, '取消', 'Cancelled')}
     </span>}

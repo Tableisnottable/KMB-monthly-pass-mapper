@@ -20,6 +20,7 @@ import { parseJourneyVias, type ViaStop } from '../../../domain/journeyVia';
 import { joinViaJourney } from '../../../engine/viaJourney';
 
 export const dynamic = 'force-dynamic';
+const previewCache = new Map<string, { expires: number; body: string }>();
 
 /** Slow external feeds may finish later; they must never hold the route list open. */
 async function beforeDeadline<T>(promise: Promise<T>, deadline: number): Promise<T | undefined> {
@@ -40,7 +41,22 @@ export async function GET(request: NextRequest) {
       { status: 429, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' } });
   }
   if (request.nextUrl.searchParams.get('operation') === 'retime') return retimeJourney(request.nextUrl.searchParams);
-  return planJourney(request.nextUrl.searchParams);
+  const params = request.nextUrl.searchParams;
+  if (params.get('phase') !== 'preview') return planJourney(params);
+  const normalized = new URLSearchParams(params); normalized.sort();
+  const key = normalized.toString(), cached = previewCache.get(key);
+  if (cached && cached.expires > Date.now()) return new NextResponse(cached.body, {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Planner-Cache': 'HIT' },
+  });
+  const response = await planJourney(params);
+  if (response.ok) {
+    const body = await response.clone().text();
+    if (JSON.parse(body).data?.length) {
+      if (previewCache.size >= 32) previewCache.delete(previewCache.keys().next().value!);
+      previewCache.set(key, { body, expires: Date.now() + (params.get('timeMode') === 'now' || !params.get('timeMode') ? 5000 : 60000) });
+    }
+  }
+  return response;
 }
 
 function retimeJourney(params: URLSearchParams) {
@@ -98,7 +114,13 @@ async function planJourney(params: URLSearchParams, now = new Date(), responseDe
   const walkingRoute = !preview && !requiredOperators?.length && !requiredModes?.length && params.get('walkComparison') !== 'false'
     && limits.walk !== 0 && withinRoutingArea(fromLat, fromLon) && withinRoutingArea(toLat, toLon)
     ? routeOnStreets([[fromLat, fromLon], [toLat, toLon]], 'foot', preferences) : undefined;
-  const result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', preview, { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits, ...(preview ? { previewBudgetMs: 100 } : {}) });
+  const searchOptions = { operators, modes, requiredOperators, requiredModes, weights, minimumChangeMinutes, preferences, limits };
+  let result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', preview,
+    { ...searchOptions, ...(preview ? { previewBudgetMs: 35 } : {}) });
+  // A busy or slower device gets a second, bounded pass if the short pass has
+  // not found a valid route. An empty fast preview is never a no-route verdict.
+  if (preview && !result.routes.length) result = findMultimodalJourneys({ lat: fromLat, lng: fromLon }, { lat: toLat, lng: toLon }, date, locale, mode === 'arrive', true,
+    { ...searchOptions, previewBudgetMs: 200 });
   const candidates: Route[] = selectJourneyAlternatives(result.routes.filter(route => (!requiredOperators?.length
     || requiredOperators.every(id => route.legs.some(leg => (leg.networkOperator ?? leg.operator).split('+').includes(id))))
     && (!requiredModes?.length || requiredModes.every(id => route.legs.some(leg => leg.mode === id)))), 64, preferences);

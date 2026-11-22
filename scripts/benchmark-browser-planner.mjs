@@ -21,6 +21,8 @@ const thread = new Worker(`
   });
 `, { eval: true, workerData: resolve('public/__planner/transport.worker.js') });
 let sequence = 0;
+const runCount = Math.max(1, Math.min(100, Number(process.argv.find(arg => arg.startsWith('--runs='))?.split('=')[1]) || 3));
+const timings = [];
 async function request(path) {
   const id = ++sequence, started = performance.now(), reply = once(thread, 'message');
   thread.postMessage({ id, url: 'http://localhost:8787' + path });
@@ -39,9 +41,12 @@ try {
   ]) {
     const params = new URLSearchParams({ fromLat: '22.33882', fromLon: '114.15387', toLat, toLon,
       timeMode: 'depart', time: '2026-11-14T10:00:00+08:00', phase: 'preview', ...extra });
-    for (let run = 0; run < 3; run++) {
+    for (let run = 0; run < runCount; run++) {
+      if (process.argv.includes('--uncached')) params.set('_benchmarkSample', String(run));
       const { elapsed, result } = await request('/api/journey?' + params);
-      console.log(`${name} ${run ? 'repeat' : 'first'}: ${elapsed.toFixed(1)} ms, ${result.data.length} results`);
+      if (!result.data.length) throw new Error(`${name}: no first results`);
+      timings.push(elapsed);
+      if (runCount <= 5) console.log(`${name} ${run ? 'repeat' : 'first'}: ${elapsed.toFixed(1)} ms, ${result.data.length} results`);
     }
     if (process.argv.includes('--complete')) {
       params.delete('phase'); params.set('walkComparison', 'false');
@@ -49,4 +54,6 @@ try {
       console.log(`${name} complete: ${elapsed.toFixed(1)} ms, ${result.data.length} results`);
     }
   }
+  timings.sort((a, b) => a - b);
+  console.log(`Preview samples: ${timings.length}; mean ${(timings.reduce((a, b) => a + b, 0) / timings.length).toFixed(1)} ms; p95 ${timings[Math.ceil(timings.length * .95) - 1].toFixed(1)} ms; max ${timings.at(-1).toFixed(1)} ms; ${process.argv.includes('--uncached') ? 'response cache bypassed' : 'response cache enabled'}`);
 } finally { await thread.terminate(); }

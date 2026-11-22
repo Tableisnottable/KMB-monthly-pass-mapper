@@ -26,6 +26,9 @@ import { journeyMatchesEndpoints } from '../../domain/journeyEndpointMatch';
 import { PaymentControl } from './PaymentControl';
 import { passActive, paymentChoices, paymentProfile, readPaymentPreferences, type OwnedPass, type PaymentChoice } from '../../domain/payment';
 import coverageSnapshot from '../../data/transport/manifest.json';
+import { encodePlannerSession, PLANNER_SESSION_KEY, readPlannerSession } from './plannerSession';
+import { ReleaseNotes } from './ReleaseNotes';
+import type { MapPickLabel, MapPickTarget } from './JourneyMap';
 
 interface JourneyMeta {
   source?: string;
@@ -71,8 +74,42 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const [activeField, setActiveField] = useState<JourneyField>('origin');
   const [endpoints, setEndpoints] = useState<{ origin: PlaceResult; destination: PlaceResult; vias?: PlaceResult[] } | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [restored, setRestored] = useState(false);
+  const restoreSearch = useRef(false);
   useEffect(() => {
-    const timer = window.setTimeout(() => { void fetch('/api/journey?operation=warm').catch(() => {}); }, 0);
+    try {
+      const saved = readPlannerSession(localStorage.getItem(PLANNER_SESSION_KEY), defaultSettings());
+      if (saved) {
+        setPlaces(saved.places); setTime(saved.time);
+        setCompanies(saved.settings.companies); setTransport(saved.settings.transport); setComparisons(saved.settings.comparisons);
+        setPreferences(saved.settings.preferences); setWeights(saved.settings.weights); setLimits(saved.settings.limits); setChangeMinutes(saved.settings.changeMinutes);
+        const keys = locationVias(saved.places).map(() => 'via-' + nextViaKey.current++); setViaKeys(keys);
+        setActiveField(saved.places.origin ? 'destination' : 'origin');
+        if (saved.searched && saved.places.origin && saved.places.destination && readyJourney(saved.places)) {
+          setRoutes(saved.routes); setSearched(true); setRestored(true);
+          setEndpoints({ origin: saved.places.origin, destination: saved.places.destination, vias: saved.places.vias?.filter((value): value is PlaceResult => Boolean(value)) });
+          restoreSearch.current = true;
+        }
+      }
+    } catch { /* The planner still works with storage disabled. */ }
+    setSessionLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!sessionLoaded) return;
+    const timer = window.setTimeout(() => {
+      try { localStorage.setItem(PLANNER_SESSION_KEY, encodePlannerSession({ places, time, routes, searched,
+        settings: { companies, transport, comparisons, preferences, changeMinutes, weights, limits } })); } catch { /* Storage may be full or blocked. */ }
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [sessionLoaded, places, time, routes, searched, companies, transport, comparisons, preferences, changeMinutes, weights, limits]);
+  useEffect(() => {
+    if (!sessionLoaded || !restoreSearch.current || !places.origin || !places.destination) return;
+    restoreSearch.current = false;
+    void handleSearch(places.origin, places.destination, undefined, true).then(() => setRestored(false)).catch(() => {});
+  }, [sessionLoaded]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fetch('/api/journey?operation=warm&phase=preview').catch(() => {}); }, 0);
     return () => window.clearTimeout(timer);
   }, []);
   const arrivalsDialog = useRef<HTMLDialogElement>(null);
@@ -226,11 +263,13 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     setWaypoints(vias, keys, `via:${target}`);
   }
 
-  function pickMapPoint(lat: number, lng: number) {
-    const name = activeField.startsWith('via:') ? copy(locale, '地圖所選途經點', 'Via selected on map') : activeField === 'origin' ? copy(locale, '地圖所選起點', 'Start selected on map') : copy(locale, '地圖所選目的地', 'Destination selected on map');
+  function pickMapPoint(lat: number, lng: number, field: MapPickTarget = activeField, label?: MapPickLabel) {
+    const name = label?.name ?? (field === 'new-via' || field.startsWith('via:') ? copy(locale, '地圖所選途經點', 'Via selected on map') : field === 'origin' ? copy(locale, '地圖所選起點', 'Start selected on map') : copy(locale, '地圖所選目的地', 'Destination selected on map'));
     const place: PlaceResult = { id: 'map-' + lat + ',' + lng + '-' + Date.now(), name,
-      address: copy(locale, '正在查找街道及鄰近地標…', 'Finding the street and nearby landmarks…'), lat, lng, type: 'map', googleMapsUrl: '' };
-    selectPlace(activeField, place); void resolveMapLabel(place);
+      address: label?.address ?? copy(locale, '正在查找街道及鄰近地標…', 'Finding the street and nearby landmarks…'), lat, lng, type: 'map', googleMapsUrl: '' };
+    if (field === 'new-via') setWaypoints([...locationVias(places), place], [...viaKeys, 'via-' + nextViaKey.current++], 'destination');
+    else selectPlace(field, place);
+    if (!label) void resolveMapLabel(place);
   }
 
   const uncovered = meta?.originUncovered || meta?.destinationUncovered;
@@ -247,7 +286,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
   const filterSections: [SettingsSection, string, string, number | string][] = [
     ['companies', '交通方式', 'Transport', Object.values(companies).filter(level => level !== 'normal').length + Object.values(transport).filter(level => level !== 'normal').length + Object.values(comparisons).filter(value => !value).length],
     ['roads', '道路', 'Roads', corridorIds.filter(id => roadLevel(preferences, id) !== 'normal').length],
-    ['changes', '時間上限', 'Time limits', Object.values(limits).filter(value => value !== null).length + (changeMinutes === DEFAULT_CHANGE_MINUTES ? 0 : 1)],
+    ['changes', '時間上限', 'Time limits', (Object.keys(DEFAULT_LIMITS) as (keyof JourneyLimits)[]).filter(key => limits[key] !== DEFAULT_LIMITS[key]).length + (changeMinutes === DEFAULT_CHANGE_MINUTES ? 0 : 1)],
     ['importance', '重要性', 'Importance', customWeights(weights) ? copy(locale, '自訂', 'Custom') : 0],
   ];
   const settingsChanged = filterSections.some(([, , , count]) => Boolean(count));
@@ -267,6 +306,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
     {notice && <p className="planner-notice notice-warning" role="status"><span>{notice}</span>{noTransitRoutes && settingsChanged && <button type="button" className="notice-action" onClick={() => applySettings(defaultSettings())}>{copy(locale, '不限篩選重搜', 'Try all routes')}</button>}</p>}
     {dataUpdateAvailable && <p className="planner-notice notice-warning" role="status">{copy(locale, '有新交通、票價或時間表資料。', 'Updated transport, fare or timetable data is available.')} <button type="button" onClick={() => window.location.reload()}>{copy(locale, '重新載入以使用新資料', 'Reload to use updated data')}</button></p>}
     {journeyRefresh.failed && <p className="planner-notice notice-warning" role="status">{copy(locale, '行程自動更新失敗；保留的時間可能已過時，將自動重試。', 'Journey refresh failed. Retained times may be stale; retrying automatically.')}</p>}
+    {restored && <p className="planner-notice" role="status">{copy(locale, '已恢復行程 · 正在更新時間', 'Journey restored · refreshing times')}</p>}
   </section>;
 
   return <main className="compass-app" lang={locale === 'en' ? 'en' : 'zh-HK'}>
@@ -275,6 +315,7 @@ export function JourneyPlanner({ initialRoutes, locale = 'zh' }: { initialRoutes
       <div className="header-brand-group">
         <button type="button" className="header-menu-button" onClick={() => setMenuOpen(true)} aria-label={copy(locale, '開啟選單', 'Open menu')}><PlannerIcon name="menu" size={24} /></button>
         <a className="app-brand" href={locale === 'en' ? '/en' : '/'} aria-label="Transit Compass HK"><span className="brand-symbol"><PlannerIcon name="arrow" size={20} /></span><span>Transit Compass</span></a>
+        <ReleaseNotes locale={locale} />
       </div>
       <nav className="header-actions" aria-label={copy(locale, '主選單', 'Main navigation')}>
         <a href={locale === 'en' ? '/' : '/en'} className="language-button" aria-label={locale === 'en' ? '繁體中文' : 'English'}>{locale === 'en' ? '中' : 'EN'}</a>

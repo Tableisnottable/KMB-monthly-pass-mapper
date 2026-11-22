@@ -17,11 +17,11 @@ describe('Joint operator arrival displays', () => {
     expect(html.match(/disabled=""/g)).toHaveLength(2);
     expect(html).toContain('Too early');
   });
-  it('offers an on-demand past-departure lookup even when no upcoming service is available', () => {
+  it('opens recent past departures above current and future times even when no upcoming service is available', () => {
     const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [], operator: 'KMB', routeNumber: '38', locale: 'en',
       historyQuery: { route: 'route-38', pattern: 'pattern-38', stop: 'stop-1', board: 0 } }));
-    expect(html).toContain('View past departures');
-    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('Loading past departures');
+    expect(html).toContain('aria-expanded="true"');
   });
   it('groups both companies into one service while retaining all individual arrivals', () => {
     const input = [row, { ...row, id: 'second', operator: 'CTB' }, { ...row, id: 'third' }];
@@ -127,6 +127,20 @@ describe('Joint operator arrival displays', () => {
     expect(html.match(/role="listitem"/g)).toHaveLength(3);
     expect(html).toContain('More departures (+10)');
     expect(html).toContain('aria-expanded="false"');
+  });
+  it('shows every provider prediction without requiring the more button, including simultaneous buses', () => {
+    const departures: LiveDeparture[] = Array.from({ length: 9 }, (_, i) => ({
+      time: new Date(Date.parse('2026-11-14T13:00:00Z') + Math.floor(i / 2) * 5 * 60000).toISOString(), minutes: i * 5,
+      operator: 'KMB', scheduleMatch: 'MATCHED', timingType: 'LIVE',
+    }));
+    departures.splice(3, 0, { time: '2026-11-14T13:06:00Z', minutes: 6, timetableEstimate: true, scheduleMatch: 'MATCHED' });
+    const html = renderToStaticMarkup(createElement(JointArrivalBoard, { locale: 'en', operator: 'KMB', departures,
+      onSelectDeparture() {}, historyQuery: { route: 'test', stop: 'stop' } }));
+    expect(html.match(/role="radio"/g)).toHaveLength(9);
+    expect(html.indexOf('Loading past departures')).toBeLessThan(html.indexOf('arrival-now-divider'));
+    expect(html.indexOf('arrival-now-divider')).toBeLessThan(html.indexOf('class="departure-choices"'));
+    expect(html).toContain('More departures (+1)');
+    expect(html).toContain('arrival-board-scroll');
   });
   it('removes stock provider remarks without swallowing useful service messages', () => {
     expect(arrivalRemark('原定班次 · Scheduled Bus')).toBe('');

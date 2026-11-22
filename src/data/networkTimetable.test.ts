@@ -109,8 +109,16 @@ describe('Added live departures', () => {
   it('allows normal ETA drift instead of marking every delayed bus as added', () => {
     expect(match('15:12:00').scheduleMatch).toBe('MATCHED');
   });
-  it('shows out-of-window live services as added, with the comparison reason', () => {
-    expect(match('16:00:00')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
+  it('does not call an out-of-window live ETA an additional departure', () => {
+    expect(match('16:00:00')).toEqual({ scheduleMatch: 'UNVERIFIED' });
+  });
+  it('does not infer extra buses from interpolated intermediate-stop times', () => {
+    for (const remark of ['', 'Scheduled Bus']) {
+      expect(matchDepartureToTimetable(index, 1, 2, day + 'T16:00:00+08:00', remark))
+        .toEqual({ scheduleMatch: 'UNVERIFIED' });
+    }
+    expect(matchDepartureToTimetable(index, 1, 2, day + 'T16:00:00+08:00', '加班車'))
+      .toEqual({ scheduleMatch: 'ADDED', addedReason: 'PROVIDER' });
   });
   it('compares provider-scheduled terminal times with slots as well as service windows', () => {
     expect(match('16:00:00', '原定班次 · Scheduled Bus')).toEqual({ scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
@@ -134,6 +142,36 @@ describe('Added live departures', () => {
 });
 
 describe('Observed timetable changes', () => {
+  it('counts four live buses against two timetable slots rather than marking every mismatched time extra', () => {
+    networkPatterns[index].w = [[127, 600, 661, 15, 20]];
+    const input = ['10:00', '10:05', '10:10', '10:15'].map(clock => ({
+      time: day + 'T' + clock + ':00+08:00', minutes: 1, operator: 'KMB', timingType: 'LIVE' as const,
+      ...matchDepartureToTimetable(index, 0, 2, day + 'T' + clock + ':00+08:00'),
+    }));
+    const classified = classifyDepartureTypes(index, 0, input);
+    expect(classified.filter(row => row.departureType === 'ADDITIONAL')).toHaveLength(2);
+    expect(input.every(row => row.scheduleMatch !== 'ADDED')).toBe(true);
+  });
+  it('retains simultaneous vehicles in count comparisons and does not double-count confirmed extras', () => {
+    networkPatterns[index].w = [[127, 600, 661, 15, 20]];
+    const input = ['10:00', '10:05', '10:05', '10:15'].map((clock, i) => ({
+      time: day + 'T' + clock + ':00+08:00', minutes: 1, operator: 'KMB', timingType: 'LIVE' as const,
+      remark: i === 1 ? '加班車' : '', ...matchDepartureToTimetable(index, 0, 2, day + 'T' + clock + ':00+08:00', i === 1 ? '加班車' : ''),
+    }));
+    const classified = classifyDepartureTypes(index, 0, input);
+    expect(classified).toHaveLength(4);
+    expect(classified.filter(row => row.departureType === 'ADDITIONAL')).toHaveLength(2);
+  });
+  it('recognises possible shifted live times without inventing additional buses or cancellation', () => {
+    networkPatterns[index].w = [[127, 600, 661, 15, 20]];
+    const input = ['10:01', '10:16', '10:31'].map(clock => ({
+      time: day + 'T' + clock + ':00+08:00', minutes: 1, operator: 'KMB', timingType: 'LIVE' as const, scheduleMatch: 'MATCHED' as const,
+    }));
+    expect(classifyDepartureTypes(index, 0, input).map(row => row.changedReason)).toEqual(['POSSIBLE_SHIFT', 'POSSIBLE_SHIFT', 'POSSIBLE_SHIFT']);
+    expect(classifyDepartureTypes(index, 0, input).some(row => row.departureType === 'ADDITIONAL' || row.departureType === 'CANCELLED')).toBe(false);
+    networkPatterns[index].w = [];
+    expect(classifyDepartureTypes(index, 0, input).some(row => row.departureType === 'ADDITIONAL')).toBe(false);
+  });
   function rows(times: string[], boarding = 0, operator = 'KMB') {
     return times.map(clock => {
       const time = day + 'T' + clock + ':00+08:00';

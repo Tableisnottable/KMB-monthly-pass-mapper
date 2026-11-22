@@ -785,6 +785,45 @@ button.departure-choice:hover { background: #e5edf3; }
 .joint-arrival-board .departure-history-row { border-bottom: 1px solid #dce3ea; }
 .joint-arrival-board .departure-history-destination, .joint-arrival-board .departure-history-note { display: block; margin-top: 3px; color: #718391; font-size: 10px; }
 .joint-arrival-board .departure-already-left strong { color: #7b8b97; font-size: 13px; }
+.arrival-now-divider { display: flex; justify-content: space-between; gap: 12px; padding: 8px 4px; margin: 7px 0; border-top: 2px solid #42945b; color: #28703e; font-size: 12px; font-weight: 700; }
+.app-version { padding: 5px 7px; border-radius: 6px; background: #ffffff18; color: inherit; font-size: 10px; white-space: nowrap; }
+.release-notes-dialog { width: min(500px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); padding: 0; border: 0; border-radius: 20px; color: #254336; box-shadow: 0 18px 80px #0003; }
+.release-notes-dialog::backdrop { background: #102e3466; backdrop-filter: blur(4px); }
+.release-notes-dialog article { padding: 24px; }
+.release-notes-dialog header { display: flex; align-items: center; justify-content: space-between; color: #687e73; font-size: 12px; }
+.release-notes-dialog header button { width: 38px; height: 38px; font-size: 24px; border-radius: 50%; background: #eff5f0; }
+.release-notes-dialog h2 { margin: 10px 0 20px; font-size: 25px; font-weight: 800; }
+.release-notes-dialog ul { list-style: disc; padding-left: 20px; font-size: 14px; line-height: 1.7; }
+.release-notes-dialog li { margin: 10px 0; }
+.release-notes-done { width: 100%; min-height: 48px; margin-top: 20px; background: #258547; color: #fff; border-radius: 12px; font-weight: 750; }
+.map-pending-pin { color: #168d47; font-size: 32px; text-align: center; text-shadow: 0 2px 2px #fff, 0 5px 10px #0005; }
+.map-selection-sheet { position: absolute; z-index: 650; bottom: 65px; left: 16px; width: min(370px, calc(100% - 32px)); padding: 16px; border-radius: 16px; background: #fff; box-shadow: 0 6px 30px #183b3540; color: #244534; }
+.map-selection-sheet header { display: flex; align-items: flex-start; gap: 10px; }
+.map-selection-sheet header > div { flex: 1; }
+.map-selection-sheet strong { display: block; font-size: 16px; }
+.map-selection-sheet small { display: block; margin-top: 5px; font-size: 11px; color: #6b8074; }
+.map-selection-sheet header button { min-width: 36px; height: 36px; background: #eff5f0; border-radius: 50%; font-size: 24px; }
+.map-selection-sheet > div { display: flex; gap: 7px; margin-top: 15px; }
+.map-selection-sheet > div button { flex: 1; min-height: 45px; padding: 6px; background: #e8f4eb; border: 1px solid #b6d5bf; border-radius: 9px; font-size: 12px; font-weight: 700; }
+.map-selection-sheet > div button:nth-child(2) { background: #238449; color: #fff; border-color: #238449; }
+.navigation-progress { height: 5px; background: #e3eee6; border-radius: 4px; overflow: hidden; margin-top: 12px; }
+.navigation-progress span { display: block; height: 100%; background: #288e48; transition: width .2s; }
+.navigation-route-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+.navigation-near-stop { display: block; color: #208b43; margin-top: 10px; font-size: 13px; }
+.navigation-step-actions { display: flex; align-items: center; gap: 12px; margin: 18px 0; }
+.navigation-step-actions > button:first-child { min-height: 48px; padding: 9px 14px; border-radius: 10px; background: #edf3ef; font-size: 12px; }
+.navigation-step-actions > button:disabled { opacity: .4; }
+.navigation-step-actions .navigation-next { flex: 1; background: #238449; color: #fff; border: 0; border-radius: 10px; margin: 0; padding: 12px; }
+.navigation-step-list { margin-top: 20px; padding: 0; list-style: none; }
+.navigation-step-list li { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid #e4ece7; font-size: 12px; color: #61766a; }
+.navigation-step-list li > span { display: grid; place-items: center; flex-shrink: 0; width: 27px; height: 27px; border-radius: 50%; background: #e7eee9; }
+.navigation-step-list li.is-current { color: #175a2e; }
+.navigation-step-list li.is-current > span { background: #258547; color: #fff; }
+.navigation-step-list li.is-complete { opacity: .6; }
+.navigation-step-list small { display: block; margin-top: 3px; }
+.faster-walk-option { display: flex; width: 100%; align-items: center; gap: 12px; padding: 15px; margin: 12px 0; background: #e7f6e5; color: #175b2e; border: 2px solid #5ca66e; border-radius: 13px; font-size: 13px; text-align: left; }
+.faster-walk-option > span { flex: 1; }
+.faster-walk-option strong { display: block; font-size: 20px; margin-top: 4px; }
 .departure-missed { background: #eee7f5; color: #62416e; border-color: #c8b0d3; }
 .arrival-help { color: #667d8d; }
 .arrival-help p { font-size: 11px; }

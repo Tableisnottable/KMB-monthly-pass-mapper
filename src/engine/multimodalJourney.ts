@@ -358,7 +358,8 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
           const departure = departureAt(pattern, serviceWindows, position, reverse ? -label.elapsed - label.readyDelay : label.elapsed + label.readyDelay, reverse);
           if (departure) {
             const wait = departure.wait + label.readyDelay;
-            if ((!reverse || label.legs.length) && !limitAllows(limits.wait, wait)) continue;
+            if ((!reverse || label.legs.length) && !limitAllows(limits.wait,
+              wait + label.legs.reduce((sum, leg) => sum + (leg.scheduledWaitMinutes ?? 0), 0))) continue;
             if (label.legs.length && !limitAllows(limits.change, label.pendingWalk + wait)) continue;
             boardings.push({ label, position, wait, duration: departure.duration, interval: departure.headway, publishedHeadway: departure.publishedHeadway });
           }

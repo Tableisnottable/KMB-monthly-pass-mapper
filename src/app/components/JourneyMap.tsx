@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import type { ScoredRoute } from '../../engine/UpgradedScoringEngine';
 import type { PlaceResult } from './PlaceAutocomplete';
-import { copy, locationVias, legOperator, routeColor, type JourneyLocations, type PlannerLocale } from './plannerUi';
+import { copy, locationVias, legOperator, routeColor, type JourneyField, type JourneyLocations, type PlannerLocale } from './plannerUi';
 import { PlannerIcon } from './PlannerIcon';
 import type { TravelOption } from '../../domain/travelOptions';
 import { routeLineStyles } from './routeColours';
@@ -16,7 +16,9 @@ import type { RoutePreferences } from '../../domain/routePreferences';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
 
-export function JourneyMap({ route, travel, places, onPick, locale, preferences, followPosition }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number) => void; locale: PlannerLocale; preferences?: RoutePreferences; followPosition?: GeolocationPosition | null }) {
+export type MapPickTarget = JourneyField | 'new-via';
+export type MapPickLabel = { name: string; address: string };
+export function JourneyMap({ route, travel, places, onPick, locale, preferences, followPosition, navigating = false }: { route?: ScoredRoute; travel?: TravelOption; places: JourneyLocations; onPick: (lat: number, lng: number, target?: MapPickTarget, label?: MapPickLabel) => void; locale: PlannerLocale; preferences?: RoutePreferences; followPosition?: GeolocationPosition | null; navigating?: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const journeyBounds = useRef<Leaflet.LatLngBounds | null>(null);
@@ -24,6 +26,9 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences,
   const onMapPick = useRef(onPick);
   useEffect(() => { onMapPick.current = onPick; }, [onPick]);
   const [ready, setReady] = useState(false);
+  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; label?: MapPickLabel } | null>(null);
+  const navigationActive = useRef(navigating);
+  useEffect(() => { navigationActive.current = navigating; if (navigating) setPendingPin(null); }, [navigating]);
   const [message, setMessage] = useState('');
   const [tileError, setTileError] = useState(false);
   const [gpsEnabled, setGpsEnabled] = useState(false);
@@ -40,7 +45,9 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences,
     import('leaflet').then(L => {
       if (cancelled || !container.current) return;
       const map = L.map(container.current, { zoomControl: false, scrollWheelZoom: true }).setView([22.303, 114.164], 14);
-      map.on('click', (event: Leaflet.LeafletMouseEvent) => onMapPick.current(event.latlng.lat, event.latlng.lng));
+      map.on('click', (event: Leaflet.LeafletMouseEvent) => {
+        if (!navigationActive.current) setPendingPin({ lat: event.latlng.lat, lng: event.latlng.lng });
+      });
       const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map);
@@ -61,6 +68,20 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences,
     // Map creation happens once; subsequent language changes do not reset the view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!pendingPin || !ready || !state.current) return;
+    const { lat, lng } = pendingPin, { L, map } = state.current;
+    const marker = L.marker([lat, lng], { icon: L.divIcon({ className: 'map-pending-pin', html: '<span>●</span>', iconSize: [32, 42], iconAnchor: [16, 38] }), interactive: false }).addTo(map);
+    const controller = new AbortController();
+    void fetch('/api/place-label?' + new URLSearchParams({ lat: String(lat), lon: String(lng), lang: locale }), { signal: controller.signal })
+      .then(async response => response.ok ? response.json() as Promise<MapPickLabel> : null)
+      .then(label => { if (label?.name && !controller.signal.aborted) setPendingPin(current => current?.lat === lat && current?.lng === lng ? { ...current, label } : current); })
+      .catch(() => {});
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPendingPin(null); };
+    document.addEventListener('keydown', escape);
+    return () => { controller.abort(); marker.remove(); document.removeEventListener('keydown', escape); };
+  }, [ready, pendingPin?.lat, pendingPin?.lng, locale]);
 
   useEffect(() => {
     const current = state.current;
@@ -168,6 +189,13 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences,
 
   return <section className="journey-map" id="map" aria-label={copy(locale, '行程地圖', 'Journey map')}>
     <div className="map-canvas" ref={container} />
+    {pendingPin && !navigating && <div className="map-selection-sheet" aria-label={copy(locale, '使用所選地點', 'Use selected place')}>
+      <header><div><strong>{pendingPin.label?.name ?? copy(locale, '地圖所選地點', 'Selected location')}</strong><small>{pendingPin.label?.address ?? copy(locale, '正在查找地點名稱…', 'Finding place name…')}</small></div>
+        <button type="button" aria-label={copy(locale, '取消選點', 'Cancel map selection')} onClick={() => setPendingPin(null)}>×</button></header>
+      <div>{([['origin', '設為起點', 'Start here'], ['destination', '設為目的地', 'Go here'], ['new-via', '加入途經點', 'Add via']] as const).map(([target, zh, en]) => <button type="button" key={target} onClick={() => {
+        onMapPick.current(pendingPin.lat, pendingPin.lng, target, pendingPin.label); setPendingPin(null);
+      }}>{copy(locale, zh, en)}</button>)}</div>
+    </div>}
     <div className="map-tools"><button className={'map-tool' + (gpsEnabled ? ' gps-active' : '')} onClick={locate} disabled={!ready} aria-pressed={gpsEnabled} aria-label={gpsEnabled ? copy(locale, '停止即時 GPS', 'Stop live GPS') : copy(locale, '顯示即時 GPS', 'Show live GPS')}><PlannerIcon name="locate" size={20} /></button>
       <button className="map-tool" aria-label={copy(locale, '返回香港全境', 'Reset Hong Kong map')} onClick={() => state.current?.map.setView([22.303, 114.164], 14)}><PlannerIcon name="compass" size={20} /></button></div>
     {!ready && !message && <div className="map-loading"><span className="planner-spinner" />{copy(locale, '正在載入地圖…', 'Loading the map…')}</div>}

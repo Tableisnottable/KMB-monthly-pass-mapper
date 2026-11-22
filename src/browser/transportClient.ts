@@ -34,7 +34,10 @@ export async function transportFetch(input: string, init?: RequestInit): Promise
   // terminates it, while a separate catalogue worker stays responsive.
   // Departure selection stays responsive while the graph worker refines the
   // preview. Cancelling a selection must not terminate that full search.
-  const dedicated = url.pathname === '/api/journey' && url.searchParams.get('operation') !== 'retime';
+  // Keep previews on the catalogue worker. Cancelling a slow full search must
+  // not discard the loaded graph needed by the next fast preview.
+  const dedicated = url.pathname === '/api/journey' && url.searchParams.get('operation') !== 'retime'
+    && url.searchParams.get('phase') !== 'preview';
   const connection = dedicated ? journey ?? (journey = connect()) : shared ?? (shared = connect());
   const id = ++sequence;
   return new Promise<Response>((resolve, reject) => {

@@ -42,7 +42,7 @@ export function JourneyPreferences({ section, companies, onCompanies, transport,
       </div>
       <p>{copy(locale, '0 分鐘不加緩衝，仍會計算轉站步行。預留越多時間，可選班次可能越少。', 'Zero adds no buffer; actual transfer walking stays unchanged. Longer buffers may reduce available connections.')}</p>
       <h3>{copy(locale, '行程上限（可留空）', 'Journey maximums (optional)')}</h3>
-      {([['transfers', '最多轉乘次數', 'Maximum transfers'], ['change', '每次轉乘（分鐘）', 'Maximum time per change (minutes)'], ['walk', '全程步行（分鐘）', 'Maximum total walking (minutes)'], ['wait', '每次候車（分鐘）', 'Maximum waiting per boarding (minutes)'], ['ride', '全程乘車（分鐘）', 'Maximum total riding (minutes)']] as const).map(([key, zh, en]) => (
+      {([['transfers', '最多轉乘次數', 'Maximum transfers'], ['change', '每次轉乘（分鐘）', 'Maximum time per change (minutes)'], ['walk', '全程步行（分鐘）', 'Maximum total walking (minutes)'], ['wait', '全程候車（分鐘）', 'Maximum total waiting (minutes)'], ['ride', '全程乘車（分鐘）', 'Maximum total riding (minutes)']] as const).map(([key, zh, en]) => (
         <label className="journey-limit-input" key={key}>
           <span>{copy(locale, zh, en)}</span>
           <input type="number" inputMode="numeric" min="0" step="1" placeholder={copy(locale, '不限', 'No limit')}

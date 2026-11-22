@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ScoredRoute, TransitLeg } from '../../engine/UpgradedScoringEngine';
 import type { PlaceResult } from './PlaceAutocomplete';
-import { JourneyMap } from './JourneyMap';
+import { JourneyMap, type MapPickLabel, type MapPickTarget } from './JourneyMap';
 import { PlannerIcon } from './PlannerIcon';
 import { RouteDetails } from './RouteDetails';
 import { hongKongTimeLabel } from '../../engine/journeyTime';
@@ -123,7 +123,7 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
   emptyHint?: string;
   endpoints: { origin: PlaceResult; destination: PlaceResult; vias?: PlaceResult[] } | null;
   places: JourneyLocations;
-  onMapPick: (lat: number, lng: number) => void;
+  onMapPick: (lat: number, lng: number, target?: MapPickTarget, label?: MapPickLabel) => void;
   locale?: PlannerLocale;
   fareProfile: FareProfile;
   selectedFareLabel?: string;
@@ -145,6 +145,23 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
   const [navigationPosition, setNavigationPosition] = useState<GeolocationPosition | null>(null);
   useEffect(() => { setNavigating(false); setNavigationPosition(null); }, [endpoints, selectedId]);
   const [showDetails, setShowDetails] = useState(false);
+  const [viewLoaded, setViewLoaded] = useState(false);
+  const viewRestored = useRef(false);
+  const viewKey = endpoints ? JSON.stringify([endpoints.origin.lat, endpoints.origin.lng, endpoints.destination.lat, endpoints.destination.lng, endpoints.vias?.map(place => [place.lat, place.lng])]) : '';
+  useEffect(() => {
+    if (!viewKey || !sourceRoutes.length || viewRestored.current) return;
+    viewRestored.current = true;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('compass-journey-view') ?? 'null');
+      if (saved?.key === viewKey && sourceRoutes.some(route => route.id === saved.selectedId)) {
+        setSelectedId(saved.selectedId); setShowDetails(Boolean(saved.showDetails));
+      }
+    } catch { /* Optional view restoration. */ }
+    setViewLoaded(true);
+  }, [viewKey, sourceRoutes]);
+  useEffect(() => {
+    if (viewLoaded && viewKey) try { sessionStorage.setItem('compass-journey-view', JSON.stringify({ key: viewKey, selectedId, showDetails })); } catch {}
+  }, [viewLoaded, viewKey, selectedId, showDetails]);
   const [showMap, setShowMap] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
   const [sort, setSort] = useState<JourneySort>('recommended');
@@ -156,11 +173,19 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
   const baseTravel = travel.options.find(option => option.mode === travelMode && option.available);
   const travelChoices = baseTravel ? [baseTravel, ...(baseTravel.alternatives ?? [])] : [];
   const selectedTravel = travelChoices[travelAlternative] ?? baseTravel;
+  const fasterWalk = travel.options.find(option => option.mode === 'walk' && option.available
+    && routes.some(route => route.legs.some(leg => leg.mode !== 'WALK'))
+    && routes.filter(route => route.legs.some(leg => leg.mode !== 'WALK')).every(route => option.minutes < journeyMinutes(route)));
   const sidebar = useRef<HTMLDivElement>(null);
   useEffect(() => { setSelectedId(current => routes.some(route => route.id === current) ? current : routes.find(route => route.legs.some(leg => leg.mode !== 'WALK'))?.id ?? ''); }, [sourceRoutes]);
-  useEffect(() => { setTravelMode(null); setTravelAlternative(0); setShowDetails(false); }, [travel.key]);
-  const selected = routes.find(route => route.id === selectedId && route.legs.some(leg => leg.mode !== 'WALK')) ?? routes.find(route => route.legs.some(leg => leg.mode !== 'WALK'));
-  const recommended = routes.filter(route => !hasEndedService(route) && route.legs.some(leg => leg.mode !== 'WALK'));
+  const previousTravelKey = useRef('');
+  useEffect(() => {
+    setTravelMode(null); setTravelAlternative(0);
+    if (previousTravelKey.current && previousTravelKey.current !== travel.key) setShowDetails(false);
+    previousTravelKey.current = travel.key;
+  }, [travel.key]);
+  const selected = routes.find(route => route.id === selectedId) ?? routes.find(route => route.legs.some(leg => leg.mode !== 'WALK')) ?? routes[0];
+  const recommended = routes.filter(route => !hasEndedService(route));
   const ended = routes.filter(hasEndedService);
   const recommendedGroups = groupJourneysByStops(recommended, sort, sortFare === 'adult' ? 'adult' : fareProfile, preferences);
   const endedGroups = groupJourneysByStops(ended, sort, sortFare === 'adult' ? 'adult' : fareProfile, preferences);
@@ -197,8 +222,8 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
   }
   return <FareProfileContext.Provider value={fareProfile}><FareLabelContext.Provider value={selectedFareLabel}><div className={'planner-layout' + (navigating ? ' is-navigating' : '')}>{searchPanel}<div className={'planner-workspace' + (showMap ? ' map-visible' : '')}>
     <div className="planner-sidebar-scroll" ref={sidebar}>
-      {navigating && selected && <JourneyNavigation key={selected.id} route={selected} places={mapPlaces} locale={locale} onStop={() => { setNavigating(false); setNavigationPosition(null); }} onPosition={setNavigationPosition} />}
-      {showDetails && selectedTravel ? <>
+      {navigating && selected && <><JourneyNavigation key={selected.id} route={selected} places={mapPlaces} locale={locale} onStop={() => { setNavigating(false); setNavigationPosition(null); }} onPosition={setNavigationPosition} /><button type="button" className="mobile-map-toggle" onClick={() => setShowMap(true)}>{copy(locale, '顯示地圖', 'Show map')}</button></>}
+      {!navigating && (showDetails && selectedTravel ? <>
         {travelChoices.length > 1 && <div className="walking-alternatives" role="group" aria-label={copy(locale, '步行方案', 'Walking options')}>{travelChoices.map((option, index) => <button type="button" key={index} aria-pressed={option === selectedTravel} onClick={() => setTravelAlternative(index)}><PlannerIcon name="walk" size={18} /><span>{copy(locale, '方案 ', 'Option ') + (index + 1)}<strong>{option.minutes} min</strong><small>{Math.round(option.distanceMetres ?? 0)} m</small></span></button>)}</div>}
         <TravelOptionDetails key={travel.key + selectedTravel.mode} option={selectedTravel} places={mapPlaces} locale={locale} time={time} profile={fareProfile}
         onBack={() => { setShowDetails(false); setTravelMode(null); }} onMap={() => setShowMap(true)} /></> : showDetails && selected ? <section className="trip-panel" id="journey-details" aria-label={copy(locale, '行程詳情', 'Journey details')}>
@@ -215,6 +240,7 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
         <section className="results-pane" id="routes" aria-label={copy(locale, '行程選擇', 'Journey options')}>
           {endpoints && comparisonModes.length > 0 && <><QuickTravelOptions options={travel.options} modes={comparisonModes} loading={travel.loading} locale={locale} onChoose={option => { setTravelMode(option.mode); setTravelAlternative(0); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }} />
             <p className="quick-mode-note">{copy(locale, '按道路／路徑估算，非即時交通；「—」表示未有可用路徑。', 'Road/path estimates, not live traffic. “—” means no route is available.')}</p></>}
+          {fasterWalk && <button type="button" className="faster-walk-option" onClick={() => { setTravelMode('walk'); setTravelAlternative(0); setShowDetails(true); sidebar.current?.scrollTo({ top: 0 }); }}><PlannerIcon name="walk" size={22} /><span>{copy(locale, '步行比公共交通快', 'Walking is faster than transit')}<strong>{fasterWalk.minutes} min</strong></span><PlannerIcon name="arrow" size={18} /></button>}
           {routes.length > 0 ? <>
             {recommendedGroups.length > 0 && <div className="route-group"><div className="route-group-heading"><h2>{copy(locale, '建議', 'Suggested')}</h2><JourneySortControl value={sort} onChange={setSort} fareBasis={sortFare} onFareBasis={setSortFare} locale={locale} /></div><div className="route-list">{(showAllRoutes ? recommendedGroups : recommendedGroups.slice(0, 12)).map(group => <JourneyChoiceGroup key={group.id} group={group} locale={locale} onSelect={choose} onPreview={preview} selectedId={selected?.id} />)}</div>
               {recommendedGroups.length > 12 && <button type="button" className="more-journeys" onClick={() => setShowAllRoutes(value => !value)}>{showAllRoutes ? copy(locale, '顯示較少路線', 'Show fewer options') : copy(locale, '顯示全部 ', 'Show all ') + recommendedGroups.length + copy(locale, ' 組行程', ' journey groups')}</button>}</div>}
@@ -226,10 +252,10 @@ export function PlannerBoard({ routes: sourceRoutes, searchPanel, emptyHint, end
             </details>
           </> : <p className="map-instruction" role="status">{emptyHint}</p>}
         </section>
-      </>}
+      </>)}
     </div>
     <div className="map-pane">
-      <JourneyMap followPosition={navigationPosition} route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={navigating ? () => {} : onMapPick} locale={locale} preferences={preferences} />
+      <JourneyMap navigating={navigating} followPosition={navigationPosition} route={selectedTravel ? undefined : selected} travel={selectedTravel} places={mapPlaces} onPick={(lat, lng, target, label) => { if (!navigating) { onMapPick(lat, lng, target, label); setShowMap(false); } }} locale={locale} preferences={preferences} />
       <button type="button" className="mobile-close-map" onClick={() => setShowMap(false)}><PlannerIcon name="back" size={17} />{copy(locale, '返回行程', 'Back to journeys')}</button>
     </div>
   </div></div></FareLabelContext.Provider></FareProfileContext.Provider>;

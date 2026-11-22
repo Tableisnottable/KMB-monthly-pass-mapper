@@ -8,6 +8,7 @@ import { RegionSwitcher } from './RegionSwitcher';
 import { PaymentControl } from './PaymentControl';
 import { readPaymentPreferences, type OwnedPass, type PaymentChoice } from '../../domain/payment';
 import { PlannerIcon } from './PlannerIcon';
+import { ReleaseNotes } from './ReleaseNotes';
 
 function AreaMap({ center, data, selected, onArea, locale }: { center: MapPoint; data: OpenMapArea | null; selected: OpenMapLine | null; onArea: (point: MapPoint) => void; locale: 'zh' | 'en' }) {
   const element = useRef<HTMLDivElement>(null);
@@ -104,7 +105,7 @@ export function OpenDataExplorer({ initialRegion = 'japan', locale }: { initialR
   const filtered = lines.filter(r => (category === 'all' || tab !== 'roads' || r.kind === category) && [r.name, r.en, r.ref, r.operator ?? ''].join(' ').toLowerCase().includes(query));
   const stops = data?.stops.filter(s => [s.name, s.en].join(' ').toLowerCase().includes(query)) ?? [];
   return <main className="open-data-app" lang={en ? 'en' : 'zh-Hant'}>
-    <header className="app-header"><a className="app-brand" href={en ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a><a className="language-button" href={regionHref(region, en ? 'zh' : 'en', currentCity)}>{en ? '中' : 'EN'}</a></header>
+    <header className="app-header"><div className="header-brand-group"><a className="app-brand" href={en ? '/en' : '/'}><span className="brand-symbol"><PlannerIcon name="arrow" /></span>Transit Compass</a><ReleaseNotes locale={locale} /></div><a className="language-button" href={regionHref(region, en ? 'zh' : 'en', currentCity)}>{en ? '中' : 'EN'}</a></header>
     <div className="open-data-layout"><aside className="open-data-sidebar">
       <div className="open-data-controls"><div className="open-region-row"><RegionSwitcher current={regionId} locale={locale} /><PaymentControl value={payment} onChange={setPayment} passes={passes} onPasses={setPasses} locale={locale} catalogOnly regionId={regionId} /></div><span className="open-data-badge">{t('開放地圖', 'Open map')}</span>
         <h1>{t(region.zh, region.en)}<span>{t('道路及交通', 'Roads & transport')}</span></h1>

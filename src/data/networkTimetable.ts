@@ -1,5 +1,5 @@
 import { hongKongClock, networkPatterns, networkRoutes, networkStops, serviceCalendarStatus } from './transportNetwork';
-import { departureType, providerMarksAdditional, providerMarksScheduled, type DepartureTimingType, type DepartureType, type TimetableComparison } from '../domain/departureType';
+import { departureTimingType, departureType, providerMarksAdditional, providerMarksScheduled, type DepartureTimingType, type DepartureType, type TimetableComparison } from '../domain/departureType';
 
 export type ScheduleMatch = 'MATCHED' | 'ADDED' | 'UNVERIFIED';
 export type AddedReason = 'PROVIDER' | 'NOT_IN_TIMETABLE';
@@ -153,7 +153,11 @@ export function matchDepartureToTimetable(patternIndex: number, boarding: number
       }
     }
   }
-  return covered ? { scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' } : { scheduleMatch: 'UNVERIFIED' };
+  // A moving ETA (especially at an intermediate stop) is not an original
+  // departure slot. Delays and interpolated running times cannot prove extras.
+  return covered && boarding === 0 && providerMarksScheduled(remark)
+    ? { scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' }
+    : { scheduleMatch: 'UNVERIFIED' };
 }
 
 /** Nearest timetable reference, not a trip-ID match or confirmed delay. */
@@ -179,6 +183,45 @@ export function compareDepartureToTimetable(patternIndex: number, boarding: numb
 /** Sparse ETA feeds cannot prove cancellations: flag slower patterns as inferred. */
 export function classifyDepartureTypes(patternIndex: number, boarding: number, departures: LiveDeparture[]): LiveDeparture[] {
   const classified = departures.map(row => ({ ...row, ...compareDepartureToTimetable(patternIndex, boarding, row.time), departureType: departureType(row) }));
+  // Count actual provider rows, including simultaneous buses, against slots in
+  // the same observation window. A timestamp mismatch alone is not an extra.
+  const liveOperators = new Set(classified.filter(row => departureTimingType(row) === 'LIVE').map(row => row.operator));
+  for (const operator of Array.from(liveOperators)) {
+    const rows = classified.filter(row => row.operator === operator && departureTimingType(row) === 'LIVE' && !row.timetableEstimate)
+      .sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+    if (rows.length < 3) continue;
+    const first = Date.parse(rows[0].time), last = Date.parse(rows.at(-1)!.time);
+    if (!Number.isFinite(first) || !Number.isFinite(last) || first === last) continue;
+    const entries = [-1, 0].flatMap(shift => patternTimetable(patternIndex,
+      hongKongServiceDate(new Date(first + shift * 86400000)), boarding));
+    const tolerance = (entry: TimetableEntry) => (entry.headwayMinutes > 0 ? entry.headwayMinutes / 2 : 2) * 60000
+      + (entry.estimatedStopTime ? 5 * 60000 : 0);
+    // Do not infer extras in a closed period or from absent timetable coverage.
+    if (rows.some(row => !entries.some(entry => Date.parse(row.time) >= Date.parse(entry.start) - tolerance(entry)
+      && Date.parse(row.time) <= Date.parse(entry.end) + tolerance(entry)))) continue;
+    const slots = publishedTimetableSlots(entries).filter(slot => entries.some(entry => {
+      const time = Date.parse(slot.time);
+      return time >= Date.parse(entry.start) && time <= Date.parse(entry.end)
+        && time >= first - tolerance(entry) && time <= last + tolerance(entry);
+    }));
+    if (slots.length < 2) continue;
+    const confirmed = rows.filter(row => row.addedReason === 'PROVIDER' || providerMarksAdditional(row.remark)).length;
+    const surplus = Math.max(0, rows.length - slots.length - confirmed);
+    const candidates = rows.filter(row => row.addedReason !== 'PROVIDER' && !providerMarksAdditional(row.remark));
+    const distance = (row: LiveDeparture) => Math.min(...slots.map(slot => Math.abs(Date.parse(row.time) - Date.parse(slot.time))));
+    candidates.sort((a, b) => distance(b) - distance(a));
+    for (const row of candidates.slice(0, surplus)) {
+      row.scheduleMatch = 'ADDED'; row.addedReason = 'NOT_IN_TIMETABLE'; row.departureType = 'ADDITIONAL';
+    }
+    if (boarding === 0 && rows.length === slots.length && !confirmed) {
+      for (const row of candidates) {
+        if (!row.timetableTime || row.deviationMinutes === undefined || Math.abs(row.deviationMinutes) < .5
+          || Math.abs(row.deviationMinutes) > 10) continue;
+        if (rows.some(other => other !== row && Math.abs(Date.parse(other.time) - Date.parse(row.timetableTime!)) <= 30000)) continue;
+        row.departureType = 'CHANGED'; row.changedReason = 'POSSIBLE_SHIFT';
+      }
+    }
+  }
   if (boarding !== 0) return classified;
   const operators = new Set(classified.map(row => row.operator));
   for (const operator of Array.from(operators)) {

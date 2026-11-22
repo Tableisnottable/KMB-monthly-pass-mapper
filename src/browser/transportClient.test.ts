@@ -11,6 +11,20 @@ class FakeWorker {
 beforeEach(() => { vi.resetModules(); FakeWorker.instances = []; vi.stubGlobal('Worker', FakeWorker); vi.stubGlobal('window', { location: { origin: 'https://planner.example' }, setTimeout, clearTimeout }); });
 afterEach(() => vi.unstubAllGlobals());
 describe('Warm and cancellable background calculators', () => {
+  it('retains the warm preview calculator when a full refinement is cancelled', async () => {
+    const { transportFetch } = await import('./transportClient');
+    const warm = transportFetch('/api/journey?operation=warm&phase=preview');
+    FakeWorker.instances[0].reply(); await warm;
+    const controller = new AbortController();
+    const full = transportFetch('/api/journey', { signal: controller.signal });
+    const rejected = expect(full).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort(); await rejected;
+    const preview = transportFetch('/api/journey?phase=preview&toLat=22.3');
+    expect(FakeWorker.instances).toHaveLength(2);
+    expect(FakeWorker.instances[0].terminated).toBe(false);
+    expect(FakeWorker.instances[1].terminated).toBe(true);
+    FakeWorker.instances[0].reply(); expect((await preview).status).toBe(200);
+  });
   it('reuses a completed journey worker instead of downloading and rebuilding its data again', async () => {
     const { transportFetch } = await import('./transportClient');
     const first = transportFetch('/api/journey?a=1'); FakeWorker.instances[0].reply(); expect((await first).status).toBe(200);
