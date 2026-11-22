@@ -797,7 +797,7 @@ button.departure-choice:hover { background: #e5edf3; }
 .release-notes-dialog li { margin: 10px 0; }
 .release-notes-done { width: 100%; min-height: 48px; margin-top: 20px; background: #258547; color: #fff; border-radius: 12px; font-weight: 750; }
 .map-pending-pin { color: #168d47; font-size: 32px; text-align: center; text-shadow: 0 2px 2px #fff, 0 5px 10px #0005; }
-.map-selection-sheet { position: absolute; z-index: 650; bottom: 65px; left: 16px; width: min(370px, calc(100% - 32px)); padding: 16px; border-radius: 16px; background: #fff; box-shadow: 0 6px 30px #183b3540; color: #244534; }
+.map-selection-sheet { position: absolute; z-index: 1100; bottom: 65px; left: 16px; width: min(370px, calc(100% - 32px)); padding: 16px; border-radius: 16px; background: #fff; box-shadow: 0 6px 30px #183b3540; color: #244534; }
 .map-selection-sheet header { display: flex; align-items: flex-start; gap: 10px; }
 .map-selection-sheet header > div { flex: 1; }
 .map-selection-sheet strong { display: block; font-size: 16px; }
@@ -806,6 +806,7 @@ button.departure-choice:hover { background: #e5edf3; }
 .map-selection-sheet > div { display: flex; gap: 7px; margin-top: 15px; }
 .map-selection-sheet > div button { flex: 1; min-height: 45px; padding: 6px; background: #e8f4eb; border: 1px solid #b6d5bf; border-radius: 9px; font-size: 12px; font-weight: 700; }
 .map-selection-sheet > div button:nth-child(2) { background: #238449; color: #fff; border-color: #238449; }
+@media (max-width: 700px) { .map-selection-sheet { bottom: 10px; left: 10px; width: calc(100% - 20px); padding: 12px; } }
 .navigation-progress { height: 5px; background: #e3eee6; border-radius: 4px; overflow: hidden; margin-top: 12px; }
 .navigation-progress span { display: block; height: 100%; background: #288e48; transition: width .2s; }
 .navigation-route-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 18px; font-weight: 800; margin-bottom: 8px; }

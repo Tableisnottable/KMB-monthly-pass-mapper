@@ -1,7 +1,7 @@
 name: Refresh Hong Kong transport data
 on:
   schedule:
-    - cron: '15 22 * * *'
+    - cron: '0 16 * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -40,13 +40,19 @@ jobs:
           python -m pip install pyproj==3.8.0
           python scripts/import-transport.py --cache "$RUNNER_TEMP/hk-data" --refresh
           python scripts/import-student-fares.py
-      - name: Refresh weekly stops, geometry and place directories
+      - name: Refresh weekly bus stops
         if: github.event_name == 'workflow_dispatch' || steps.cadence.outputs.weekday == '7'
         run: |
           node scripts/fetch-kmb-route-stops.mjs
           node scripts/fetch-citybus-data.mjs
+      - name: Refresh weekly road and track geometry
+        if: github.event_name == 'workflow_dispatch' || steps.cadence.outputs.weekday == '7'
+        run: |
           python -m pip install --target "$RUNNER_TEMP/hk-data/python-libs" osmium
           python scripts/import-alignments.py --cache "$RUNNER_TEMP/hk-data"
+      - name: Refresh weekly place directories
+        if: github.event_name == 'workflow_dispatch' || steps.cadence.outputs.weekday == '7'
+        run: |
           python scripts/import-school-places.py
           python scripts/import-residents.py --cache "$RUNNER_TEMP/hk-data" --refresh
       - name: Rebuild corridor tags against the current stops

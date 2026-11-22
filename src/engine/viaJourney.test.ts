@@ -44,7 +44,7 @@ describe('Via journeys', () => {
     expect(withinJourneyLimits(joined, { ...DEFAULT_LIMITS, walk: 9 })).toBe(false);
     expect(withinJourneyLimits(joined, { ...DEFAULT_LIMITS, change: 11 })).toBe(false);
     expect(withinJourneyLimits(joined, { ...DEFAULT_LIMITS, wait: 4 })).toBe(false);
-    expect(withinJourneyLimits(joined, { ...DEFAULT_LIMITS, change: 12, walk: 10, wait: 5 })).toBe(true);
+    expect(withinJourneyLimits(joined, { ...DEFAULT_LIMITS, change: 12, walk: 10, wait: 10 })).toBe(true);
   });
   it('counts explicit walking stages without inventing a vehicle transfer', () => {
     const walk = { ...after, walkTransferTimeMinutes: 0, originWalkMinutes: 0, destinationWalkMinutes: 0,

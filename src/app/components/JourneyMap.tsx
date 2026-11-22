@@ -15,6 +15,9 @@ import { appendJourneyVias } from '../../domain/journeyVia';
 import type { RoutePreferences } from '../../domain/routePreferences';
 
 type MapState = { map: Leaflet.Map; L: typeof Leaflet; routeLayer: Leaflet.LayerGroup; locationLayer: Leaflet.LayerGroup };
+const fitPadding = (element: HTMLDivElement | null): Leaflet.PointTuple => [
+  Math.min(55, (element?.clientWidth ?? 550) * .1), Math.min(55, (element?.clientHeight ?? 550) * .12),
+];
 
 export type MapPickTarget = JourneyField | 'new-via';
 export type MapPickLabel = { name: string; address: string };
@@ -58,7 +61,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences,
       resize = new ResizeObserver(() => {
         map.invalidateSize();
         if (journeyBounds.current && container.current?.clientWidth && container.current.clientHeight) {
-          map.fitBounds(journeyBounds.current, { padding: [65, 75], maxZoom: 15, animate: false });
+          map.fitBounds(journeyBounds.current, { padding: fitPadding(container.current), maxZoom: 15, animate: false });
         }
       });
       resize.observe(container.current);
@@ -121,7 +124,7 @@ export function JourneyMap({ route, travel, places, onPick, locale, preferences,
     function fit() {
       if (points.length) {
         journeyBounds.current = L.latLngBounds(points);
-        if (container.current?.clientWidth && container.current.clientHeight) map.fitBounds(journeyBounds.current, { padding: [65, 75], maxZoom: 15 });
+        if (container.current?.clientWidth && container.current.clientHeight) map.fitBounds(journeyBounds.current, { padding: fitPadding(container.current), maxZoom: 15 });
       }
     }
     fit();

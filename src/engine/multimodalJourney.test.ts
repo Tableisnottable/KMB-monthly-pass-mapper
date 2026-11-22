@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { activeWindows, findMultimodalJourneys, journeyAccessStops, nextDeparture, previousDeparture, selectJourneyAlternatives } from './multimodalJourney';
 import { networkPatterns, networkRoutes, networkStops, hongKongClock, isServiceActive, transportCoverage } from '../data/transportNetwork';
+import { DEFAULT_LIMITS } from '../domain/journeyLimits';
 
 const noon = new Date('2026-11-13T04:00:00Z');
 const point = (s: typeof networkStops[number]) => ({ lat: s[3], lng: s[4] });
@@ -85,7 +86,10 @@ describe('Multimodal connectivity', () => {
       expect(p).toBeDefined();
       const last = p!.s[p!.s.length - 1] === p!.s[0] ? Math.floor(p!.s.length / 2) : p!.s.length - 1;
       const started = performance.now();
-      const result = findMultimodalJourneys(point(networkStops[p!.s[0]]), point(networkStops[p!.s[last]]), noon, 'en');
+      // Test topology independently of the default 120-minute waiting policy:
+      // the first published ferry fixture can be an infrequent island service.
+      const result = findMultimodalJourneys(point(networkStops[p!.s[0]]), point(networkStops[p!.s[last]]), noon, 'en', false, false,
+        { limits: { ...DEFAULT_LIMITS, wait: null } });
       expect(result.routes.some(r => r.legs.some(l => l.mode === mode))).toBe(true);
       expect(result.routes.every(r => r.transferCount < networkRoutes.length)).toBe(true);
       if (mode === 'FERRY') {
