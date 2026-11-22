@@ -7,6 +7,7 @@ import argparse
 import collections
 import datetime
 import json
+import shutil
 import math
 from pathlib import Path
 import sys
@@ -16,7 +17,29 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = {'bus': 'td_rcd_1638844988873_41214', 'gmb': 'td_rcd_1697082463580_57453'}
-OSM_SOURCE = 'https://download.geofabrik.de/asia/china/hong-kong-latest.osm.pbf'
+OSM_SOURCE = 'https://download.geofabrik.de/asia/china/hong-kong/hong-kong-latest.osm.pbf'
+
+def download(url, target):
+    """Retry downloads without treating an interrupted file as a usable cache."""
+    partial = target.with_name(target.name + '.part')
+    for attempt in range(3):
+        try:
+            request = urllib.request.Request(url, headers={'User-Agent': 'Transit-Compass-data-refresh/1.1'})
+            with urllib.request.urlopen(request, timeout=90) as response, partial.open('wb') as output:
+                if 'text/html' in response.headers.get('Content-Type', ''):
+                    raise ValueError('Expected OSM data, received HTML')
+                shutil.copyfileobj(response, output)
+                expected = response.headers.get('Content-Length')
+            size = partial.stat().st_size
+            if not size or expected and size != int(expected):
+                raise ValueError('Incomplete OSM download')
+            partial.replace(target)
+            return
+        except (OSError, ValueError):
+            partial.unlink(missing_ok=True)
+            if attempt == 2:
+                raise
+            time.sleep(attempt + 1)
 
 def encoded(value): return json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
 
@@ -68,7 +91,7 @@ def fetch_td(cache, name, dataset):
 def osm_tracks(cache):
     sys.path.insert(0,str(cache/'python-libs'));import osmium
     source=cache/'hong-kong-latest.osm.pbf'
-    if not source.exists():urllib.request.urlretrieve(OSM_SOURCE,source)
+    if not source.exists():download(OSM_SOURCE,source)
     class Reader(osmium.SimpleHandler):
         def __init__(self):super().__init__();self.ways={};self.relations=[]
         def way(self,w):
