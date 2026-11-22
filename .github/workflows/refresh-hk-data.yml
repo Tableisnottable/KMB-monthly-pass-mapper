@@ -29,6 +29,8 @@ jobs:
           key: hk-rail-coordinates-${{ github.run_id }}
           restore-keys: hk-rail-coordinates-
       - run: npm ci
+      - name: Verify KMB download retries and snapshot protection
+        run: node --test scripts/fetch-kmb-route-stops.test.mjs
       - id: cadence
         run: echo "weekday=$(TZ=Asia/Hong_Kong date +%u)" >> "$GITHUB_OUTPUT"
       - name: Refresh daily timetables and adult/student fares
