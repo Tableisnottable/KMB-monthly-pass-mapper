@@ -2,7 +2,7 @@
   "provider": "Education Bureau",
   "source": "https://www.edb.gov.hk/attachment/en/student-parents/sch-info/sch-search/sch-location-info/SCH_LOC_EDB.csv",
   "catalogue": "https://data.gov.hk/en-data/dataset/hk-edb-schinfo-school-location-and-information",
-  "importedOn": "2026-11-14",
+  "importedOn": "2026-11-23",
   "sourceRows": 3496,
   "places": 3022,
   "rejectedRows": 28,
