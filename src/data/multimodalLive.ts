@@ -1,7 +1,7 @@
 import { getCitybusEta, getKmbStopEta, getKmbStops, type TransitStopRecord } from './hkTransitApi';
 import { getStaticCitybusRouteStops, getStaticCitybusStops } from './citybusStopsStatic';
 import { getStaticKmbRouteStops } from './kmbRouteStopsStatic';
-import { networkPatterns, networkRoutes, networkStops } from './transportNetwork';
+import { networkPatterns, networkRoutes, networkStops, networkStop } from './transportNetwork';
 import { haversineKm } from '../engine/journeyHelpers';
 import type { Segment, Route } from '../engine/UpgradedScoringEngine';
 import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable } from './networkTimetable';
@@ -175,5 +175,36 @@ export async function enrichJourneyArrivals(routes: Route[], now = new Date()): 
         attach(leg, data.data.eta.map(e => ({ time: e.timestamp })), now, route.originWalkMinutes);
       }
     } catch { /* Remain explicitly timetable-based / unverified. */ }
+  }));
+}
+
+/** Propagate a live ETA from the previous boardable stop to a terminal. */
+export async function enrichTerminalArrivals(routes: Route[], now = new Date()): Promise<void> {
+  await Promise.all(routes.map(async route => {
+    const leg = route.legs?.[0];
+    if (!leg || leg.networkPattern === undefined || !leg.originStop || !leg.destinationStop) return;
+    const pattern = networkPatterns[leg.networkPattern], terminal = leg.boardingIndex ?? -1;
+    if (terminal !== pattern.s.length - 1 || terminal <= 0) return;
+    let previous = terminal - 1;
+    while (previous > 0 && pattern.p[previous] !== 0) previous--;
+    const tempLeg: Segment = { ...leg, boardingIndex: previous, alightingIndex: terminal,
+      originStop: networkStop(pattern.s[previous]), destinationStop: networkStop(pattern.s[terminal]),
+      liveDepartures: undefined, departureNotices: undefined };
+    await enrichJourneyArrivals([{ ...route, legs: [tempLeg] }], now);
+    if (!tempLeg.liveDepartures?.length) return;
+    const total = pattern.t.at(-1) ?? 0, publishedDuration = pattern.w[0]?.[4] ?? total;
+    const runMinutes = Math.max(1, Math.round((pattern.t[terminal] - pattern.t[previous]) * (total > 0 ? publishedDuration / total : 1)));
+    const shifted = tempLeg.liveDepartures.map(row => {
+      const time = new Date(Date.parse(row.time) + runMinutes * 60000).toISOString();
+      return { ...row, time, minutes: Math.max(0, Math.ceil((Date.parse(time) - now.getTime()) / 60000)) };
+    });
+    leg.liveDepartures = classifyDepartureTypes(leg.networkPattern, terminal, shifted);
+    leg.departureNotices = tempLeg.departureNotices;
+    const first = leg.liveDepartures[0];
+    leg.realtimeEta = first ? { etaMinutes: first.minutes, dataTime: now.toISOString(), isLive: departureTimingType(first) === 'LIVE', source: departureTimingType(first) === 'LIVE' ? 'DATAGOVHK' : 'SCHEDULED' } : null;
+    leg.scheduledWaitMinutes = first?.minutes;
+    leg.scheduledDepartureMinutes = first?.minutes;
+    leg.serviceStatus = first && departureTimingType(first) === 'LIVE' ? 'LIVE' : 'TIMETABLE';
+    leg.serviceEnded = false;
   }));
 }

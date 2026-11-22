@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { networkPatterns, networkRoutes, networkStops } from '../../../data/transportNetwork';
-import { enrichJourneyArrivals } from '../../../data/multimodalLive';
+import { enrichJourneyArrivals, enrichTerminalArrivals } from '../../../data/multimodalLive';
 
 vi.mock('../../../lib/cloudflare', () => ({ getRateLimiter: vi.fn(async () => null) }));
-vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined) }));
+vi.mock('../../../data/multimodalLive', () => ({ enrichJourneyArrivals: vi.fn(async () => undefined), enrichTerminalArrivals: vi.fn(async () => undefined) }));
 const lookup = (params: string) => GET(new NextRequest('http://localhost/api/network?' + params));
-afterEach(() => { vi.mocked(enrichJourneyArrivals).mockReset(); vi.useRealTimers(); });
+afterEach(() => { vi.mocked(enrichJourneyArrivals).mockReset(); vi.mocked(enrichTerminalArrivals).mockReset(); vi.useRealTimers(); });
 
 describe('All-network catalogue', () => {
   it('provides route directions, complete ordered stops and fares without endpoints', async () => {
@@ -152,6 +152,7 @@ describe('All-network catalogue', () => {
     expect(data.map((row: { time: string }) => row.time)).toEqual(terminal.slots.map((row: { time: string }) => row.time));
     expect(data[0]).toMatchObject({ minutes: 119, patternId: pattern, status: 'TIMETABLE', timetableEstimate: true });
     expect(enrichJourneyArrivals).not.toHaveBeenCalled();
+    expect(enrichTerminalArrivals).toHaveBeenCalled();
     params.set('scope', 'stop');
     expect((await (await lookup(params.toString())).json()).data).toEqual([]);
     params.set('scope', 'route-stop'); params.set('pattern', 'td:570');

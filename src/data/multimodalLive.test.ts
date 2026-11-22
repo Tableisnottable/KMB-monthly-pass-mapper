@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { networkPatterns, networkRoutes, networkStop, networkStops } from './transportNetwork';
-import { enrichJourneyArrivals, providerTimestamp } from './multimodalLive';
+import { enrichJourneyArrivals, enrichTerminalArrivals, providerTimestamp } from './multimodalLive';
 import type { Route } from '../engine/UpgradedScoringEngine';
 import { getKmbStops, getKmbStopEta } from './hkTransitApi';
 import { getStaticKmbRouteStops } from './kmbRouteStopsStatic';
@@ -23,6 +23,28 @@ function railRoute(): Route {
 }
 
 describe('Official live arrivals', () => {
+  it('propagates a live ETA from the previous stop to the selected terminal', async () => {
+    const index = networkPatterns.findIndex(pattern => networkRoutes[pattern.r][1] === 'KMB' && pattern.s.length > 2);
+    const pattern = networkPatterns[index], routeNumber = networkRoutes[pattern.r][2], terminal = pattern.s.length - 1, previous = terminal - 1;
+    const origin = networkStop(pattern.s[previous]), destination = networkStop(pattern.s[terminal]);
+    vi.mocked(getKmbStops).mockResolvedValue([
+      { stop: 'terminal-previous', name_tc: '', name_en: '', lat: origin.lat!, long: origin.lng! },
+      { stop: 'terminal-last', name_tc: '', name_en: '', lat: destination.lat!, long: destination.lng! },
+    ]);
+    vi.mocked(getStaticKmbRouteStops).mockImplementation((_route, bound) => bound === 'outbound'
+      ? [{ stop: 'terminal-previous', seq: 1 }, { stop: 'terminal-last', seq: 2 }] : undefined);
+    vi.mocked(getKmbStopEta).mockResolvedValue([{ route: routeNumber, dir: 'O', seq: 1, dest_tc: '', dest_en: '',
+      eta: new Date(now.getTime() + 5 * 60000).toISOString(), rmk_tc: '', data_timestamp: now.toISOString() }]);
+    const route: Route = { id: 'terminal-live', legs: [{ operator: 'KMB', mode: 'BUS', routeNumber,
+      networkPattern: index, boardingIndex: terminal, alightingIndex: terminal, originStop: destination,
+      destinationStop: destination, serviceStatus: 'TIMETABLE' }] };
+    await enrichTerminalArrivals([route], now);
+    const departure = route.legs![0].liveDepartures?.[0];
+    expect(departure).toBeDefined();
+    expect(departure!.minutes).toBeGreaterThan(5);
+    expect(route.legs![0].boardingIndex).toBe(terminal);
+    expect(route.legs![0].realtimeEta?.etaMinutes).toBe(departure!.minutes);
+  });
   it('interprets MTR wall-clock timestamps as Hong Kong time', () => {
     expect(providerTimestamp('2026-11-13 12:03:00')).toBe(Date.parse('2026-11-13T04:03:00Z'));
   });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { networkPatterns, networkRoutes, networkStops, networkStop, normalAdultFare, transportCoverage } from '../../../data/transportNetwork';
 import { transitGeometry } from '../../../data/routeGeometry';
-import { enrichJourneyArrivals, notificationTargets } from '../../../data/multimodalLive';
+import { enrichJourneyArrivals, enrichTerminalArrivals, notificationTargets } from '../../../data/multimodalLive';
 import type { Route } from '../../../engine/UpgradedScoringEngine';
 import { getRateLimiter } from '../../../lib/cloudflare';
 import { normalizeTransitQuery } from '../../../data/networkPlaceSearch';
@@ -139,9 +139,18 @@ export async function GET(request: NextRequest) {
   }) === i);
   const liveCandidates = routeStop ? unique.filter(r => {
     const leg = r.legs![0];
-    return canBoard(networkPatterns[leg.networkPattern!], leg.boardingIndex!);
+    const pattern = networkPatterns[leg.networkPattern!];
+    return canBoard(pattern, leg.boardingIndex!) || leg.boardingIndex === pattern.s.length - 1;
   }) : unique;
-  if (!includeHistory && liveCandidates.length) await enrichJourneyArrivals(liveCandidates, now);
+  if (!includeHistory && liveCandidates.length) {
+    const terminal = liveCandidates.filter(r => {
+      const leg = r.legs![0], pattern = networkPatterns[leg.networkPattern!];
+      return routeStop && leg.boardingIndex === pattern.s.length - 1;
+    });
+    const ordinary = liveCandidates.filter(r => !terminal.includes(r));
+    if (ordinary.length) await enrichJourneyArrivals(ordinary, now);
+    if (terminal.length) await enrichTerminalArrivals(terminal, now);
+  }
   return NextResponse.json({ data: unique.flatMap(r => {
     const leg = r.legs![0];
     const pattern = networkPatterns[leg.networkPattern!], route = networkRoutes[pattern.r];
