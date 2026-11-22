@@ -52,9 +52,8 @@ export function JointArrivalBoard({ departures, cancellations = [], operator, ro
   const companyLabel = (id?: string) => !(id ?? (operator.includes('+') ? undefined : operator)) || id?.includes('+') ? copy(locale, '營辦商未提供', 'Operator not supplied')
     : locale === 'zh' ? shortNames[id ?? operator] ?? operatorName(id ?? operator, locale) : id ?? operator;
   const missing = operator.split('+').filter(id => !rows.some(row => row.operator === id));
-  const today = routeStop ? hongKongInputValue(new Date(clock)).slice(0, 10) : '';
+  const today = hongKongInputValue(new Date(clock)).slice(0, 10);
   const timeLabel = (time: string) => {
-    if (!routeStop) return hongKongTimeLabel(time);
     const local = hongKongInputValue(new Date(time));
     return (local.slice(0, 10) !== today ? local.slice(5, 10).replace('-', '/') + ' ' : '') + local.slice(11);
   };

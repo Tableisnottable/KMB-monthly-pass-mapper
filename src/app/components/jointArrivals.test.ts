@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { arrivalRemark, groupStationDepartures } from './jointArrivals';
@@ -8,6 +8,17 @@ import type { LiveDeparture } from '../../data/networkTimetable';
 const row = { id: 'first', routeId: 'joint-104', patternId: 'outbound', stopId: 'stop-A', destination: 'Central',
   operator: 'KMB', networkOperator: 'KMB+CTB', mode: 'BUS' };
 describe('Joint operator arrival displays', () => {
+  it('labels a different service day so chronological times across midnight are understandable', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-22T16:00:00Z'));
+    try {
+      const html = renderToStaticMarkup(createElement(JointArrivalBoard, { locale: 'en', operator: 'KMB', departures: [
+        { time: '2026-11-22T17:00:00Z', minutes: 60, scheduleMatch: 'MATCHED' },
+        { time: '2026-11-23T17:00:00Z', minutes: 1500, scheduleMatch: 'MATCHED', timetableEstimate: true },
+      ] }));
+      expect(html).toContain('11/24 01:00');
+      expect(html).not.toContain('11/23 01:00');
+    } finally { clock.mockRestore(); }
+  });
   it('keeps simultaneous buses selectable and disables unreachable departures', () => {
     const departure: LiveDeparture = { time: '2026-11-18T02:05:00Z', minutes: 5, operator: 'KMB', scheduleMatch: 'MATCHED' };
     const html = renderToStaticMarkup(createElement(JointArrivalBoard, { departures: [departure, { ...departure }], operator: 'KMB', locale: 'en',
