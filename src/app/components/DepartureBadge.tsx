@@ -10,9 +10,11 @@ export function DepartureBadge({ departure, locale, showTiming = true }: { depar
   if (!service && (!showTiming || !timing)) return null;
   return <span className="departure-badges">
     {showTiming && timing && <span className={'departure-type departure-' + timing.toLowerCase()} data-departure-type={timing}
-      title={timing === 'LIVE' ? copy(locale, '營辦商即時預測，並非車輛 GPS 確認。', 'Operator live prediction, not a GPS confirmation.')
+      title={timing === 'LIVE' ? departure.projectedArrival
+        ? copy(locale, '根據上游站的即時預測推算。', 'Projected from a live prediction at an upstream stop.')
+        : copy(locale, '營辦商即時預測，並非車輛 GPS 確認。', 'Operator live prediction, not a GPS confirmation.')
         : copy(locale, '時間表估算，並非即時預測。', 'Timetable estimate, not an operator live prediction.')}>
-      {timing === 'LIVE' ? copy(locale, '即時', 'Live') : copy(locale, '原定班次', 'Scheduled')}
+      {timing === 'LIVE' ? departure.projectedArrival ? copy(locale, '即時推算', 'Live estimate') : copy(locale, '即時', 'Live') : copy(locale, '原定班次', 'Scheduled')}
     </span>}
     {service && <span className={'departure-type departure-' + service.toLowerCase()} data-departure-type={service}
       title={inferred ? copy(locale, '同時段預測班數多於時間表，或總站原定時間不符；可能為額外班次，未獲營辦商確認。', 'More predicted trips than timetable slots in the same window, or a terminal scheduled-time mismatch. Possible extra; not operator-confirmed.')

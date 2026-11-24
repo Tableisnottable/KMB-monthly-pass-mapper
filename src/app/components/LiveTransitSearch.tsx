@@ -16,7 +16,7 @@ import { useAutoRefresh } from './useAutoRefresh';
 import { RefreshStatus } from './RefreshStatus';
 
 interface Stop { id: string; nameTc: string; nameEn: string; mode: string }
-interface Departure extends Pick<LiveDeparture, 'scheduleMatch' | 'addedReason' | 'changedReason' | 'departureType' | 'timingType' | 'timetableTime' | 'deviationMinutes' | 'comparisonBasis' | 'timetableEstimate'> { id: string; operator: string; networkOperator?: string; number: string; mode: string; destination: string;
+interface Departure extends Pick<LiveDeparture, 'scheduleMatch' | 'addedReason' | 'changedReason' | 'departureType' | 'timingType' | 'timetableTime' | 'deviationMinutes' | 'comparisonBasis' | 'timetableEstimate' | 'projectedArrival'> { id: string; operator: string; networkOperator?: string; number: string; mode: string; destination: string;
   minutes: number | null; time: string | null; routeId: string; patternId: string; stopId: string; remark?: string;
   publishedHeadwayMinutes?: number;
   status: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED' | 'NO_UPCOMING' }
@@ -80,7 +80,7 @@ export function LiveTransitSearch({ locale = 'zh' }: { locale?: PlannerLocale })
           cancellations={group.rows.filter(item => isNonOperatingDeparture(item)).map(item => ({ departureType: item.departureType === 'MISSED' ? 'MISSED' : 'CANCELLED', operator: item.operator, remark: item.remark ?? '', time: item.time ?? undefined }))}
           departures={group.rows.flatMap(item => !isNonOperatingDeparture(item) && (item.status === 'LIVE' || item.status === 'TIMETABLE') && item.time !== null && item.minutes !== null
             ? [{ time: item.time, minutes: item.minutes, operator: item.operator, remark: item.remark,
-                timetableTime: item.timetableTime, deviationMinutes: item.deviationMinutes, comparisonBasis: item.comparisonBasis, timetableEstimate: item.timetableEstimate,
+                timetableTime: item.timetableTime, deviationMinutes: item.deviationMinutes, comparisonBasis: item.comparisonBasis, timetableEstimate: item.timetableEstimate, projectedArrival: item.projectedArrival,
                 scheduleMatch: item.scheduleMatch, addedReason: item.addedReason, changedReason: item.changedReason, timingType: item.timingType ?? (item.status === 'TIMETABLE' ? 'SCHEDULED' : 'LIVE'), departureType: item.departureType ?? (item.status === 'TIMETABLE' ? 'SCHEDULED' : undefined) }] : [])} scheduledTime={row.status === 'TIMETABLE' ? row.time ?? undefined : undefined} />
       </div>;
       })}</div>

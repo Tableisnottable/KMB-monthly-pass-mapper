@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { networkPatterns, networkRoutes, networkStops, serviceCalendarStatus, type NetworkPattern } from './transportNetwork';
 import { exceptions } from './transport/snapshot';
-import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, publishedDeparturesAround, routeTimetable, upcomingPublishedDepartures } from './networkTimetable';
+import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, nextPublishedDeparture, parseServiceDate, patternTimetable, publishedDeparturesAround, routeTimetable, runMinutesNearPrediction, upcomingPublishedDepartures } from './networkTimetable';
 import { operatorInfo, transportOperators } from './transportOperators';
 
 const day = '2026-11-13';
@@ -28,6 +28,13 @@ describe('Published service timetables', () => {
     const rows = patternTimetable(index, day, 1);
     expect(rows.map(row => row.startMinute)).toEqual([610, 920]);
     expect(rows.every(row => row.estimatedStopTime)).toBe(true);
+  });
+  it('uses the trip profile and previous service date when projecting an overnight arrival', () => {
+    networkPatterns[index].u = [[0, 7, 30]];
+    networkPatterns[index].w = [[127, 1200, 1200, 0, 20], [127, 1490, 1490, 0, 30, 0]];
+    expect(patternTimetable(index, day, 1).map(row => row.startMinute)).toEqual([1210, 1497]);
+    expect(patternTimetable(index, day, 2, true).map(row => row.startMinute)).toEqual([1220, 1520]);
+    expect(runMinutesNearPrediction(networkPatterns[index], 1, 2, new Date('2026-11-14T00:58:00+08:00'))).toBe(23);
   });
   it('retains after-midnight times and searches beyond 90 minutes', () => {
     networkPatterns[index].w = [[127, 1500, 1500, 0, 20]];

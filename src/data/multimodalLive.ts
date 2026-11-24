@@ -4,7 +4,7 @@ import { getStaticKmbRouteStops } from './kmbRouteStopsStatic';
 import { networkPatterns, networkRoutes, networkStops, networkStop } from './transportNetwork';
 import { haversineKm } from '../engine/journeyHelpers';
 import type { Segment, Route } from '../engine/UpgradedScoringEngine';
-import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable } from './networkTimetable';
+import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, runMinutesNearPrediction } from './networkTimetable';
 import { departureTimingType, isNonOperatingDeparture, providerMarksCancelled, providerMarksMissed, providerMarksScheduled } from '../domain/departureType';
 import type { NotificationTarget } from '../domain/journeyNotifications';
 
@@ -190,16 +190,22 @@ export async function enrichTerminalArrivals(routes: Route[], now = new Date()):
     const tempLeg: Segment = { ...leg, boardingIndex: previous, alightingIndex: terminal,
       originStop: networkStop(pattern.s[previous]), destinationStop: networkStop(pattern.s[terminal]),
       liveDepartures: undefined, departureNotices: undefined };
-    await enrichJourneyArrivals([{ ...route, legs: [tempLeg] }], now);
+    await enrichJourneyArrivals([{ ...route, originWalkMinutes: 0, legs: [tempLeg] }], now);
+    const projectTime = (upstream: string) => {
+      const time = new Date(upstream);
+      const runMinutes = runMinutesNearPrediction(pattern, previous, terminal, time);
+      return new Date(time.getTime() + runMinutes * 60000).toISOString();
+    };
+    leg.departureNotices = tempLeg.departureNotices?.map(notice => ({
+      ...notice, time: notice.time ? projectTime(notice.time) : undefined,
+    }));
     if (!tempLeg.liveDepartures?.length) return;
-    const total = pattern.t.at(-1) ?? 0, publishedDuration = pattern.w[0]?.[4] ?? total;
-    const runMinutes = Math.max(1, Math.round((pattern.t[terminal] - pattern.t[previous]) * (total > 0 ? publishedDuration / total : 1)));
-    const shifted = tempLeg.liveDepartures.map(row => {
-      const time = new Date(Date.parse(row.time) + runMinutes * 60000).toISOString();
-      return { ...row, time, minutes: Math.max(0, Math.ceil((Date.parse(time) - now.getTime()) / 60000)) };
-    });
-    leg.liveDepartures = classifyDepartureTypes(leg.networkPattern, terminal, shifted);
-    leg.departureNotices = tempLeg.departureNotices;
+    leg.liveDepartures = tempLeg.liveDepartures.map(row => {
+      const time = projectTime(row.time);
+      return { ...row, time, minutes: Math.max(0, Math.ceil((Date.parse(time) - now.getTime()) / 60000)),
+        projectedArrival: true, timetableTime: undefined, deviationMinutes: undefined, comparisonBasis: undefined,
+        ...compareDepartureToTimetable(leg.networkPattern!, terminal, time, true) };
+    }).sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
     const first = leg.liveDepartures[0];
     leg.realtimeEta = first ? { etaMinutes: first.minutes, dataTime: now.toISOString(), isLive: departureTimingType(first) === 'LIVE', source: departureTimingType(first) === 'LIVE' ? 'DATAGOVHK' : 'SCHEDULED' } : null;
     leg.scheduledWaitMinutes = first?.minutes;

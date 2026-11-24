@@ -2,9 +2,10 @@ import { haversineKm } from './journeyHelpers';
 import { scoreRoutes, UpgradedScoringEngine, WALK_MULTIPLIER, FARE_MINUTES_PER_DOLLAR,
   type Route, type Segment, type ScoredRoute } from './UpgradedScoringEngine';
 import { hongKongClock, isServiceActive, networkPatterns, networkRoutes, networkStops,
-  networkStop, networkStopIndex, normalAdultFare, railFare, weightingDate, type NetworkPattern } from '../data/transportNetwork';
+  networkStop, networkStopIndex, normalAdultFare, railFare, weightingDate, type NetworkPattern, stopOffset, stopRunMinutes } from '../data/transportNetwork';
 
 type Point = { lat: number; lng: number };
+import { runMinutesNearPrediction } from '../data/networkTimetable';
 import { DEFAULT_WEIGHTS, type RouteWeights } from './routeWeights';
 import { operatorAllowed } from '../domain/operatorSelection';
 import { transitTypeAllowed } from '../domain/transportSelection';
@@ -16,7 +17,7 @@ export interface JourneySearchOptions { operators?: string[]; modes?: string[]; 
 const serviceFamily = (leg: Segment) => leg.networkPattern === undefined || leg.mode !== 'MINIBUS'
   ? leg.operator + ':' + leg.routeNumber : networkRoutes[networkPatterns[leg.networkPattern].r][0];
 type Label = { stop: number; elapsed: number; cost: number; legs: Segment[]; walk: number; pendingWalk: number; originWalk: number; used: number[]; visited: number[]; family: string; readyDelay: number };
-type Window = { start: number; end: number; headway: number; duration: number };
+type Window = { start: number; end: number; headway: number; duration: number; profile?: number };
 const WALK_SPEED = 5 / 60, TIMETABLE_DAY_RANGE = 7;
 const FALLBACK_STOP_LIMIT = 16;
 const grid = new Map<string, number[]>();
@@ -136,33 +137,35 @@ function serviceContext(date: Date) {
 }
 export function activeWindows(pattern: NetworkPattern, date: Date, context = serviceContext(date)): Window[] {
   const now = context.minute, windows: Window[] = [];
-  for (const { shift, active } of context.days) for (const [service, start, end, headway, duration] of pattern.w) {
+  for (const { shift, active } of context.days) for (const [service, start, end, headway, duration, profile] of pattern.w) {
     if (active(service)) {
       const s = start + shift * 1440 - now, e = end + shift * 1440 - now;
-      windows.push({ start: s, end: e, headway, duration });
+      windows.push({ start: s, end: e, headway, duration, profile });
     }
   }
   return windows;
 }
-export function nextDeparture(windows: Window[], offset: number, earliest: number, durationFraction = 0) {
-  let best: { wait: number; duration: number; headway: number; publishedHeadway?: number } | undefined;
+export function nextDeparture(windows: Window[], offset: number, earliest: number, durationFraction = 0, pattern?: NetworkPattern, position = 0) {
+  let best: { wait: number; duration: number; profile?: number; headway: number; publishedHeadway?: number } | undefined;
   for (const w of windows) {
-    const stopOffset = offset + w.duration * durationFraction;
-    let departure = w.start + stopOffset;
+    const departureOffset = w.profile !== undefined && pattern
+      ? stopOffset(pattern, position, w.duration, w.profile) : offset + w.duration * durationFraction;
+    let departure = w.start + departureOffset;
     if (w.headway > 0 && departure < earliest) departure += Math.ceil((earliest - departure) / w.headway) * w.headway;
-    if (departure + 0.001 < earliest || (w.headway > 0 && departure >= w.end + stopOffset)) continue;
+    if (departure + 0.001 < earliest || (w.headway > 0 && departure >= w.end + departureOffset)) continue;
     const wait = Math.max(0, departure - earliest);
     if (best && wait >= best.wait) continue;
-    best = { wait, duration: w.duration, headway: Math.max(w.headway, wait * 2), publishedHeadway: w.headway || undefined };
+    best = { wait, duration: w.duration, profile: w.profile, headway: Math.max(w.headway, wait * 2), publishedHeadway: w.headway || undefined };
   }
   return best;
 }
 /** Latest trip at a downstream stop; frequency end is exclusive. */
-export function previousDeparture(windows: Window[], offset: number, latest: number, durationFraction = 0) {
-  let best: { wait: number; duration: number; headway: number; publishedHeadway?: number } | undefined;
+export function previousDeparture(windows: Window[], offset: number, latest: number, durationFraction = 0, pattern?: NetworkPattern, position = 0) {
+  let best: { wait: number; duration: number; profile?: number; headway: number; publishedHeadway?: number } | undefined;
   for (const w of windows) {
-    const stopOffset = offset + w.duration * durationFraction;
-    let departure = w.start + stopOffset;
+    const departureOffset = w.profile !== undefined && pattern
+      ? stopOffset(pattern, position, w.duration, w.profile) : offset + w.duration * durationFraction;
+    let departure = w.start + departureOffset;
     if (w.headway > 0) {
       const n = Math.min(Math.floor((latest - departure + 1e-7) / w.headway), Math.ceil((w.end - w.start) / w.headway) - 1);
       if (n < 0) continue;
@@ -171,7 +174,7 @@ export function previousDeparture(windows: Window[], offset: number, latest: num
     if (departure > latest + 0.001) continue;
     const wait = Math.max(0, latest - departure);
     if (best && wait >= best.wait) continue;
-    best = { wait, duration: w.duration, headway: w.headway, publishedHeadway: w.headway || undefined };
+    best = { wait, duration: w.duration, profile: w.profile, headway: w.headway, publishedHeadway: w.headway || undefined };
   }
   return best;
 }
@@ -187,7 +190,7 @@ function patternWindows(pattern: NetworkPattern, date: Date, context = serviceCo
 function departureAt(pattern: NetworkPattern, windows: Window[], position: number, time: number, reverse: boolean) {
   const total = pattern.t[pattern.t.length - 1];
   const offset = total ? 0 : pattern.t[position], fraction = total ? pattern.t[position] / total : 0;
-  return reverse ? previousDeparture(windows, offset, time, fraction) : nextDeparture(windows, offset, time, fraction);
+  return reverse ? previousDeparture(windows, offset, time, fraction, pattern, position) : nextDeparture(windows, offset, time, fraction, pattern, position);
 }
 /** Resolve the next reachable connection using this pattern's operating calendar. */
 export function nextJourneyConnection(leg: Segment, ready: Date) {
@@ -197,10 +200,9 @@ export function nextJourneyConnection(leg: Segment, ready: Date) {
     || leg.alightingIndex >= pattern.s.length || leg.boardingIndex >= leg.alightingIndex) return;
   const next = departureAt(pattern, patternWindows(pattern, ready), leg.boardingIndex, 0, false);
   if (!next) return;
-  const scale = pattern.t.at(-1)! > 0 ? next.duration / pattern.t.at(-1)! : 1;
   return { departure: { time: new Date(ready.getTime() + next.wait * 60000).toISOString(), minutes: next.wait,
     timingType: 'SCHEDULED' as const, departureType: 'SCHEDULED' as const, scheduleMatch: 'MATCHED' as const, timetableEstimate: true },
-    rideMinutes: Math.max(1, Math.round((pattern.t[leg.alightingIndex] - pattern.t[leg.boardingIndex]) * scale)) };
+    rideMinutes: Math.max(1, Math.round(stopRunMinutes(pattern, leg.boardingIndex, leg.alightingIndex, next.duration, next.profile))) };
 }
 function addLabel(map: Map<number, Label[]>, value: Label, limit = 4) {
   const labels = map.get(value.stop) ?? [];
@@ -290,17 +292,16 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
       const serviceWindows = windows[patternIndex] ?? (windows[patternIndex] = patternWindows(pattern, date, context));
       if (!serviceWindows.length) return;
       const operator = route[1] === 'KMB+CTB' ? 'KMB' : route[1] === 'LWB+CTB' ? 'LWB' : route[1];
-      const boardings: { label: Label; position: number; wait: number; duration: number; interval: number; publishedHeadway?: number }[] = [];
+      const boardings: { label: Label; position: number; wait: number; duration: number; profile?: number; interval: number; publishedHeadway?: number }[] = [];
       for (let step = 0; step < pattern.s.length; step++) {
         if (options.previewBudgetMs !== undefined && performance.now() > previewDeadline) { previewComplete = false; return; }
         const position = reverse ? pattern.s.length - 1 - step : step, index = pattern.s[position];
         if ((reverse ? pattern.p : pattern.a)[position] === 0) for (const boarding of boardings) {
-          const { label, wait, duration, interval } = boarding;
+          const { label, wait, duration, profile, interval } = boarding;
           if (label.visited.includes(index)) continue;
           const start = reverse ? position : boarding.position, end = reverse ? boarding.position : position;
           if (options.preferences && !corridorLegAllowed(pattern.id, start, end, options.preferences)) continue;
-          const scale = pattern.t[pattern.t.length - 1] > 0 ? duration / pattern.t[pattern.t.length - 1] : 1;
-          const ride = Math.max(1, Math.round((pattern.t[end] - pattern.t[start]) * scale)), elapsed = label.elapsed + wait + ride;
+          const ride = Math.max(1, Math.round(stopRunMinutes(pattern, start, end, duration, profile))), elapsed = label.elapsed + wait + ride;
           if (discardedByDirect(label, elapsed)) continue;
           if (limits.ride !== null && !limitAllows(limits.ride, label.legs.reduce((sum, leg) => sum + (leg.journeyTimeMinutes ?? 0), ride))) continue;
           const waitCost = (reverse ? (label.legs.length ? wait : 0) : wait) * waitMultiplier;
@@ -361,7 +362,7 @@ export function findMultimodalJourneys(from: Point, to: Point, date = new Date()
             if ((!reverse || label.legs.length) && !limitAllows(limits.wait,
               wait + label.legs.reduce((sum, leg) => sum + (leg.scheduledWaitMinutes ?? 0), 0))) continue;
             if (label.legs.length && !limitAllows(limits.change, label.pendingWalk + wait)) continue;
-            boardings.push({ label, position, wait, duration: departure.duration, interval: departure.headway, publishedHeadway: departure.publishedHeadway });
+            boardings.push({ label, position, wait, duration: departure.duration, profile: departure.profile, interval: departure.headway, publishedHeadway: departure.publishedHeadway });
           }
         }
         if (boardings.length > (simpleOnly ? 100 : 12)) {
@@ -466,7 +467,7 @@ export function selectJourneyAlternatives(routes: ScoredRoute[], limit = 40, pre
   // comparison next to the faster connection rather than losing it in ties.
   const feederComparisons = feeders.flatMap(feeder => [feeder, ...busPairs.filter(r => family(r.legs[0]) === family(feeder.legs[0])
     && !direct.some(d => family(d.legs[0]) === family(r.legs[1]))
-    && r.discountedFare < feeder.discountedFare && r.finalScore <= feeder.finalScore + 15)
+    && r.discountedFare < feeder.discountedFare && duration(r) <= duration(feeder) + 25)
     .sort((a, b) => a.discountedFare - b.discountedFare).slice(0, 1)]);
   add(feederComparisons, Math.max(0, limit - chosen.size - 1));
   add(efficient, limit); add(useful, limit);
@@ -501,14 +502,19 @@ export function retimeConnections(routes: Route[], now: Date, minimumChangeMinut
       if (index === 0 && leg.realtimeEta && (leg.realtimeEta.isLive || leg.realtimeEta.source === 'SCHEDULED')) {
         if (leg.realtimeEta.etaMinutes < elapsed) { leg.serviceEnded = true; continue; }
         leg.scheduledWaitMinutes = leg.realtimeEta.etaMinutes - elapsed; leg.scheduledDepartureMinutes = leg.realtimeEta.etaMinutes;
+        if ((leg.mode === 'BUS' || leg.mode === 'MINIBUS') && leg.networkPattern !== undefined
+          && leg.boardingIndex !== undefined && leg.alightingIndex !== undefined) {
+          const prediction = new Date(now.getTime() + leg.realtimeEta.etaMinutes * 60000);
+          leg.journeyTimeMinutes = Math.max(1, Math.round(runMinutesNearPrediction(
+            networkPatterns[leg.networkPattern], leg.boardingIndex, leg.alightingIndex, prediction)));
+        }
       } else if (leg.networkPattern !== undefined) {
         const buffer = index === 0 ? 0 : Math.max(0, minimumChangeMinutes - accessWalk);
         const pattern = networkPatterns[leg.networkPattern], departure = departureAt(pattern, patternWindows(pattern, now), leg.boardingIndex!, elapsed + buffer, false);
         if (!departure) { leg.serviceEnded = true; continue; }
         leg.scheduledWaitMinutes = departure.wait + buffer; leg.scheduledIntervalMinutes = departure.headway;
         leg.publishedHeadwayMinutes = departure.publishedHeadway; leg.scheduledDepartureMinutes = elapsed + buffer + departure.wait;
-        const scale = pattern.t[pattern.t.length - 1] > 0 ? departure.duration / pattern.t[pattern.t.length - 1] : 1;
-        leg.journeyTimeMinutes = Math.max(1, Math.round((pattern.t[leg.alightingIndex!] - pattern.t[leg.boardingIndex!]) * scale));
+        leg.journeyTimeMinutes = Math.max(1, Math.round(stopRunMinutes(pattern, leg.boardingIndex!, leg.alightingIndex!, departure.duration, departure.profile)));
       }
       elapsed += (leg.scheduledWaitMinutes ?? (leg.scheduledIntervalMinutes ?? 6) / 2) + (leg.journeyTimeMinutes ?? 0);
     }

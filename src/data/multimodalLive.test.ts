@@ -33,14 +33,15 @@ describe('Official live arrivals', () => {
     ]);
     vi.mocked(getStaticKmbRouteStops).mockImplementation((_route, bound) => bound === 'outbound'
       ? [{ stop: 'terminal-previous', seq: 1 }, { stop: 'terminal-last', seq: 2 }] : undefined);
-    vi.mocked(getKmbStopEta).mockResolvedValue([{ route: routeNumber, dir: 'O', seq: 1, dest_tc: '', dest_en: '',
-      eta: new Date(now.getTime() + 5 * 60000).toISOString(), rmk_tc: '', data_timestamp: now.toISOString() }]);
+    vi.mocked(getKmbStopEta).mockResolvedValue([1, 2].map(() => ({ route: routeNumber, dir: 'O', seq: 1, dest_tc: '', dest_en: '',
+      eta: new Date(now.getTime() + 5 * 60000).toISOString(), rmk_tc: '', data_timestamp: now.toISOString() })));
     const route: Route = { id: 'terminal-live', legs: [{ operator: 'KMB', mode: 'BUS', routeNumber,
       networkPattern: index, boardingIndex: terminal, alightingIndex: terminal, originStop: destination,
       destinationStop: destination, serviceStatus: 'TIMETABLE' }] };
     await enrichTerminalArrivals([route], now);
     const departure = route.legs![0].liveDepartures?.[0];
-    expect(departure).toBeDefined();
+    expect(departure).toMatchObject({ projectedArrival: true, timingType: 'LIVE' });
+    expect(route.legs![0].liveDepartures).toEqual([departure, departure]);
     expect(departure!.minutes).toBeGreaterThan(5);
     expect(route.legs![0].boardingIndex).toBe(terminal);
     expect(route.legs![0].realtimeEta?.etaMinutes).toBe(departure!.minutes);

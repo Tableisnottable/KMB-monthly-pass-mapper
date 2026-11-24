@@ -1,4 +1,4 @@
-import { hongKongClock, networkPatterns, networkRoutes, networkStops, serviceCalendarStatus } from './transportNetwork';
+import { hongKongClock, networkPatterns, networkRoutes, networkStops, serviceCalendarStatus, stopOffset, stopRunMinutes, type NetworkPattern } from './transportNetwork';
 import { departureTimingType, departureType, providerMarksAdditional, providerMarksScheduled, type DepartureTimingType, type DepartureType, type TimetableComparison } from '../domain/departureType';
 
 export type ScheduleMatch = 'MATCHED' | 'ADDED' | 'UNVERIFIED';
@@ -15,6 +15,8 @@ export interface LiveDeparture extends TimetableComparison {
   addedReason?: AddedReason;
   changedReason?: 'PROVIDER' | 'OBSERVED_SPACING' | 'POSSIBLE_SHIFT';
   timetableEstimate?: boolean;
+  /** Arrival projected from an upstream operator prediction. */
+  projectedArrival?: boolean;
   /** Calculated published timetable slot whose scheduled time has passed. */
   pastSchedule?: boolean;
 }
@@ -53,11 +55,10 @@ export function patternTimetable(patternIndex: number, serviceDate: string, boar
   const day = parseServiceDate(serviceDate), pattern = networkPatterns[patternIndex];
   if (!pattern || !Number.isInteger(boardingIndex) || boardingIndex < 0 || boardingIndex >= pattern.s.length
     || (!everyStop && (boardingIndex === pattern.s.length - 1 || pattern.p[boardingIndex] !== 0))) return [];
-  const total = pattern.t[pattern.t.length - 1];
-  return pattern.w.flatMap(([service, start, end, headway, duration], index) => {
+  return pattern.w.flatMap(([service, start, end, headway, duration, profile], index) => {
     const calendar = serviceCalendarStatus(service, day);
     if (!calendar.active) return [];
-    const offset = pattern.t[boardingIndex] * (total ? duration / total : 1);
+    const offset = stopOffset(pattern, boardingIndex, duration, profile);
     const startMinute = start + offset, endMinute = (headway > 0 ? end : start) + offset;
     return [{ id: `${pattern.id}:${serviceDate}:${index}:${boardingIndex}`, serviceId: service, serviceDate,
       start: new Date(day.getTime() + startMinute * 60000).toISOString(),
@@ -65,6 +66,28 @@ export function patternTimetable(patternIndex: number, serviceDate: string, boar
       headwayMinutes: headway, kind: headway > 0 ? 'FREQUENCY' as const : 'DEPARTURE' as const,
       estimatedStopTime: boardingIndex > 0, calendarAdded: calendar.added }];
   }).sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute);
+}
+
+/** Use the operating window closest to an upstream prediction to project its arrival. */
+export function runMinutesNearPrediction(pattern: NetworkPattern, from: number, to: number, prediction: Date) {
+  const { minute } = hongKongClock(prediction);
+  let bestDifference = Infinity;
+  let selectedRun = stopRunMinutes(pattern, from, to, pattern.t.at(-1)!);
+  for (const shift of [-1, 0, 1]) {
+    const serviceDay = new Date(prediction.getTime() + shift * 86400000);
+    for (const [service, start, end, headway, duration, profile] of pattern.w) {
+      if (!serviceCalendarStatus(service, serviceDay).active) continue;
+      const first = start + shift * 1440 + stopOffset(pattern, from, duration, profile);
+      const last = headway ? Math.max(0, Math.ceil((end - start) / headway) - 1) : 0;
+      const slot = headway ? first + Math.min(last, Math.max(0, Math.round((minute - first) / headway))) * headway : first;
+      const difference = Math.abs(minute - slot);
+      if (difference < bestDifference) {
+        bestDifference = difference;
+        selectedRun = stopRunMinutes(pattern, from, to, duration, profile);
+      }
+    }
+  }
+  return selectedRun;
 }
 
 /** No 90-minute cutoff: a station can link to its next published shift. */
@@ -161,13 +184,13 @@ export function matchDepartureToTimetable(patternIndex: number, boarding: number
 }
 
 /** Nearest timetable reference, not a trip-ID match or confirmed delay. */
-export function compareDepartureToTimetable(patternIndex: number, boarding: number, time: string): TimetableComparison {
+export function compareDepartureToTimetable(patternIndex: number, boarding: number, time: string, everyStop = false): TimetableComparison {
   const timestamp = Date.parse(time);
   if (!Number.isFinite(timestamp)) return {};
   let nearest: { slot: number; difference: number; basis: TimetableComparison['comparisonBasis'] } | undefined;
   for (const shift of [-1, 0]) {
     const day = hongKongServiceDate(new Date(timestamp + shift * 86400000));
-    for (const entry of patternTimetable(patternIndex, day, boarding)) {
+    for (const entry of patternTimetable(patternIndex, day, boarding, everyStop)) {
       const start = Date.parse(entry.start), end = Date.parse(entry.end), step = entry.headwayMinutes * 60000;
       const slot = step ? start + Math.max(0, Math.min(Math.ceil((end - start) / step) - 1, Math.round((timestamp - start) / step))) * step : start;
       const difference = (timestamp - slot) / 60000;

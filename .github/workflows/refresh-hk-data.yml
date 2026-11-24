@@ -32,14 +32,9 @@ jobs:
       - name: Verify KMB download retries and snapshot protection
         run: |
           node --test scripts/fetch-kmb-route-stops.test.mjs
-          python -m unittest discover -s scripts -p test_import_alignments.py
+          python -m unittest discover -s scripts
       - id: cadence
         run: echo "weekday=$(TZ=Asia/Hong_Kong date +%u)" >> "$GITHUB_OUTPUT"
-      - name: Refresh daily timetables and adult/student fares
-        run: |
-          python -m pip install pyproj==3.8.0
-          python scripts/import-transport.py --cache "$RUNNER_TEMP/hk-data" --refresh
-          python scripts/import-student-fares.py
       - name: Refresh weekly bus stops
         if: github.event_name == 'workflow_dispatch' || steps.cadence.outputs.weekday == '7'
         run: |
@@ -50,6 +45,11 @@ jobs:
         run: |
           python -m pip install --target "$RUNNER_TEMP/hk-data/python-libs" osmium
           python scripts/import-alignments.py --cache "$RUNNER_TEMP/hk-data"
+      - name: Refresh daily timetables and adult/student fares
+        run: |
+          python -m pip install pyproj==3.8.0
+          python scripts/import-transport.py --cache "$RUNNER_TEMP/hk-data" --refresh
+          python scripts/import-student-fares.py
       - name: Refresh weekly place directories
         if: github.event_name == 'workflow_dispatch' || steps.cadence.outputs.weekday == '7'
         run: |

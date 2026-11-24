@@ -15,9 +15,26 @@ export interface NetworkPattern {
   t: number[];
   p: number[];
   a: number[];
-  /** service, first departure, end (exclusive for frequencies), headway, run time */
+  /** Alternate cumulative offsets for trips with published intermediate timepoints. */
+  u?: number[][];
+  /** Service, first departure, exclusive end, headway, run time, optional profile index. */
   w: number[][];
 }
+/** Use a trip's complete offsets when available, or scale the default to its scheduled duration. */
+export function stopOffset(pattern: NetworkPattern, position: number, duration: number, profile?: number) {
+  const offsets = profile === undefined ? undefined : pattern.u?.[profile];
+  if (offsets) return offsets[position];
+  const total = pattern.t.at(-1)!;
+  return total ? pattern.t[position] / total * duration : pattern.t[position];
+}
+
+export function stopRunMinutes(pattern: NetworkPattern, from: number, to: number, duration: number, profile?: number) {
+  const offsets = profile === undefined ? undefined : pattern.u?.[profile];
+  if (offsets) return offsets[to] - offsets[from];
+  const last = pattern.t[pattern.t.length - 1];
+  return (pattern.t[to] - pattern.t[from]) * (last ? duration / last : 1);
+}
+
 export const networkRoutes = routes as NetworkRoute[];
 export const networkPatterns = patterns as NetworkPattern[];
 for (const correction of timetableCorrections) {

@@ -14,11 +14,12 @@ import json
 import math
 from pathlib import Path
 import re
-import statistics
 import time
 import urllib.parse
 import urllib.request
 import zipfile
+
+from bus_timing import bus_weights, interpolate, road_alignments
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = {
@@ -175,7 +176,8 @@ def main():
     for r in rows(en, 'stop_times.txt'):
         grouped[r['trip_id']].append(r)
     print('Loaded', len(trips), 'trips', flush=True)
-    patterns, keys = [], {}
+    patterns, keys, weights = [], {}, {}
+    alignments = road_alignments()
     for tid, records in grouped.items():
         records.sort(key=lambda r: int(r['stop_sequence']))
         trip = trips[tid]; direction = tid.split('-')[1]
@@ -186,23 +188,34 @@ def main():
         times = [minute(r['departure_time'] or r['arrival_time']) if (r['departure_time'] or r['arrival_time']) else None for r in records]
         if times[0] is None or times[-1] is None:
             raise ValueError('Missing terminal time: ' + tid)
-        # Interpolate unpublished intermediate times between official timepoints.
-        distances = [0.0]
-        for a, b in zip(sequence, sequence[1:]): distances.append(distances[-1] + distance(stops[a], stops[b]))
-        known = [i for i, t in enumerate(times) if t is not None]
-        for a, b in zip(known, known[1:]):
-            if times[b] < times[a]: times[b] += 1440
-            for i in range(a + 1, b):
-                ratio = (distances[i] - distances[a]) / (distances[b] - distances[a]) if distances[b] > distances[a] else (i-a)/(b-a)
-                times[i] = times[a] + (times[b] - times[a]) * ratio
-        offsets = [round(t - times[0], 1) for t in times]
+        route = routes[route_index[trip['route_id']]]
+        is_bus = route[5] in ('BUS', 'MINIBUS')
+        if signature not in weights:
+            if is_bus:
+                points = [stops[i][3:5] for i in sequence]
+                weights[signature] = bus_weights(points, alignments.get((route[0], direction), []), pickup, dropoff)
+            else:
+                weights[signature] = [distance(stops[a], stops[b]) for a, b in zip(sequence, sequence[1:])]
+        has_intermediate_times = is_bus and any(value is not None for value in times[1:-1])
+        offsets = interpolate(times, weights[signature])
+        if not is_bus:
+            offsets = [round(value, 1) for value in offsets]
         if signature not in keys:
             keys[signature] = len(patterns)
+            default_offsets = interpolate([times[0], *[None] * (len(times) - 2), times[-1]], weights[signature]) if has_intermediate_times else offsets
             patterns.append({'id': 'td:' + str(len(patterns)), 'r': route_index[trip['route_id']], 'd': direction,
-                             's': sequence, 't': offsets, 'p': pickup, 'a': dropoff, 'w': []})
+                             's': sequence, 't': default_offsets, 'p': pickup, 'a': dropoff, 'w': []})
         pattern = patterns[keys[signature]]
+        # The default shape scales to the published duration of each window.
+        # Preserve a dedicated profile when a trip has intermediate anchors.
+        profile = []
+        if is_bus and has_intermediate_times and offsets != pattern['t']:
+            profiles = pattern.setdefault('u', [])
+            if offsets not in profiles:
+                profiles.append(offsets)
+            profile = [profiles.index(offsets)]
         for start, end, headway in frequencies.get(tid, [[times[0], times[0], 0]]):
-            pattern['w'].append([int(trip['service_id']), start, end, headway, offsets[-1]])
+            pattern['w'].append([int(trip['service_id']), start, end, headway, offsets[-1], *profile])
     # Identical records occur across special-service trips; preserve the union.
     for p in patterns: p['w'] = sorted(map(list, set(map(tuple, p['w']))))
     stop_modes = collections.defaultdict(set)
@@ -279,7 +292,7 @@ def main():
                 'counts': {'routes': len(routes), 'stops': len(stops), 'patterns': len(patterns), 'trips': len(trips),
                            'operators': dict(collections.Counter(r[1] for r in routes)), 'modes': dict(collections.Counter(r[5] for r in routes))},
                 'limitations': ['Rail topology has estimated journey times; service availability requires live verification.',
-                 'TD intermediate stop times are interpolated between published timepoints.',
+                 'Bus and green minibus stop times use distance, road type and stop allowances between TD timepoints.',
                  'Published schedules are not live vehicle positions. Adult Octopus fares are used where available; unverified interchange discounts are excluded.',
                  'Red minibuses, taxis, Ngong Ping 360 and private services absent from the imported feeds are not included.'],
                 'files': files}

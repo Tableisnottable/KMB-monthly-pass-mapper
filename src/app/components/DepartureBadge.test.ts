@@ -12,6 +12,9 @@ describe('Independent timing and service badges', () => {
     expect(html).toContain('data-departure-type="ADDITIONAL"');
     expect(html).not.toContain('data-departure-type="SCHEDULED"');
   });
+  it('labels an upstream projection as a live estimate', () => {
+    expect(render({ timingType: 'LIVE', projectedArrival: true })).toContain('>Live estimate</span>');
+  });
   it('keeps provider-scheduled extras separate from live predictions', () => {
     const html = render({ timingType: 'SCHEDULED', remark: 'Scheduled Bus', scheduleMatch: 'ADDED', addedReason: 'NOT_IN_TIMETABLE' });
     expect(html).toContain('data-departure-type="SCHEDULED"');
