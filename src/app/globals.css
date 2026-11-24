@@ -905,14 +905,42 @@ button.departure-choice:hover { background: #e5edf3; }
 .route-direction > span { flex-shrink: 0; white-space: nowrap; }
 .route-direction select { width: 100%; min-width: 0; padding: 12px 6px; border: 1px solid #cbd7df; border-radius: 10px; background: #fff; font-size: 13px; }
 .route-timetable-link { display: block; color: #367798; font-size: 13px; margin: 10px 0; }
-.route-browser-stops { list-style: none; padding: 0; margin: 0; background: #fff; border-radius: 14px; overflow: hidden; }
-.route-browser-stops > li { border-bottom: 1px solid #e8edf1; }
-.route-browser-stops > li > button { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 15px 12px; }
-.route-browser-stops > li > button[aria-pressed=true] { background: #e8f4e2; }
-.route-stop-number { width: 27px; height: 27px; border: 2px solid #b6c9d3; display: grid; place-items: center; border-radius: 50%; font-size: 11px; flex-shrink: 0; }
-.route-browser-stops strong { font-size: 15px; }
+.route-browser-stops { --stop-line: #d14551; --stop-line-secondary: #d14551; list-style: none; padding: 0; margin: 0; background: #fff; border-radius: 8px; overflow: hidden; }
+.route-browser-stops > li { position: relative; border-bottom: 1px solid #e8edf1; }
+.route-browser-stops > li::before { position: absolute; top: 30px; bottom: -30px; left: 25px; width: 4px; content: ''; background: linear-gradient(90deg, var(--stop-line) 0 50%, var(--stop-line-secondary) 50% 100%); }
+.route-browser-stops > li:last-child::before { display: none; }
+.route-browser-stops > li > .route-stop-button { position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; text-align: left; width: 100%; min-height: 64px; padding: 8px 12px; }
+.route-browser-stops > li > .route-stop-button[aria-expanded=true] { background: #f1f6fb; }
+.route-stop-button > svg:last-child { flex: none; margin-left: auto; color: #65788a; }
+.route-stop-button[aria-expanded=true] > svg:last-child { transform: rotate(90deg); }
+.route-stop-details { display: flex; flex: 1; flex-wrap: wrap; min-width: 0; align-items: baseline; justify-content: space-between; gap: 3px 10px; }
+.route-stop-number { position: relative; display: grid; place-items: center; width: 30px; height: 30px; flex: none; border: 2px solid var(--stop-line); border-radius: 50%; background: #fff; color: #263648; font-size: 11px; font-variant-numeric: tabular-nums; }
+.route-browser-stops strong { font-size: 15px; line-height: 1.35; }
+.route-browser-stops .route-stop-details > small { margin: 0; color: #465c70; font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .route-browser-stops small { display: block; font-size: 11px; color: #6d8190; margin-top: 4px; }
-.route-browser-stops .leg-arrivals { margin: 0 12px 12px; }
+.route-browser-stops .leg-arrivals { position: relative; z-index: 1; margin: 0; padding: 7px 12px 12px 52px; background: #f8fafc; }
+.route-browser-stops .joint-arrival-board { margin-top: 0; padding: 0; background: transparent; }
+.route-browser-stops .joint-arrival-board header { justify-content: space-between; padding: 0 0 5px; }
+.route-browser-stops .joint-arrival-board header > span:first-child { color: #607286; font-size: 11px; font-weight: 650; }
+.arrival-live-status { display: inline-flex; align-items: center; gap: 5px; color: #176b3a !important; font-size: 11px !important; font-weight: 700; }
+.arrival-live-status > span { width: 7px; height: 7px; border-radius: 50%; background: #219653; }
+.route-browser-stops .departure-choices { gap: 0; }
+.route-browser-stops .departure-choice { grid-template-columns: minmax(34px, auto) minmax(0, 1fr); gap: 5px 10px; padding: 9px 7px; border-bottom: 1px solid #e2e8ef; border-radius: 0; }
+.route-browser-stops .departure-choice:last-child { border-bottom: 0; }
+.route-browser-stops .departure-choice-company { align-self: center; }
+.route-browser-stops .departure-choice-company .arrival-company { margin: 0; font-size: 10px; font-weight: 750; }
+.route-browser-stops .departure-choice-status { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 7px; }
+.route-browser-stops .departure-choice-status > .departure-badges { order: 0; }
+.route-browser-stops .departure-choice-clock { display: inline-flex; align-items: baseline; gap: 4px; order: 1; margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.route-browser-stops .departure-choice-clock > strong { color: #205f91; font-size: 22px; line-height: 1; font-weight: 750; }
+.route-browser-stops .departure-choice-clock > span { color: #485d6c; font-size: 12px; }
+.route-browser-stops .departure-choice-clock > time { color: #4e5e70; font-size: 15px; font-weight: 550; }
+.route-browser-stops .departure-choice-status > .timetable-difference { order: 2; width: 100%; margin: 0; }
+.route-browser-stops .departure-choice-wait { display: none; }
+.route-browser-stops .arrival-company { color: #17212b; }
+.route-browser-stops .departure-choice:hover { background: #f1f6fb; }
+.route-browser-stops .departure-choice.is-selected { border-color: #7ab38b; background: #e8f5eb; }
+.route-browser-stops .departure-choice .joint-arrival-remark { width: 100%; }
 .route-browser-map { position: relative; min-height: 0; min-width: 0; }
 .route-browser-map > div { height: 100%; width: 100%; }
 .route-browser-map > p { position: absolute; bottom: 25px; left: 12px; right: 12px; padding: 9px; background: #fffffff0; z-index: 1000; font-size: 12px; border-radius: 8px; }

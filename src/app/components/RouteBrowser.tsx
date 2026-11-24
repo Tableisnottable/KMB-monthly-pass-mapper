@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type * as Leaflet from 'leaflet';
 import { transportFetch } from '../../browser/transportClient';
 import type { Segment, Stop } from '../../engine/UpgradedScoringEngine';
 import { LegArrivalBoard } from './LegArrivalBoard';
 import { copy, routeBadgeStyle, type PlannerLocale } from './plannerUi';
 import { operatorName } from '../../data/transportOperators';
-import { routeLineStyles } from './routeColours';
+import { routeLineColours, routeLineStyles } from './routeColours';
 import { PlannerIcon } from './PlannerIcon';
 
 interface RouteRow { id: string; operator: string; number: string; nameTc: string; nameEn: string; mode: string }
@@ -46,6 +46,7 @@ export function RouteBrowser() {
     finally { if (!controller.signal.aborted) setLoading(false); }
   }
   const pattern = patterns.find(item => item.id === patternId), stop = pattern?.stops[stopIndex];
+  const [primaryColour, secondaryColour] = routeLineColours(route?.operator ?? '', route?.number);
   const leg: Segment | undefined = route && pattern && stop ? { operator: route.operator.split('+')[0], networkOperator: route.operator,
     mode: route.mode, routeNumber: route.number, networkRouteId: route.id, networkPatternId: pattern.id, networkPattern: pattern.index,
     boardingIndex: stopIndex, alightingIndex: pattern.stops.length - 1, originStop: stop, destinationStop: pattern.stops.at(-1) } : undefined;
@@ -62,10 +63,22 @@ export function RouteBrowser() {
         <label className="route-direction"><span>{copy(locale, '方向', 'Direction')}</span><select value={patternId} onChange={event => { setPatternId(event.target.value); setStopIndex(0); }}>{patterns.map((item, i) => <option key={item.id} value={item.id}>{item.stops[0]?.name} → {item.stops.at(-1)?.name} ({i + 1})</option>)}</select></label>
         <a className="route-timetable-link" href={'/timetables?' + new URLSearchParams({ route: route.id, pattern: patternId, lang: locale,
           ...(stop ? { stop: stop.id, position: String(stopIndex) } : {}) })}>{copy(locale, '全日時間表', 'Full-day timetable')} →</a>
-        <ol className="route-browser-stops">{pattern?.stops.map((item, i) => <li data-stop-index={i} key={item.id + ':' + i}><button type="button" aria-pressed={i === stopIndex} onClick={() => setStopIndex(i)}>
-          <span className="route-stop-number">{i + 1}</span><span><strong>{item.name}</strong>{i < pattern.stops.length - 1 && <small>{item.fareStatus === 'UNAVAILABLE' ? copy(locale, '票價待查', 'Fare unavailable') : 'HK$' + item.fare.toFixed(1) + (item.fareStatus === 'FULL_FARE' ? copy(locale, ' 上限', ' maximum') : '')}</small>}</span>
-        </button>{i === stopIndex && leg && <LegArrivalBoard key={pattern.id + ':' + i} leg={leg} locale={locale} laterConnection={false}
-          routeStop={item.boarding && i < pattern.stops.length - 1 ? 'departure' : 'arrival'} />}</li>)}</ol>
+        <ol className="route-browser-stops" role="list" style={{
+          '--stop-line': primaryColour, '--stop-line-secondary': secondaryColour ?? primaryColour,
+        } as CSSProperties}>{pattern?.stops.map((item, i) => <li data-stop-index={i} key={item.id + ':' + i}>
+          <button className="route-stop-button" type="button" aria-expanded={i === stopIndex} onClick={() => setStopIndex(i === stopIndex ? -1 : i)}>
+            <span className="route-stop-number">{i + 1}</span>
+            <span className="route-stop-details">
+              <strong>{item.name}</strong>
+              {item.boarding && i < pattern.stops.length - 1 && <small>{item.fareStatus === 'UNAVAILABLE'
+                ? copy(locale, '票價待查', 'Fare unavailable')
+                : copy(locale, '車資 ', 'Fare ') + 'HK$' + item.fare.toFixed(1) + (item.fareStatus === 'FULL_FARE' ? copy(locale, ' 上限', ' maximum') : '')}</small>}
+            </span>
+            <PlannerIcon name="chevron" size={16} />
+          </button>
+          {i === stopIndex && leg && <LegArrivalBoard key={pattern.id + ':' + i} leg={leg} locale={locale} laterConnection={false}
+            routeStop={item.boarding && i < pattern.stops.length - 1 ? 'departure' : 'arrival'} />}
+        </li>)}</ol>
       </>}
       {loading && <p role="status">{copy(locale, '載入中…', 'Loading…')}</p>}{error && <p role="alert">{error}</p>}
     </section><RouteBrowserMap pattern={pattern} selected={stopIndex} route={route} onStop={index => { setStopIndex(index); requestAnimationFrame(() => document.querySelector('[data-stop-index="' + index + '"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })); }} locale={locale} /></div>

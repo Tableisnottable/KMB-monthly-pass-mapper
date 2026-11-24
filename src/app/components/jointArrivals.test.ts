@@ -62,8 +62,8 @@ describe('Joint operator arrival displays', () => {
     expect(html).toContain('彩虹道遊樂場');
     expect(html.indexOf('02:54')).toBeLessThan(html.indexOf('03:15'));
     expect(html.indexOf('03:15')).toBeLessThan(html.indexOf('03:38'));
-    expect(html).toMatch(/02:54[\s\S]*?九巴[\s\S]*?<strong>1<\/strong>/);
-    expect(html).toMatch(/03:15[\s\S]*?城巴[\s\S]*?<strong>23<\/strong>/);
+    expect(html).toMatch(/九巴[\s\S]*?<strong>1<\/strong>[\s\S]*?02:54/);
+    expect(html).toMatch(/城巴[\s\S]*?<strong>23<\/strong>[\s\S]*?03:15/);
     expect(html).toContain('data-departure-type="ADDITIONAL"');
     expect(html).toContain('加班');
     expect(departures[0].minutes).toBe(46);

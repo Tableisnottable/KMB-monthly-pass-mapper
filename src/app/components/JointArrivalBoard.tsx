@@ -83,7 +83,9 @@ export function JointArrivalBoard({ departures, cancellations = [], operator, ro
     finally { if (!controller.signal.aborted) setHistoryLoading(false); }
   }
   return <section className="joint-arrival-board" aria-label={(routeNumber ?? '') + ' ' + copy(locale, '路線到站及班次時間', 'Route arrivals and departures')}>
-    <header><strong>{[routeNumber, stopName].filter(Boolean).join(' · ')}</strong><span>{routeStop === 'arrival' ? copy(locale, '預計到站', 'Estimated arrivals') : routeStop ? copy(locale, '班次時間', 'Departures') : rows.length ? copy(locale, '選擇班次', 'Departures') : historyQuery ? copy(locale, '班次時間', 'Schedule') : copy(locale, '上車時間估算 · 香港時間', 'Boarding estimate · HKT')}</span></header>
+    {routeStop ? <header><strong>{[routeNumber, stopName].filter(Boolean).join(' · ')}</strong><span>{routeStop === 'arrival' ? copy(locale, '預計到站', 'Estimated arrivals') : copy(locale, '班次時間', 'Departures')}</span>
+      {rows.some(row => row.timingType === 'LIVE' || row.projectedArrival) && <span className="arrival-live-status"><span />{copy(locale, '即時', 'Live')}</span>}</header>
+      : <header><strong>{[routeNumber, stopName].filter(Boolean).join(' · ')}</strong><span>{rows.length ? copy(locale, '選擇班次', 'Departures') : historyQuery ? copy(locale, '班次時間', 'Schedule') : copy(locale, '上車時間估算 · 香港時間', 'Boarding estimate · HKT')}</span></header>}
     {historyQuery && <>
       <button type="button" className="arrival-history-button" aria-expanded={showDeparted} onClick={() => void toggleDeparted()} disabled={historyLoading}>
         {historyLoading ? copy(locale, '載入已過班次…', 'Loading past departures…') : showDeparted ? copy(locale, '收起已過班次', 'Hide past departures') : copy(locale, '查看已過班次', 'View past departures')}
@@ -114,12 +116,15 @@ export function JointArrivalBoard({ departures, cancellations = [], operator, ro
           const chosen = selectedDepartureKey ? selectedDepartureKey === key : row.time === scheduledTime && index === rows.findIndex(item => item.time === scheduledTime);
           const unreachable = earliestTime ? Date.parse(row.time) < Date.parse(earliestTime) - 1000 : false;
           const contents = <>
-            <span className="departure-choice-time"><time dateTime={row.time}>{timeLabel(row.time)}</time>
+            <span className="departure-choice-time departure-choice-company">
               <span className="arrival-company" style={routeBadgeStyle(row.operator ?? (operator.includes('+') ? '' : operator), routeNumber)}>{companyLabel(row.operator)}</span>
             </span>
-            <span className="departure-choice-status"><DepartureBadge departure={row} locale={locale} compact /><TimetableDifference departure={row} locale={locale} compact />
+            <span className="departure-choice-status"><DepartureBadge departure={row} locale={locale} compact />
+              <span className="departure-choice-clock"><strong>{remaining(row)}</strong><span>{copy(locale, '分鐘', 'min')}</span>
+                <time dateTime={row.time}>{timeLabel(row.time)}</time></span>
+              <TimetableDifference departure={row} locale={locale} compact />
               {arrivalRemark(row.remark) && <span className="joint-arrival-remark">{arrivalRemark(row.remark)}</span>}</span>
-            <span className="departure-choice-wait"><strong>{remaining(row)}</strong> {copy(locale, '分', 'min')}
+            <span className="departure-choice-wait">
               {onSelectDeparture && <small>{unreachable ? copy(locale, '趕不及', 'Too early') : chosen ? copy(locale, '已選', 'Selected') : <span aria-hidden="true">○</span>}</small>}
             </span>
           </>;
