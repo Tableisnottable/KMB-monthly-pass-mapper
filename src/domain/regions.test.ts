@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { regions, regionGroups, regionHref, matchingRegions, matchingRegionCity, browseLocation } from './regions';
+import { countries, regions, regionGroups, regionHref, matchingRegions, matchingRegionCity, browseLocation } from './regions';
 import { localMapBounds } from './openMap';
 
 describe('Worldwide region directory', () => {
+  it('counts 193 UN members and two observer states as 195 countries', () => {
+    expect(countries).toHaveLength(195);
+    expect(countries.filter(r => r.unStatus === 'member')).toHaveLength(193);
+    expect(countries.filter(r => r.unStatus === 'observer').map(r => r.code).sort()).toEqual(['PS', 'VA']);
+    expect(new Set(countries.map(r => r.code)).size).toBe(195);
+    expect(regions.every(r => ['member', 'observer', 'other'].includes(r.unStatus))).toBe(true);
+    for (const code of ['HK', 'MO', 'TW', 'XK']) {
+      expect(regions.find(r => r.code === code)?.unStatus).toBe('other');
+      expect(matchingRegions(code).map(r => r.code)).toContain(code);
+    }
+    expect(regionHref(countries.find(r => r.code === 'VA')!, 'zh')).toBe('/world?region=va');
+    expect(regionHref(countries.find(r => r.code === 'PS')!, 'en')).toBe('/world/en?region=palestine');
+  });
   it('accepts common abbreviations, simplified names and unaccented names', () => {
-    for (const [query, code] of [['UK', 'GB'], ['USA', 'US'], ['台湾', 'TW'], ['macau', 'MO'], ['Turkiye', 'TR']]) {
+    for (const [query, code] of [['UK', 'GB'], ['USA', 'US'], ['台湾', 'TW'], ['macau', 'MO'], ['Turkiye', 'TR'], ['教廷', 'VA'], ['Holy See', 'VA'], ['巴勒斯坦國', 'PS']]) {
       expect(matchingRegions(query).some(r => r.code === code)).toBe(true);
     }
     expect(matchingRegions('UK').map(r => r.code)).toEqual(['GB']);

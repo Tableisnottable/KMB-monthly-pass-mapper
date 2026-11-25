@@ -992,6 +992,10 @@ button.departure-choice:hover { background: #e5edf3; }
 .choice-search:focus-within { outline: 2px solid #277d5b; outline-offset: 2px; }
 .choice-caption { margin: 12px 0; color: #62767b; font-size: 12px; line-height: 1.6; }
 .region-control { flex: 0 0 auto; }
+.region-scopes { display: flex; gap: 4px; padding: 4px; margin-top: 14px; border-radius: 12px; background: #edf3ef; }
+.region-scopes button { flex: 1; min-height: 40px; padding: 8px; border-radius: 9px; color: #4a6258; font-size: 13px; font-weight: 700; }
+.region-scopes button[aria-pressed=true] { background: #fff; color: #1f6844; box-shadow: 0 1px 4px #163b201a; }
+.region-scopes button:focus-visible { outline: 2px solid #277d5b; outline-offset: 2px; }
 .region-code { display: inline-grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; background: #e8f3ed; color: #226d4a; font-size: 10px; font-weight: 800; }
 .region-group { margin-top: 20px; }
 .region-group h3, .payment-options h3 { margin: 0 0 9px; color: #60767c; font-size: 12px; font-weight: 700; }
