@@ -1,4 +1,4 @@
-# Transit Compass HK / 香港出行地圖
+# Transit Compass / 出行地圖
 
 > 香港多模式公共交通導航原型 / Hong Kong multimodal public-transit journey-planning prototype
 
@@ -12,9 +12,9 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 | --- | --- |
 | [Hong Kong planner / 香港路線規劃](https://kmb-monthly-pass-mapper.tableisnottable.workers.dev/) | Journey planning, fares, traffic notices and iOS/Android installation |
 | [Hong Kong bus routes / 香港巴士路線](https://kmb-monthly-pass-mapper.tableisnottable.workers.dev/routes?q=970) | Numbered stops, departure times, per-trip destinations and estimated bus positions |
-| [Macau preview / 澳門預覽](https://kmb-monthly-pass-mapper-macau-v2-preview.tableisnottable.workers.dev/macau) | Bus and light rail planning, fares, route directory and bus positions where available |
+| [Macau planner / 澳門路線規劃](https://kmb-monthly-pass-mapper.tableisnottable.workers.dev/macau) | Bus and light rail planning, fares, route directory and bus positions where available |
 
-The Macau preview is built from [`feature/macau-v2`](https://github.com/Tableisnottable/KMB-monthly-pass-mapper/tree/feature/macau-v2). Bus search is included by default. The route directory plots buses when the public Macau feed returns vehicle coordinates. Arrival estimates use those coordinates and the published route shape.
+Use the region picker on the main site to switch between Hong Kong, Macau and the other region pages. Macau includes bus search by default. The route directory plots buses when the public Macau feed returns vehicle coordinates. Arrival estimates use those coordinates and the published route shape.
 
 ## Quick start / 快速開始
 
@@ -69,7 +69,7 @@ Each board initially shows three departures. **More departures** expands a scrol
 
 `.github/workflows/refresh-hk-data.yml` schedules checked timetable/adult/student-fare imports daily at 00:00 Hong Kong time; stops, alignments and place/residents directories refresh weekly and on manual runs. Raw caches remain on the runner. Tests, a production build, browser-worker checks and a 1 MB per-source-file guard must pass before snapshots are committed. The existing Cloudflare Git integration can build those main-branch updates. A failed source download/check keeps the published snapshot unchanged; this is not a guarantee that upstream data is complete. Open apps check for newer imported transport dates and offer a reload.
 
-The region picker opens map views for the supported country directory. Hong Kong routing is on the main site. Macau routing runs on the separate preview linked above. GPS can set the starting point on request. The map also offers an opt-in live blue GPS dot and accuracy circle. It watches location while visible, pauses when hidden, resumes on return, and has a stop button. GPS trails are never uploaded or saved, and movement does not silently change the chosen journey endpoints. Driving joins walking, cycling and taxi comparisons, reusing road geometry with taxi without inventing fuel/toll/parking prices. The road settings now expose 28 identified corridors.
+The region picker opens map views for the supported country directory. Hong Kong and Macau routing are available on the main site. GPS can set the starting point on request. The map also offers an opt-in live blue GPS dot and accuracy circle. It watches location while visible, pauses when hidden, resumes on return, and has a stop button. GPS trails are never uploaded or saved, and movement does not silently change the chosen journey endpoints. Driving joins walking, cycling and taxi comparisons, reusing road geometry with taxi without inventing fuel/toll/parking prices. The road settings now expose 28 identified corridors.
 
 Journey details offer opt-in **phone boarding notifications** for the first boarding within the next two hours. A SQLite-backed Cloudflare Durable Object checks official KMB/Long Win, Citybus, MTR, Light Rail or GMB predictions about once a minute and sends encrypted standards-based Web Push, including while the page is asleep. Other imported modes receive clearly labelled planned-time reminders, not invented live ETAs. Alerts reuse a single notification tag, support Stop updates, and expire within two hours (or 20 minutes after planned boarding). This is not full journey navigation or background GPS. iOS/iPadOS 16.4+ requires a Home Screen web app; delivery still depends on OS/network/permission settings. The pilot caps simultaneous watches at 15 and does not enable a paid plan. Only the temporary push subscription and selected public boarding details are stored; stop/expiry deletes the watch, while the server VAPID key remains for existing browser subscriptions. The SQLite Durable Object binding/migration is in `wrangler.jsonc`. Actual phone delivery must be tested on a subscribed device.
 
@@ -480,7 +480,7 @@ data stays explicitly unavailable; scheduled boarding estimates are labelled sep
 
 ### Upcoming releases / 下兩個版本
 
-1. **Macau Turnstile.** The [Turnstile branch](https://github.com/Tableisnottable/KMB-monthly-pass-mapper/tree/codex/macau-turnstile) implements server-side verification for the preview. Activation requires a Cloudflare Widget for the preview hostname and the Worker bindings `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. Store the secret in Cloudflare. The public preview currently opens without the challenge.
+1. **Turnstile.** The [Turnstile branch](https://github.com/Tableisnottable/KMB-monthly-pass-mapper/tree/codex/macau-turnstile) implements server-side verification for the preview. Activation on the unified site requires adding its hostname to the Cloudflare Widget, integrating the branch and configuring the Worker bindings `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. Store the secret in Cloudflare. The unified site currently opens without the challenge.
 2. **Hong Kong vehicle locations.** The next Hong Kong location release will use Macau's position-to-route method where a public feed provides vehicle coordinates, route and direction. The checked KMB and Citybus feeds supply arrival times and destinations. Current Hong Kong bus markers use the timetable.
 
 Recommended next steps / 建議後續工作：

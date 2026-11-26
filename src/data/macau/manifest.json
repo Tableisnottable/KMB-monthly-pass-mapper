@@ -1,0 +1,20 @@
+{
+  "city": "macau",
+  "importedOn": "2026-11-15T06:41:50.224902+00:00",
+  "routes": 90,
+  "patterns": 111,
+  "stops": 599,
+  "roadPatterns": 111,
+  "sources": [
+    "https://bis.dsat.gov.mo:37812/macauweb/",
+    "https://www.macaotourism.gov.mo/en/travelessential/before-you-travel/local-transportation",
+    "https://www.mlm.com.mo/en/route.html",
+    "https://www.mlm.com.mo/en/general_ticket.html"
+  ],
+  "limitations": [
+    "Bus operating hours and timetables are not yet verified. Bus journeys are opt-in estimates, not live or confirmed services.",
+    "Temporary stop suspensions reflect the import time, not continuous live updates.",
+    "Only the published MOP6 cash bus fare is applied. Unverified concession and transfer discounts are not assumed.",
+    "Casino shuttles, ferries and Hong Kong–Macau cross-border journeys are not included."
+  ]
+}

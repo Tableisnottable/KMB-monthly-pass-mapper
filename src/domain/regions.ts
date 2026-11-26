@@ -65,7 +65,6 @@ export const regions: BrowseRegion[] = [...asianRegions.map(r => ({ ...r, unStat
 export const countries = regions.filter(r => r.unStatus === 'member' || r.unStatus === 'observer');
 export const regionGroups = [['east', '東亞', 'East Asia'], ['southeast', '東南亞', 'Southeast Asia'], ['south', '南亞', 'South Asia'], ['central', '中亞', 'Central Asia'], ['west', '西亞', 'West Asia'], ['north', '北亞', 'North Asia'], ['europe', '歐洲', 'Europe'], ['africa', '非洲', 'Africa'], ['americas', '美洲', 'Americas'], ['oceania', '大洋洲', 'Oceania'], ['antarctic', '南極洲', 'Antarctica']] as const;
 export function regionHref(region: BrowseRegion, locale: 'zh' | 'en', selectedCity?: BrowseCity) {
-  if (region.id === 'macau') return 'https://kmb-monthly-pass-mapper-macau-v2-preview.tableisnottable.workers.dev/macau' + (locale === 'en' ? '/en' : '');
   const path = region.planner ?? (['taiwan', 'japan'].includes(region.id) ? '/' + region.id : '/world');
   const params = new URLSearchParams();
   if (path === '/world') params.set('region', region.id);

@@ -37,7 +37,8 @@ export async function transportFetch(input: string, init?: RequestInit): Promise
   // Keep previews on the catalogue worker. Cancelling a slow full search must
   // not discard the loaded graph needed by the next fast preview.
   const dedicated = url.pathname === '/api/journey' && url.searchParams.get('operation') !== 'retime'
-    && url.searchParams.get('phase') !== 'preview';
+    && url.searchParams.get('phase') !== 'preview'
+    || url.pathname === '/api/macau' && url.searchParams.get('resource') === 'journey';
   const connection = dedicated ? journey ?? (journey = connect()) : shared ?? (shared = connect());
   const id = ++sequence;
   return new Promise<Response>((resolve, reject) => {

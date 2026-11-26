@@ -26,12 +26,35 @@ describe('Free-hosting public provider proxy', () => {
     expect(url.searchParams.get('bounded')).toBe('1'); expect(url.searchParams.get('viewbox')).toBe('113.8,22.6,114.5,22.1');
     expect(providerCacheSeconds(url)).toBe(300);
   });
+  it('bounds explicitly scoped Macau geocoding without widening Hong Kong searches', () => {
+    const url = safeProviderUrl('https://nominatim.openstreetmap.org/search?q=airport&region=macau&viewbox=0,90,180,0')!;
+    expect(url.searchParams.get('viewbox')).toBe('113.51,22.24,113.62,22.09'); expect(url.searchParams.has('region')).toBe(false);
+    expect(safeProviderUrl('https://nominatim.openstreetmap.org/reverse?lat=22.17&lon=113.55&region=macau')).toBeDefined();
+    expect(safeProviderUrl('https://nominatim.openstreetmap.org/reverse?lat=22.3&lon=114.1&region=macau')).toBeUndefined();
+    expect(safeProviderUrl('https://nominatim.openstreetmap.org/search?q=airport&region=elsewhere')).toBeUndefined();
+  });
   it('allows government place queries while stripping unrelated parameters', () => {
     const url = safeProviderUrl('https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=Harbour%20City&redirect=https://example.com')!;
     expect(url.search).toBe('?q=Harbour+City');
     expect(providerCacheSeconds(url)).toBe(300);
     expect(safeProviderUrl('https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=x')).toBeUndefined();
     expect(safeProviderUrl('https://www.map.gov.hk/admin?q=Harbour')).toBeUndefined();
+  });
+  it('allows only the public Macao live bus feed', () => {
+    const live = safeProviderUrl('https://motransportinfo.com/its/getRealTime.php?id=1A&dir=0');
+    expect(live).toBeDefined(); expect(providerCacheSeconds(live!)).toBe(10);
+    expect(safeProviderUrl('https://motransportinfo.com/its/getRealTime.php?id=1A%26url=https://example.com&dir=0')).toBeUndefined();
+    expect(safeProviderUrl('https://motransportinfo.com/its/getRealTime.php?id=1A&id=2&dir=0')).toBeUndefined();
+    expect(safeProviderUrl('https://motransportinfo.com/zh/rss/adjust')).toBeUndefined();
+    expect(safeProviderUrl('https://motransportinfo.com/admin/export')).toBeUndefined();
+  });
+  it('serves mislabeled Macao JSON as JSON and rejects upstream HTML', async () => {
+    const request = new Request('https://planner.example/api/upstream?url=' + encodeURIComponent('https://motransportinfo.com/its/getRealTime.php?id=1A&dir=0'));
+    const fetcher = (body: string) => vi.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/html' } }));
+    const data = await proxyProvider(request, fetcher('{"0":{"bus":[]}}'));
+    expect(data.headers.get('Content-Type')).toContain('application/json');
+    expect(await data.json()).toEqual({ 0: { bus: [] } });
+    expect((await proxyProvider(request, fetcher('<html>Not available</html>'))).status).toBe(502);
   });
   it('does not follow upstream redirects or forward user credentials', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response('', { status: 302, headers: { Location: 'https://example.com' } }));

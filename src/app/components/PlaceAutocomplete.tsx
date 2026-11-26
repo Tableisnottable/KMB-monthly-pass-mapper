@@ -24,7 +24,7 @@ export const placeDisplayName = (place: PlaceResult, locale: PlannerLocale) =>
 export const placeDisplayAddress = (place: PlaceResult, locale: PlannerLocale) =>
   (locale === 'zh' ? typeof place.addressZh === 'string' && place.addressZh : typeof place.addressEn === 'string' && place.addressEn) || place.address;
 
-export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect, onFocus, selectedPlace, inputRef, locale = 'zh' }: {
+export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect, onFocus, selectedPlace, inputRef, locale = 'zh', region = 'hk' }: {
   label: string;
   value: string;
   colorClass: string;
@@ -34,6 +34,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
   selectedPlace?: PlaceResult | null;
   inputRef?: RefObject<HTMLInputElement>;
   locale?: PlannerLocale;
+  region?: 'hk' | 'macau';
 }) {
   const id = useId();
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -42,6 +43,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
   const [error, setError] = useState(false);
   const [active, setActive] = useState(-1);
   const selected = useRef<string | null>(null);
+  const onlineRequest = useRef<AbortController | null>(null);
   const [recent, setRecent] = useState<PlaceResult[]>([]);
   const interacted = useRef(false);
   const ownInputRef = useRef<HTMLInputElement>(null);
@@ -49,8 +51,11 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
   const showRecent = value.trim().length < 2 || selectedPlace?.name === value;
   const suggestions = showRecent ? recent : results;
   const expanded = open;
+  const api = region === 'macau' ? '/api/macau?resource=places&lang=' + locale + '&' : '/api/places?lang=' + locale + '&';
+  const recentPlaces = () => readRecentPlaces().filter(place => region === 'macau' ? place.lng >= 113.51 && place.lng <= 113.62 && place.lat >= 22.09 && place.lat <= 22.24 : !(place.lng >= 113.51 && place.lng <= 113.62 && place.lat >= 22.09 && place.lat <= 22.24));
 
   useEffect(() => {
+    onlineRequest.current?.abort();
     const query = value.trim();
     setResults([]); interacted.current = false;
     setActive(-1);
@@ -64,13 +69,16 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
     const timer = window.setTimeout(async () => {
       let hasLocal = false;
       try {
-        const local = await fetch('/api/places?scope=local&lang=' + locale + '&q=' + encodeURIComponent(query), { signal: controller.signal });
+        const local = await fetch(api + 'scope=local&q=' + encodeURIComponent(query), { signal: controller.signal });
         const nearby = local.ok ? await local.json() as { data?: PlaceResult[] } : {};
         if (!controller.signal.aborted && nearby.data?.length) {
           hasLocal = true;
-          setResults(nearby.data.slice(0, 3)); setActive(0);
+          setResults(region === 'macau' ? nearby.data : nearby.data.slice(0, 3)); setActive(0);
         }
-        const response = await fetch('/api/places?lang=' + locale + '&q=' + encodeURIComponent(query), { signal: controller.signal });
+        // Macau's imported catalogue supplies autocomplete. Query the public
+        // geocoder only after an explicit click, rather than on every keystroke.
+        if (region === 'macau') return;
+        const response = await fetch(api + 'q=' + encodeURIComponent(query), { signal: controller.signal });
         if (!response.ok) throw new Error('Place lookup failed');
         const payload = await response.json() as { data?: PlaceResult[] };
         if (!controller.signal.aborted) {
@@ -84,8 +92,8 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
         if (!controller.signal.aborted) setLoading(false);
       }
     }, 400);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [value, selectedPlace, locale]);
+    return () => { window.clearTimeout(timer); controller.abort(); onlineRequest.current?.abort(); };
+  }, [value, selectedPlace, api]);
 
   function choose(place: PlaceResult) {
     selected.current = place.name;
@@ -93,6 +101,19 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
     onChange(place.name);
     onSelect?.(place);
     setOpen(false);
+  }
+
+  async function searchOnline() {
+    onlineRequest.current?.abort();
+    const controller = new AbortController(); onlineRequest.current = controller;
+    setLoading(true); setError(false);
+    try {
+      const response = await fetch(api + 'q=' + encodeURIComponent(value.trim()), { signal: controller.signal });
+      if (!response.ok) throw new Error('Place lookup failed');
+      const payload = await response.json() as { data?: PlaceResult[] };
+      if (!controller.signal.aborted) { setResults(payload.data ?? []); setActive(payload.data?.length ? 0 : -1); }
+    } catch { if (!controller.signal.aborted) setError(true); }
+    finally { if (!controller.signal.aborted) setLoading(false); }
   }
 
   return (
@@ -107,7 +128,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
             enterKeyHint="search" aria-controls={expanded ? id + '-list' : undefined} aria-activedescendant={expanded && suggestions[active] ? id + '-' + active : undefined}
             autoComplete="off" value={selectedPlace && selectedPlace.name === value ? placeDisplayName(selectedPlace, locale) : value}
             onChange={event => { selected.current = null; onChange(event.target.value); setOpen(true); }}
-            onFocus={event => { onFocus?.(); setRecent(readRecentPlaces()); setActive(-1); if (selectedPlace) event.currentTarget.select(); setOpen(true); }}
+            onFocus={event => { onFocus?.(); setRecent(recentPlaces()); setActive(-1); if (selectedPlace) event.currentTarget.select(); setOpen(true); }}
             onKeyDown={event => {
               if (event.key === 'Escape') { setOpen(false); return; }
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -123,7 +144,7 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
       {selectedPlace && <small className="selected-place-description" title={placeDisplayAddress(selectedPlace, locale)}>{placeDisplayAddress(selectedPlace, locale)}
         {(selectedPlace.type === 'map' || selectedPlace.type === 'location') && <span className="endpoint-coordinate">{selectedPlace.lat.toFixed(5)}, {selectedPlace.lng.toFixed(5)}</span>}</small>}
       {value && <button type="button" className="field-clear" aria-label={copy(locale, '清除', 'Clear') + ' ' + label}
-        onClick={() => { selected.current = null; onChange(''); setRecent(readRecentPlaces()); setOpen(true); fieldInput.current?.focus(); }}><PlannerIcon name="close" size={14} /></button>}
+        onClick={() => { selected.current = null; onChange(''); setRecent(recentPlaces()); setOpen(true); fieldInput.current?.focus(); }}><PlannerIcon name="close" size={14} /></button>}
       {expanded && (
         <div className="place-results" id={id + '-list'} role="listbox" aria-label={label}>
           {showRecent && <p className="place-results-hint">{recent.length ? copy(locale, '最近地點', 'Recent places') : copy(locale, '搜尋地點、地址或車站', 'Search a place, address or station')}</p>}
@@ -137,6 +158,9 @@ export function PlaceAutocomplete({ label, value, colorClass, onChange, onSelect
               <span><strong>{placeDisplayName(place, locale)}</strong><small>{placeDisplayAddress(place, locale)}</small></span>
               <PlannerIcon name="chevron" size={16} />
             </button>)}
+          {region === 'macau' && !showRecent && <button type="button" disabled={loading} onMouseDown={event => event.preventDefault()} onClick={searchOnline}>
+            <PlannerIcon name="compass" size={18} /><span><strong>{copy(locale, '在澳門搜尋更多地點', 'Search online in Macao')}</strong><small>OpenStreetMap Nominatim</small></span>
+          </button>}
           <button type="button" className="choose-place-map" onClick={() => { onFocus?.(); setOpen(false); }}><PlannerIcon name="pin" size={18} />{copy(locale, '在地圖選擇', 'Choose on map')}</button>
         </div>
       )}

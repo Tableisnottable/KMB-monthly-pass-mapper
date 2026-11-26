@@ -3,6 +3,7 @@ import { NextRequest } from './platform';
 // Reuse the actual application handlers and scoring engine. Only the execution
 // environment changes: expensive graph searches never run on the free Worker.
 const handlers = {
+  '/api/macau': () => import('../app/api/macau/route'),
   '/api/journey': () => import('../app/api/journey/route'),
   '/api/journey-geometry': () => import('../app/api/journey-geometry/route'),
   '/api/network': () => import('../app/api/network/route'),

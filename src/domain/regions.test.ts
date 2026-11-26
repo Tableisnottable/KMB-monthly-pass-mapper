@@ -13,6 +13,8 @@ describe('Worldwide region directory', () => {
       expect(regions.find(r => r.code === code)?.unStatus).toBe('other');
       expect(matchingRegions(code).map(r => r.code)).toContain(code);
     }
+    expect(regionHref(regions.find(r => r.code === 'MO')!, 'zh')).toBe('/macau');
+    expect(regionHref(regions.find(r => r.code === 'MO')!, 'en')).toBe('/macau/en');
     expect(regionHref(countries.find(r => r.code === 'VA')!, 'zh')).toBe('/world?region=va');
     expect(regionHref(countries.find(r => r.code === 'PS')!, 'en')).toBe('/world/en?region=palestine');
   });
