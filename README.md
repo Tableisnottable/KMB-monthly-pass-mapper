@@ -6,6 +6,16 @@ Transit Compass HK 是一個香港多模式交通導航 prototype，提供地圖
 
 產品採用中立 operator-neutral branding；KMB、LWB、MTR 及 Citybus 只會作為營辦商 metadata、route information 或 data-source attribution，不會使用交通公司 logo、品牌視覺或商業產品作為本產品 identity 或主要 selling point / The product is operator-neutral; KMB, LWB, MTR, and Citybus appear only as operator metadata, route information, or source attribution, never as the product identity or primary selling point.
 
+## Live sites / 網站
+
+| Site 網站 | What you can use 可用功能 |
+| --- | --- |
+| [Hong Kong planner / 香港路線規劃](https://kmb-monthly-pass-mapper.tableisnottable.workers.dev/) | Journey planning, fares, traffic notices and iOS/Android installation |
+| [Hong Kong bus routes / 香港巴士路線](https://kmb-monthly-pass-mapper.tableisnottable.workers.dev/routes?q=970) | Numbered stops, departure times, per-trip destinations and estimated bus positions |
+| [Macau preview / 澳門預覽](https://kmb-monthly-pass-mapper-macau-v2-preview.tableisnottable.workers.dev/macau) | Bus and light rail planning, fares, route directory and bus positions where available |
+
+The Macau preview is built from [`feature/macau-v2`](https://github.com/Tableisnottable/KMB-monthly-pass-mapper/tree/feature/macau-v2). Bus search is included by default. The route directory plots buses when the public Macau feed returns vehicle coordinates. Arrival estimates use those coordinates and the published route shape.
+
 ## Quick start / 快速開始
 
 Use **Node.js 22.12.0 or newer**, matching [package.json](package.json). From the repository root:
@@ -17,7 +27,7 @@ npm run dev
 
 Open `http://localhost:3000` for Traditional Chinese or `http://localhost:3000/en` for English. The main journey map uses Leaflet and OpenStreetMap; no Google Maps key is required. Live arrivals, place search and map tiles require an internet connection.
 
-The checked-in [transport manifest](src/data/transport/manifest.json) records a network import on November 13, 2026, with agency metadata refreshed on November 14, 2026. Those are snapshot dates, not a guarantee that fares, calendars or live feeds remain current. See local development and Cloudflare deployment below for the full setup.
+The checked-in [transport manifest](src/data/transport/manifest.json) records the Hong Kong snapshot date, source links and coverage. Fares and timetables depend on the published data available at import.
 
 ## Product scope / 產品範圍
 
@@ -59,7 +69,7 @@ Each board initially shows three departures. **More departures** expands a scrol
 
 `.github/workflows/refresh-hk-data.yml` schedules checked timetable/adult/student-fare imports daily at 00:00 Hong Kong time; stops, alignments and place/residents directories refresh weekly and on manual runs. Raw caches remain on the runner. Tests, a production build, browser-worker checks and a 1 MB per-source-file guard must pass before snapshots are committed. The existing Cloudflare Git integration can build those main-branch updates. A failed source download/check keeps the published snapshot unchanged; this is not a guarantee that upstream data is complete. Open apps check for newer imported transport dates and offer a reload.
 
-The top city selector lists Hong Kong only. **Macau is deferred to a separate next version and Git push**; this release adds no Macau routes or fare claims. GPS can set the starting point on request. The map also offers an opt-in live blue GPS dot and accuracy circle. It watches location while visible, pauses when hidden, resumes on return, and has a stop button. GPS trails are never uploaded or saved, and movement does not silently change the chosen journey endpoints. Driving joins walking, cycling and taxi comparisons, reusing road geometry with taxi without inventing fuel/toll/parking prices. The road settings now expose 28 identified corridors.
+The region picker opens map views for the supported country directory. Hong Kong routing is on the main site. Macau routing runs on the separate preview linked above. GPS can set the starting point on request. The map also offers an opt-in live blue GPS dot and accuracy circle. It watches location while visible, pauses when hidden, resumes on return, and has a stop button. GPS trails are never uploaded or saved, and movement does not silently change the chosen journey endpoints. Driving joins walking, cycling and taxi comparisons, reusing road geometry with taxi without inventing fuel/toll/parking prices. The road settings now expose 28 identified corridors.
 
 Journey details offer opt-in **phone boarding notifications** for the first boarding within the next two hours. A SQLite-backed Cloudflare Durable Object checks official KMB/Long Win, Citybus, MTR, Light Rail or GMB predictions about once a minute and sends encrypted standards-based Web Push, including while the page is asleep. Other imported modes receive clearly labelled planned-time reminders, not invented live ETAs. Alerts reuse a single notification tag, support Stop updates, and expire within two hours (or 20 minutes after planned boarding). This is not full journey navigation or background GPS. iOS/iPadOS 16.4+ requires a Home Screen web app; delivery still depends on OS/network/permission settings. The pilot caps simultaneous watches at 15 and does not enable a paid plan. Only the temporary push subscription and selected public boarding details are stored; stop/expiry deletes the watch, while the server VAPID key remains for existing browser subscriptions. The SQLite Durable Object binding/migration is in `wrangler.jsonc`. Actual phone delivery must be tested on a subscribed device.
 
@@ -76,6 +86,10 @@ Map tiles use OpenStreetMap with visible attribution. No map API key is required
 - 提供 traffic sources、service alerts、route updates、calendar export、saved-place UI 及 English page `/en` / Provide traffic sources, service alerts, route updates, calendar export, saved-place UI, and an English page at `/en`.
 - 使用 static pages、browser Web Workers 和受限制的 upstream proxy 部署至 Cloudflare Workers / Deploy static pages, browser Web Worker calculations and a restricted upstream proxy to Cloudflare Workers.
 
+### Bus route details / 巴士路線詳情
+
+Open `/routes`, search a bus number and select its direction and stop. The map shows numbered stops and can display **時間表估算 / Timetable estimate** markers using the selected timetable and available road alignment. Departure rows show the countdown and Hong Kong clock time, for example `5 分鐘 (17:25)`, plus the destination when the provider publishes it. At a shared stop, routes such as 970 and 970X can show departures to multiple termini. The board shows **特別班次 / Special service** when the operator identifies a departure as such.
+
 ## Routes and APIs / 頁面與 API
 
 | Path 路徑 | Purpose 用途 |
@@ -84,6 +98,7 @@ Map tiles use OpenStreetMap with visible attribution. No map API key is required
 | `/en` | English product surface / 英文產品頁面 |
 | `/traffic` | 交通及服務受阻資訊 / Traffic and service disruption information |
 | `/updates` | 路線及服務更新 / Route and service updates |
+| `/routes?q=970` | 巴士路線、站序、到站時間及逐班終點 / Bus directory, numbered stops, ETAs and per-trip destinations |
 | `/timetables?lang=en` | Government companies/networks and complete published service-day timetables |
 | `/api/network?resource=operators` | Source-provided bilingual operator names, coverage counts and official links |
 | `/api/network?resource=timetable&route=…&date=YYYY-MM-DD` | All published windows for a route variant and boarding stop on a Hong Kong service day |
@@ -91,7 +106,7 @@ Map tiles use OpenStreetMap with visible attribution. No map API key is required
 | `/api/transit` | KMB 及 Citybus routes、stops、ETA proxy / KMB and Citybus route, stop, and ETA proxy |
 | `/api/eta` | Allowlisted ETA lookup / 受 allowlist 限制的 ETA 查詢 |
 | `/api/routes` | Prototype scored-route response / 原型評分路線回應 |
-| `/api/journey` | Coordinate-based multimodal journeys, up to 3 transfers, ranked by the existing weighted engine; optional `lang=en` |
+| `/api/journey` | Coordinate-based multimodal journeys ranked by the weighted engine; optional `lang=en` |
 | `/coverage` | Bilingual transport coverage, sources and limitations |
 | `/api/network` | Imported coverage, route/stop search and live-or-timetable departures |
 | `/api/traffic` | Traffic information response / 交通資訊回應 |
@@ -462,6 +477,11 @@ data stays explicitly unavailable; scheduled boarding estimates are labelled sep
 4. Place search 依賴 Nominatim availability 及 usage policy / depends on Nominatim availability and usage policy。
 5. Map embed 及 external links 受第三方 browser/network policies 影響 / depend on third-party browser and network policies。
 6. Traffic alerts 及 source catalogues 需要 maintained refresh process / require a maintained data-refresh process。
+
+### Upcoming releases / 下兩個版本
+
+1. **Macau Turnstile.** The [Turnstile branch](https://github.com/Tableisnottable/KMB-monthly-pass-mapper/tree/codex/macau-turnstile) implements server-side verification for the preview. Activation requires a Cloudflare Widget for the preview hostname and the Worker bindings `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. Store the secret in Cloudflare. The public preview currently opens without the challenge.
+2. **Hong Kong vehicle locations.** The next Hong Kong location release will use Macau's position-to-route method where a public feed provides vehicle coordinates, route and direction. The checked KMB and Citybus feeds supply arrival times and destinations. Current Hong Kong bus markers use the timetable.
 
 Recommended next steps / 建議後續工作：
 
