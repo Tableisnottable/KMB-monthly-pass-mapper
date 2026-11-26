@@ -72,6 +72,7 @@ export interface CitybusEtaRecord {
   dir: string;
   seq: number;
   dest_tc: string;
+  dest_en?: string;
   eta: string | null;
   remarks_tc: string;
   rmk_tc?: string;

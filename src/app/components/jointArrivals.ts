@@ -31,5 +31,5 @@ export function groupStationDepartures<T extends DepartureIdentity>(departures: 
 /** Status badges already convey these stock provider remarks. Keep useful notices. */
 export function arrivalRemark(remark = ''): string {
   return remark.split(/[·;|]/).map(part => part.trim()).filter(part => part
-    && !/^(?:scheduled (?:bus|departure|service|trip)|原定班次|預定班次|预定班次|additional (?:bus|departure)|extra (?:bus|departure)|加班車|加班车|加班|班次調整)$/i.test(part)).join(' · ');
+    && !/^(?:scheduled (?:bus|departure|service|trip)|原定班次|預定班次|预定班次|additional (?:bus|departure)|extra (?:bus|departure)|加班車|加班车|加班|班次調整|特別班次|特别班次|特別車|特别车|special (?:bus|trip|departure|service))$/i.test(part)).join(' · ');
 }

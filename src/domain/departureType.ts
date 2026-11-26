@@ -20,6 +20,7 @@ export interface DepartureEvidence {
 }
 
 export const providerMarksAdditional = (remark = '') => /(?:\bextra\b|\badditional\b|加班|加開|加开|特別加)/i.test(remark);
+export const providerMarksSpecial = (remark = '') => /(?:特別班次|特别班次|特別車|特别车|\bspecial\s+(?:bus|trip|departure|service)\b)/i.test(remark);
 export const providerMarksScheduled = (remark = '') => /(?:\bscheduled\s+(?:bus|departure|service|trip)\b|原定班次|預定班次|预定班次|按時間表|按时间表)/i.test(remark);
 export const providerMarksChanged = (remark = '') => /(?:\brescheduled\b|\brevised\s+(?:timetable|departure|service)\b|班次調整|調整班次|更改班次)/i.test(remark);
 export const providerMarksCancelled = (remark = '') => /(?:\bcancell?ed\b|班次取消|取消班次|已取消|暫停服務|暂停服务)/i.test(remark);

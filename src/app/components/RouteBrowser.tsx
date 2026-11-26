@@ -8,6 +8,7 @@ import { copy, routeBadgeStyle, type PlannerLocale } from './plannerUi';
 import { operatorName } from '../../data/transportOperators';
 import { routeLineColours, routeLineStyles } from './routeColours';
 import { PlannerIcon } from './PlannerIcon';
+import { RouteBusMarkers } from './RouteBusMarkers';
 
 interface RouteRow { id: string; operator: string; number: string; nameTc: string; nameEn: string; mode: string }
 interface RouteStop extends Stop { lat: number; lng: number; boarding: boolean; fare: number; fareStatus: string }
@@ -90,6 +91,7 @@ function RouteBrowserMap({ pattern, selected, route, onStop, locale }: { pattern
   const callback = useRef(onStop); callback.current = onStop;
   const selectionMarker = useRef<Leaflet.CircleMarker | null>(null);
   const [ready, setReady] = useState(false), [message, setMessage] = useState('');
+  const [shape, setShape] = useState<{ pattern: string; paths: [number, number][][] }>();
   useEffect(() => {
     let disposed = false; let observer: ResizeObserver | undefined;
     import('leaflet').then(L => {
@@ -107,10 +109,14 @@ function RouteBrowserMap({ pattern, selected, route, onStop, locale }: { pattern
     import('leaflet').then(async L => {
       if (controller.signal.aborted) return;
       layer = L.layerGroup().addTo(current);
+      const [colour] = routeLineColours(route.operator, route.number);
       pattern.stops.forEach((stop, index) => {
         const label = document.createElement('span'); label.textContent = `${index + 1}. ${stop.name}`;
-        L.circleMarker([stop.lat, stop.lng], { radius: index === selected ? 8 : 5, color: '#fff', weight: 2, fillColor: index === selected ? '#1485cc' : '#3b5363', fillOpacity: 1 }).bindTooltip(label)
-          .on('click', () => callback.current(index)).addTo(layer!);
+        const number = document.createElement('span'); number.textContent = String(index + 1);
+        number.style.borderColor = colour;
+        L.marker([stop.lat, stop.lng], { title: label.textContent, alt: label.textContent,
+          icon: L.divIcon({ className: 'route-numbered-map-stop', html: number, iconSize: [24, 24], iconAnchor: [12, 12] }),
+        }).bindTooltip(label).on('click', () => callback.current(index)).addTo(layer!);
       });
       current.fitBounds(L.latLngBounds(pattern.stops.map(stop => [stop.lat, stop.lng])), { padding: [30, 30], maxZoom: 15 });
       try {
@@ -118,12 +124,16 @@ function RouteBrowserMap({ pattern, selected, route, onStop, locale }: { pattern
         if (!response.ok) throw new Error(); const geometry = await response.json();
         if (controller.signal.aborted) return;
         if (geometry.source === 'UNAVAILABLE') throw new Error();
+        setShape({ pattern: pattern.id, paths: geometry.paths });
         for (const path of geometry.paths) {
           L.polyline(path, { color: '#fff', weight: 9, interactive: false }).addTo(layer!);
           for (const style of routeLineStyles(route.operator, route.number)) L.polyline(path, { ...style, interactive: false }).addTo(layer!);
         }
         setMessage('');
-      } catch { if (!controller.signal.aborted) setMessage(copy(locale, '部分路線線形暫不可用', 'Some route geometry is unavailable')); }
+      } catch { if (!controller.signal.aborted) {
+        setShape({ pattern: pattern.id, paths: [] });
+        setMessage(copy(locale, '部分路線線形暫不可用', 'Some route geometry is unavailable'));
+      } }
     });
     return () => { controller.abort(); layer?.remove(); };
   }, [ready, pattern, route, locale]);
@@ -134,5 +144,10 @@ function RouteBrowserMap({ pattern, selected, route, onStop, locale }: { pattern
     import('leaflet').then(L => { if (disposed || !map.current) return; selectionMarker.current?.remove(); selectionMarker.current = L.circleMarker([stop.lat, stop.lng], { radius: 9, color: '#fff', weight: 3, fillColor: '#1686ce', fillOpacity: 1, interactive: false }).addTo(map.current); });
     return () => { disposed = true; selectionMarker.current?.remove(); };
   }, [ready, pattern, selected]);
-  return <section className="route-browser-map" aria-label={copy(locale, '路線地圖', 'Route map')}><div ref={container} />{message && <p role="status">{message}</p>}</section>;
+  return <section className="route-browser-map" aria-label={copy(locale, '路線地圖', 'Route map')}><div ref={container} />
+    {ready && map.current && pattern && route?.mode === 'BUS' && <RouteBusMarkers key={pattern.id + ':' + locale} map={map.current}
+      patternId={pattern.id} stops={pattern.stops} paths={shape?.pattern === pattern.id ? shape.paths : undefined}
+      operator={route.operator} number={route.number} locale={locale} onStop={onStop} />}
+    {message && <p role="status">{message}</p>}
+  </section>;
 }

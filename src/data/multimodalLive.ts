@@ -1,11 +1,12 @@
 import { getCitybusEta, getKmbStopEta, getKmbStops, type TransitStopRecord } from './hkTransitApi';
 import { getStaticCitybusRouteStops, getStaticCitybusStops } from './citybusStopsStatic';
 import { getStaticKmbRouteStops } from './kmbRouteStopsStatic';
-import { networkPatterns, networkRoutes, networkStops, networkStop } from './transportNetwork';
+import { networkPatterns, networkRoutes, networkStops, networkStop, type NetworkPattern, type NetworkRoute } from './transportNetwork';
 import { haversineKm } from '../engine/journeyHelpers';
 import type { Segment, Route } from '../engine/UpgradedScoringEngine';
-import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, runMinutesNearPrediction } from './networkTimetable';
-import { departureTimingType, isNonOperatingDeparture, providerMarksCancelled, providerMarksMissed, providerMarksScheduled } from '../domain/departureType';
+import { classifyDepartureTypes, compareDepartureToTimetable, matchDepartureToTimetable, runMinutesNearPrediction, type LiveDeparture } from './networkTimetable';
+import { normalizeTransitQuery } from './networkPlaceSearch';
+import { departureTimingType, departureType, isNonOperatingDeparture, providerMarksAdditional, providerMarksCancelled, providerMarksMissed, providerMarksScheduled, providerMarksSpecial } from '../domain/departureType';
 import type { NotificationTarget } from '../domain/journeyNotifications';
 
 type Train = { dest: string; time: string; valid?: string };
@@ -39,22 +40,56 @@ function fresh(value: string | undefined, now: Date) {
   if (!value) return false;
   return Math.abs(now.getTime() - providerTimestamp(value)) <= 120_000;
 }
-function attach(leg: Segment, predictions: { time: string | null; remark?: string; operator?: string }[], now: Date, earliest = 0) {
+type ArrivalScope = 'journey' | 'route-stop' | 'terminal';
+type Prediction = Pick<LiveDeparture, 'remark' | 'operator' | 'destinationTc' | 'destinationEn'> & {
+  time: string | null;
+  timetable?: { index: number; boarding: number; alighting: number };
+  destinationChecked?: boolean;
+};
+
+function attach(leg: Segment, predictions: Prediction[], now: Date, earliest = 0) {
   leg.departureNotices = predictions.filter(isNonOperatingDeparture).map(row => ({
     departureType: providerMarksMissed(row.remark) && !providerMarksCancelled(row.remark) ? 'MISSED' : 'CANCELLED', operator: row.operator, remark: row.remark!,
     time: row.time && Number.isFinite(Date.parse(row.time)) ? row.time : undefined,
+    ...(row.destinationTc ? { destinationTc: row.destinationTc } : {}),
+    ...(row.destinationEn ? { destinationEn: row.destinationEn } : {}),
   }));
-  const departures = classifyDepartureTypes(leg.networkPattern!, leg.boardingIndex ?? 0, predictions.filter((prediction): prediction is typeof prediction & { time: string } => !!prediction.time && !isNonOperatingDeparture(prediction)).filter(prediction => {
-    const minutes = (Date.parse(prediction.time) - now.getTime()) / 60000;
-    // Different vehicles may share an ETA (for example B10). Provider rows
-    // remain distinct even when their operator and timestamp match.
-    return Number.isFinite(minutes) && minutes >= Math.max(0, earliest) - 0.5;
-  }).map(prediction => ({ ...prediction, timingType: providerMarksScheduled(prediction.remark) ? 'SCHEDULED' as const : 'LIVE' as const,
-    minutes: Math.max(0, Math.ceil((Date.parse(prediction.time) - now.getTime()) / 60000)),
-    ...compareDepartureToTimetable(leg.networkPattern!, leg.boardingIndex ?? 0, prediction.time),
-    ...matchDepartureToTimetable(leg.networkPattern!, leg.boardingIndex ?? 0,
-      leg.alightingIndex ?? networkPatterns[leg.networkPattern!].s.length - 1, prediction.time, prediction.remark) }))
-    .sort((a, b) => Date.parse(a.time) - Date.parse(b.time)));
+  const selected = leg.networkPattern!, boarding = leg.boardingIndex ?? 0;
+  const groups = new Map<number, Map<number, LiveDeparture[]>>();
+  const departures: LiveDeparture[] = [];
+  for (const { time, timetable, destinationChecked, ...prediction } of predictions) {
+    if (!time || isNonOperatingDeparture(prediction)) continue;
+    const minutes = (Date.parse(time) - now.getTime()) / 60000;
+    // Distinct provider rows can share an ETA (for example B10).
+    if (!Number.isFinite(minutes) || minutes < Math.max(0, earliest) - 0.5) continue;
+    const match = timetable ?? (destinationChecked ? undefined : {
+      index: selected, boarding, alighting: leg.alightingIndex ?? networkPatterns[selected].s.length - 1,
+    });
+    const row: LiveDeparture = { ...prediction, time, minutes: Math.max(0, Math.ceil(minutes)),
+      timingType: providerMarksScheduled(prediction.remark) ? 'SCHEDULED' : 'LIVE',
+      scheduleMatch: 'UNVERIFIED',
+      ...(destinationChecked ? { timetablePatternId: match ? networkPatterns[match.index].id : null } : {}),
+    };
+    if (match) {
+      Object.assign(row, compareDepartureToTimetable(match.index, match.boarding, time),
+        matchDepartureToTimetable(match.index, match.boarding, match.alighting, time, prediction.remark));
+    }
+    if (match && !providerMarksSpecial(prediction.remark)) {
+      let byStop = groups.get(match.index);
+      if (!byStop) { byStop = new Map(); groups.set(match.index, byStop); }
+      const rows = byStop.get(match.boarding);
+      if (rows) rows.push(row); else byStop.set(match.boarding, [row]);
+    } else {
+      if (providerMarksAdditional(prediction.remark)) { row.scheduleMatch = 'ADDED'; row.addedReason = 'PROVIDER'; }
+      else if (row.addedReason === 'NOT_IN_TIMETABLE') { row.scheduleMatch = 'UNVERIFIED'; delete row.addedReason; }
+      row.departureType = departureType(row);
+      departures.push(row);
+    }
+  }
+  groups.forEach((byStop, index) => {
+    byStop.forEach((rows, position) => departures.push(...classifyDepartureTypes(index, position, rows)));
+  });
+  departures.sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
   if (!departures.length) return;
   leg.liveDepartures = departures;
   const scheduled = departureTimingType(departures[0]) === 'SCHEDULED';
@@ -62,6 +97,87 @@ function attach(leg: Segment, predictions: { time: string | null; remark?: strin
   leg.scheduledWaitMinutes = Math.max(0, departures[0].minutes - (leg.accessWalkMinutes ?? earliest));
   leg.scheduledDepartureMinutes = departures[0].minutes;
   leg.serviceStatus = scheduled ? 'TIMETABLE' : 'LIVE'; leg.serviceEnded = false;
+}
+
+interface BusVariant {
+  index: number;
+  pattern: NetworkPattern;
+  names: Set<string>;
+}
+
+const busVariantsByNumber = new Map<string, BusVariant[]>();
+function stopNames(stop: number) {
+  return networkStops[stop].slice(1, 3).flatMap(value => {
+    const name = String(value);
+    return [name, name.split(/[,，]/)[0]].map(normalizeTransitQuery);
+  });
+}
+
+function variantNames(pattern: NetworkPattern, route: NetworkRoute) {
+  const origin = stopNames(pattern.s[0]), destination = stopNames(pattern.s.at(-1)!);
+  const names = new Set(destination);
+  for (const label of [route[3], route[4]]) {
+    const parts = label.split(/\s+[-–—]\s+/).map(normalizeTransitQuery);
+    if (parts.length !== 2) continue;
+    const [first, last] = parts;
+    if (origin.includes(first) || destination.includes(last)) names.add(last);
+    else if (origin.includes(last) || destination.includes(first)) names.add(first);
+  }
+  if (route[1] === 'CTB' && route[0] === '8715') {
+    // The fare-stop and GTFS route names use different forms of this terminus.
+    for (const alias of ['旺角', 'Mong Kok', '旺角（弼街）', 'Mong Kok (Bute Street)']) names.add(normalizeTransitQuery(alias));
+  }
+  return names;
+}
+
+function busVariants(number: string) {
+  let variants = busVariantsByNumber.get(number);
+  if (!variants) {
+    variants = networkPatterns.flatMap((pattern, index) => {
+      const route = networkRoutes[pattern.r];
+      return route[2] === number && route[5] === 'BUS' ? [{ index, pattern, names: variantNames(pattern, route) }] : [];
+    });
+    busVariantsByNumber.set(number, variants);
+  }
+  return variants;
+}
+
+/** Match to onward patterns at this stop before using a bus for a connection or timetable inference. */
+function busPrediction(leg: Segment, prediction: Prediction, scope: ArrivalScope): Prediction | undefined {
+  const names = [prediction.destinationTc, prediction.destinationEn].filter((name): name is string => !!name).map(normalizeTransitQuery);
+  if (!names.length) return prediction;
+  const index = leg.networkPattern!, pattern = networkPatterns[index];
+  const boarding = leg.boardingIndex ?? 0, alighting = leg.alightingIndex ?? pattern.s.length - 1;
+  const boardStop = pattern.s[boarding], alightStop = pattern.s[alighting];
+  const variants = busVariants(leg.routeNumber!).filter(variant => (networkRoutes[variant.pattern.r][1].split('+').includes(prediction.operator!)));
+  const matches = variants.filter(variant => names.some(name => variant.names.has(name)));
+  const atStop = matches.flatMap(variant => variant.pattern.s.flatMap((stop, position) =>
+    stop === boardStop && position < variant.pattern.s.length - 1 && variant.pattern.p[position] === 0
+      ? [{ ...variant, position }] : []));
+  if (atStop.length) {
+    const compatible = scope === 'route-stop' ? atStop : atStop.filter(variant => scope === 'terminal'
+      ? variant.pattern.s.at(-1) === alightStop
+      : variant.pattern.s.indexOf(alightStop, variant.position + 1) >= 0);
+    if (!compatible.length || (scope === 'journey' && compatible.length !== atStop.length)) return undefined;
+    // This also handles circular services where a stop occurs more than once.
+    const selected = compatible.find(variant => variant.index === index && variant.position === boarding);
+    const first = selected ?? compatible[0];
+    const onward = first.pattern.s.slice(first.position);
+    const sameService = compatible.every(variant => variant.pattern.r === first.pattern.r
+      && variant.pattern.s.length - variant.position === onward.length
+      && onward.every((stop, offset) => variant.pattern.s[variant.position + offset] === stop));
+    return { ...prediction, destinationChecked: true, timetable: sameService ? {
+      index: first.index, boarding: first.position,
+      alighting: scope === 'journey' ? first.pattern.s.indexOf(alightStop, first.position + 1) : first.pattern.s.length - 1,
+    } : undefined };
+  }
+  // Some operator-only short turns have no published pattern. Check whether
+  // the named endpoint is an intermediate stop before using it for a journey.
+  const stops = pattern.s.flatMap((stop, position) =>
+    position > boarding && names.some(name => stopNames(stop).includes(name)) ? [position] : []);
+  if (scope !== 'route-stop' && (stops.length ? stops.every(position => position < alighting) || scope === 'terminal' && !stops.includes(alighting)
+    : matches.length > 0 || scope === 'terminal')) return undefined;
+  return { ...prediction, destinationChecked: true };
 }
 
 function matchBusStops(leg: Segment, stops: TransitStopRecord[], citybus: boolean) {
@@ -109,7 +225,7 @@ export async function notificationTargets(leg: Segment): Promise<NotificationTar
   });
 }
 
-export async function enrichJourneyArrivals(routes: Route[], now = new Date()): Promise<void> {
+export async function enrichJourneyArrivals(routes: Route[], now = new Date(), scope: ArrivalScope = 'journey'): Promise<void> {
   let kmbStops: TransitStopRecord[] = [];
   if (routes.some(r => r.legs?.[0] && ['KMB', 'LWB'].includes(r.legs[0].operator))) {
     try { kmbStops = await getKmbStops(); } catch { /* Published topology still works offline. */ }
@@ -155,7 +271,11 @@ export async function enrichJourneyArrivals(routes: Route[], now = new Date()): 
           const remark = (r: typeof rows[number]) => [r.rmk_tc, r.rmk_en, 'remarks_tc' in r ? r.remarks_tc : '', 'remarks_en' in r ? r.remarks_en : ''].filter(Boolean).join(' · ');
           return rows.filter(r => r.route === leg.routeNumber && r.dir === match.dir && (citybus || Number(r.seq) === Number(match.seq)) && (r.eta || providerMarksCancelled(remark(r)) || providerMarksMissed(remark(r)))
             && (!r.data_timestamp || fresh(r.data_timestamp, now)))
-            .map(r => ({ time: r.eta, operator, remark: remark(r) }));
+            .flatMap(r => {
+              const prediction = busPrediction(leg, { time: r.eta, operator, remark: remark(r),
+                destinationTc: r.dest_tc?.trim() || undefined, destinationEn: r.dest_en?.trim() || undefined }, scope);
+              return prediction ? [prediction] : [];
+            });
         }));
         const predictions = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
         attach(leg, predictions, now, route.originWalkMinutes);
@@ -190,7 +310,7 @@ export async function enrichTerminalArrivals(routes: Route[], now = new Date()):
     const tempLeg: Segment = { ...leg, boardingIndex: previous, alightingIndex: terminal,
       originStop: networkStop(pattern.s[previous]), destinationStop: networkStop(pattern.s[terminal]),
       liveDepartures: undefined, departureNotices: undefined };
-    await enrichJourneyArrivals([{ ...route, originWalkMinutes: 0, legs: [tempLeg] }], now);
+    await enrichJourneyArrivals([{ ...route, originWalkMinutes: 0, legs: [tempLeg] }], now, 'terminal');
     const projectTime = (upstream: string) => {
       const time = new Date(upstream);
       const runMinutes = runMinutesNearPrediction(pattern, previous, terminal, time);

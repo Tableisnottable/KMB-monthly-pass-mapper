@@ -1,4 +1,4 @@
-import { departureTimingType, departureType, providerMarksAdditional, type DepartureEvidence } from '../../domain/departureType';
+import { departureTimingType, departureType, providerMarksAdditional, providerMarksSpecial, type DepartureEvidence } from '../../domain/departureType';
 import { copy, type PlannerLocale } from './plannerUi';
 
 /** Timing source and exceptional service status are independent. */
@@ -7,7 +7,8 @@ export function DepartureBadge({ departure, locale, showTiming = true }: { depar
   const type = departureType(departure), timing = departureTimingType(departure);
   const service = type === 'ADDITIONAL' || type === 'CANCELLED' || type === 'MISSED' ? type : undefined;
   const inferred = service === 'ADDITIONAL' && departure.addedReason !== 'PROVIDER' && !providerMarksAdditional(departure.remark);
-  if (!service && (!showTiming || !timing)) return null;
+  const special = providerMarksSpecial(departure.remark);
+  if (!special && !service && (!showTiming || !timing)) return null;
   return <span className="departure-badges">
     {showTiming && timing && <span className={'departure-type departure-' + timing.toLowerCase()} data-departure-type={timing}
       title={timing === 'LIVE' ? departure.projectedArrival
@@ -16,6 +17,7 @@ export function DepartureBadge({ departure, locale, showTiming = true }: { depar
         : copy(locale, '時間表估算，並非即時預測。', 'Timetable estimate, not an operator live prediction.')}>
       {timing === 'LIVE' ? departure.projectedArrival ? copy(locale, '即時推算', 'Live estimate') : copy(locale, '即時', 'Live') : copy(locale, '原定班次', 'Scheduled')}
     </span>}
+    {special && <span className="departure-type departure-special" data-departure-type="SPECIAL">{copy(locale, '特別班次', 'Special service')}</span>}
     {service && <span className={'departure-type departure-' + service.toLowerCase()} data-departure-type={service}
       title={inferred ? copy(locale, '同時段預測班數多於時間表，或總站原定時間不符；可能為額外班次，未獲營辦商確認。', 'More predicted trips than timetable slots in the same window, or a terminal scheduled-time mismatch. Possible extra; not operator-confirmed.')
         : copy(locale, '營辦商明確提供的班次狀態。', 'Service status explicitly supplied by the operator.')}>

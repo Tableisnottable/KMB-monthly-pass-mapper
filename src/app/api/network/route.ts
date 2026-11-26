@@ -10,6 +10,7 @@ import { hongKongServiceDate, nextPublishedDeparture, publishedDeparturesAround,
 import { isResidentsService, searchTimetableRoutes, timetableRoutes } from '../../../data/timetableCatalog';
 import { residentsDirectoryMeta, residentsOperator, residentsRoute, residentsRoutes } from '../../../data/residentsServices';
 import { departureTimingType, departureType } from '../../../domain/departureType';
+import { scheduledBusRuns } from '../../../data/networkVehicles';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
@@ -19,6 +20,14 @@ export async function GET(request: NextRequest) {
   }
   const p = request.nextUrl.searchParams, resource = p.get('resource') ?? 'coverage';
   if (resource === 'coverage') return NextResponse.json(transportCoverage);
+  if (resource === 'route-vehicles') {
+    const index = networkPatterns.findIndex(pattern => pattern.id === p.get('pattern'));
+    if (index < 0) return NextResponse.json({ error: 'Unknown direction.' }, { status: 404 });
+    const now = new Date();
+    return NextResponse.json({ data: scheduledBusRuns(index, now), meta: {
+      source: 'TIMETABLE', gpsAvailable: false, fetchedAt: now.toISOString(),
+    } }, { headers: { 'Cache-Control': 'no-store' } });
+  }
   if (resource === 'route-map') {
     const routeIndex = networkRoutes.findIndex(route => route[0] === p.get('route'));
     if (routeIndex < 0) return NextResponse.json({ error: 'Unknown route.' }, { status: 404 });
@@ -148,7 +157,7 @@ export async function GET(request: NextRequest) {
       return routeStop && leg.boardingIndex === pattern.s.length - 1;
     });
     const ordinary = liveCandidates.filter(r => !terminal.includes(r));
-    if (ordinary.length) await enrichJourneyArrivals(ordinary, now);
+    if (ordinary.length) await enrichJourneyArrivals(ordinary, now, routeStop ? 'route-stop' : 'journey');
     if (terminal.length) await enrichTerminalArrivals(terminal, now);
   }
   return NextResponse.json({ data: unique.flatMap(r => {
@@ -161,9 +170,11 @@ export async function GET(request: NextRequest) {
       publishedHeadwayMinutes: leg.publishedHeadwayMinutes,
       status: leg.serviceEnded ? 'NO_UPCOMING' : leg.serviceStatus };
     const observed = leg.liveDepartures ?? [];
+    const selectedObservations = observed.filter(row => row.timetablePatternId === undefined || row.timetablePatternId === pattern.id);
+    const terminalStop = networkStops[pattern.s.at(-1)!];
     // Append only beyond the provider's preview. A timetable row must not
     // reintroduce a departure that may already have moved or been cancelled.
-    const previewEnd = Math.max(now.getTime() - 1, ...observed.flatMap(row => [Date.parse(row.time),
+    const previewEnd = Math.max(now.getTime() - 1, ...selectedObservations.flatMap(row => [Date.parse(row.time),
       ...(departureType(row) === 'CHANGED' && row.timetableTime ? [Date.parse(row.timetableTime)] : [])]).filter(Number.isFinite));
     const cancelled = new Set((leg.departureNotices ?? []).flatMap(row => row.time ? [Date.parse(row.time)] : []));
     const observedTimes = new Set(observed.map(row => Date.parse(row.time)).filter(Number.isFinite));
@@ -178,6 +189,7 @@ export async function GET(request: NextRequest) {
       .filter(row => Date.parse(row.time) > previewEnd && !cancelled.has(Date.parse(row.time)));
     const estimates = [...historical, ...upcoming];
     const departures = [...observed, ...estimates].map((departure, index) => ({ ...base, ...departure,
+      ...(routeStop && departure.timetableEstimate ? { destinationTc: terminalStop[1], destinationEn: terminalStop[2] } : {}),
       company: operatorInfo(departure.operator ?? base.operator), networkOperator: base.operator,
       id: `${r.id}:${departure.timetableEstimate ? 'estimate' : 'live'}:${index}`, departureType: departureType(departure), timingType: departureTimingType(departure), status: departureTimingType(departure) === 'SCHEDULED' ? 'TIMETABLE' : 'LIVE' }));
     const fallback = !routeStop && !includeHistory && !departures.length && !cancelled.has(Date.parse(leg.departureTime ?? '')) ? [{ ...base, id: r.id,

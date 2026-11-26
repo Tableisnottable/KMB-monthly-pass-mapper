@@ -10,6 +10,9 @@ import { departureTimingType, departureType, isNonOperatingDeparture } from '../
 import { TimetableDifference } from './TimetableDifference';
 import { arrivalRemark } from './jointArrivals';
 
+const departureDestination = (row: Pick<LiveDeparture, 'destinationTc' | 'destinationEn'>, locale: PlannerLocale) =>
+  locale === 'en' ? row.destinationEn || row.destinationTc : row.destinationTc || row.destinationEn;
+
 const shortNames: Record<string, string> = { KMB: '九巴', CTB: '城巴', LWB: '龍運' };
 
 export function JointArrivalBoard({ departures, cancellations = [], operator, routeNumber, stopName, locale, scheduledTime, timetableOnly = false, onSelectDeparture, selectedDepartureKey, earliestTime, selecting = false, historyQuery, routeStop }: {
@@ -115,13 +118,15 @@ export function JointArrivalBoard({ departures, cancellations = [], operator, ro
           const key = departureChoiceKey(row, index);
           const chosen = selectedDepartureKey ? selectedDepartureKey === key : row.time === scheduledTime && index === rows.findIndex(item => item.time === scheduledTime);
           const unreachable = earliestTime ? Date.parse(row.time) < Date.parse(earliestTime) - 1000 : false;
+          const destination = departureDestination(row, locale);
           const contents = <>
             <span className="departure-choice-time departure-choice-company">
               <span className="arrival-company" style={routeBadgeStyle(row.operator ?? (operator.includes('+') ? '' : operator), routeNumber)}>{companyLabel(row.operator)}</span>
             </span>
             <span className="departure-choice-status"><DepartureBadge departure={row} locale={locale} compact />
               <span className="departure-choice-clock"><strong>{remaining(row)}</strong><span>{copy(locale, '分鐘', 'min')}</span>
-                <time dateTime={row.time}>{timeLabel(row.time)}</time></span>
+                <time dateTime={row.time}>({timeLabel(row.time)})</time></span>
+              {destination && <small className="arrival-destination">{copy(locale, '往 ', 'To ')}{destination}</small>}
               <TimetableDifference departure={row} locale={locale} compact />
               {arrivalRemark(row.remark) && <span className="joint-arrival-remark">{arrivalRemark(row.remark)}</span>}</span>
             <span className="departure-choice-wait">
@@ -142,7 +147,11 @@ export function JointArrivalBoard({ departures, cancellations = [], operator, ro
       {scheduledTime && Number.isFinite(Date.parse(scheduledTime)) && <p className="joint-arrival-note">{timetableOnly && <DepartureBadge departure={{ status: 'TIMETABLE' }} locale={locale} />} <strong>{hongKongTimeLabel(scheduledTime)}</strong> · {copy(locale, '此行程預計上車時間（非即時）', 'Estimated boarding time for this journey (not live)')}</p>}
       {!historyQuery && <p className="joint-arrival-note">{timetableOnly ? copy(locale, '此路段採用時間表估算，未套用現在的即時到站預測。', 'This leg uses a timetable estimate; current live arrivals are not applied.') : copy(locale, '暫無可核實的即時班次，請查看時間表；不代表服務已結束。', 'No verified live predictions. Check the timetable; this does not mean service has ended.')}</p>}
     </>}
-    {cancellations.map((notice, index) => <p className="cancelled-departure" key={index}><DepartureBadge departure={notice} locale={locale} compact /> {notice.time && hongKongTimeLabel(notice.time)} {companyLabel(notice.operator)} · {notice.remark}</p>)}
+    {cancellations.map((notice, index) => {
+      const destination = departureDestination(notice, locale);
+      return <p className="cancelled-departure" key={index}><DepartureBadge departure={notice} locale={locale} compact /> {notice.time && hongKongTimeLabel(notice.time)} {companyLabel(notice.operator)}
+        {destination && <> · {copy(locale, '往 ', 'To ')}{destination}</>} · {notice.remark}</p>;
+    })}
     <details className="arrival-help"><summary>{copy(locale, '班次說明', 'Help')}</summary><DepartureLegend locale={locale} /><p>{copy(locale, '即時／時間表為預測來源；加班、取消、脫班為營辦商狀態。? 表示未確認。沒有預測不代表取消或脫班。', 'Live / Scheduled is the timing source. Additional, Cancelled and Missed are service statuses. ? means unconfirmed. Missing predictions alone do not indicate cancellation or a missed service.')}</p></details>
   </section>;
 }

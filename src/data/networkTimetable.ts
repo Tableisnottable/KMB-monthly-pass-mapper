@@ -10,6 +10,10 @@ export interface LiveDeparture extends TimetableComparison {
   time: string;
   minutes: number;
   remark?: string;
+  destinationTc?: string;
+  destinationEn?: string;
+  /** ETA matched to this published variant; null means the match was inconclusive. */
+  timetablePatternId?: string | null;
   operator?: string;
   scheduleMatch: ScheduleMatch;
   addedReason?: AddedReason;
@@ -24,6 +28,8 @@ export interface CancellationNotice {
   departureType: 'CANCELLED' | 'MISSED';
   operator?: string;
   remark: string;
+  destinationTc?: string;
+  destinationEn?: string;
   time?: string;
 }
 export interface TimetableEntry {

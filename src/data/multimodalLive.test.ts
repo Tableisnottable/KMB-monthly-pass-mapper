@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { networkPatterns, networkRoutes, networkStop, networkStops } from './transportNetwork';
 import { enrichJourneyArrivals, enrichTerminalArrivals, providerTimestamp } from './multimodalLive';
 import type { Route } from '../engine/UpgradedScoringEngine';
-import { getKmbStops, getKmbStopEta } from './hkTransitApi';
+import { getCitybusEta, getKmbStops, getKmbStopEta } from './hkTransitApi';
 import { getStaticKmbRouteStops } from './kmbRouteStopsStatic';
 import { retimeConnections } from '../engine/multimodalJourney';
 
@@ -45,6 +45,35 @@ describe('Official live arrivals', () => {
     expect(departure!.minutes).toBeGreaterThan(5);
     expect(route.legs![0].boardingIndex).toBe(terminal);
     expect(route.legs![0].realtimeEta?.etaMinutes).toBe(departure!.minutes);
+  });
+  it.each([
+    { routeNumber: '970', short: 'td:1639', full: 'td:786', shortDest: '旺角（弼街）', fullDest: '蘇屋邨' },
+    { routeNumber: '970X', short: 'td:1711', full: 'td:937', shortDest: '旺角', fullDest: '長沙灣（甘泉街）' },
+  ])('matches $routeNumber destinations to their own timetable and excludes short turns from longer journeys', async ({ routeNumber, short, full, shortDest, fullDest }) => {
+    const makeRoute = (id: string, terminal = false): Route => {
+      const index = networkPatterns.findIndex(pattern => pattern.id === id), pattern = networkPatterns[index];
+      const last = pattern.s.length - 1, board = terminal ? last : 0;
+      return { id, legs: [{ operator: 'CTB', routeNumber, mode: 'BUS', networkPattern: index, boardingIndex: board,
+        alightingIndex: last, originStop: networkStop(pattern.s[board]), destinationStop: networkStop(pattern.s[last]) }] };
+    };
+    const row = (destination: string, minutes: number, rmk_tc = '') => ({ co: 'CTB', route: routeNumber, dir: 'O', seq: 1,
+      dest_tc: destination, eta: new Date(now.getTime() + minutes * 60000).toISOString(), remarks_tc: '', rmk_tc, data_timestamp: now.toISOString() });
+    vi.mocked(getCitybusEta).mockResolvedValue([
+      row(shortDest, 5, '特別班次'), row(fullDest, 10), row(fullDest, 10), row('未載於路線資料的終點', 15),
+    ]);
+    const board = makeRoute(short);
+    await enrichJourneyArrivals([board], now, 'route-stop');
+    const rows = board.legs![0].liveDepartures!;
+    expect(rows.map(row => row.timetablePatternId)).toEqual([short, full, full, null]);
+    expect(rows[0]).toMatchObject({ destinationTc: shortDest, timingType: 'LIVE', remark: '特別班次' });
+    expect(rows[0].departureType).toBe('LIVE');
+    expect(rows[3]).toMatchObject({ destinationTc: '未載於路線資料的終點', scheduleMatch: 'UNVERIFIED' });
+    const journey = makeRoute(full);
+    await enrichJourneyArrivals([journey], now);
+    expect(journey.legs![0].liveDepartures?.map(row => row.destinationTc)).toEqual([fullDest, fullDest, '未載於路線資料的終點']);
+    const lastStop = makeRoute(full, true);
+    await enrichTerminalArrivals([lastStop], now);
+    expect(lastStop.legs![0].liveDepartures?.map(row => row.destinationTc)).toEqual([fullDest, fullDest]);
   });
   it('interprets MTR wall-clock timestamps as Hong Kong time', () => {
     expect(providerTimestamp('2026-11-13 12:03:00')).toBe(Date.parse('2026-11-13T04:03:00Z'));

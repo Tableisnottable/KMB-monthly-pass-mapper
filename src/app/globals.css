@@ -242,6 +242,7 @@ button {
 .departure-type { display: inline-block; border: 1px solid; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-weight: 700; line-height: 1.5; vertical-align: middle; white-space: normal; }
 .departure-live { color: #186839; background: #dcf5e6; border-color: #76bf92; }
 .departure-scheduled { color: #194e88; background: #e2edff; border-color: #93b3e0; }
+.departure-special { color: #4c3688; background: #efe8ff; border-color: #c1aae9; }
 .departure-additional { color: #834500; background: #fff0cf; border-color: #e8bc71; }
 .departure-changed { color: #60318b; background: #f0e2ff; border-color: #b390d0; }
 .departure-cancelled { color: #9c1d2c; background: #ffe3e6; border-color: #dc8995; }
@@ -937,12 +938,27 @@ button.departure-choice:hover { background: #e5edf3; }
 .route-browser-stops .departure-choice-clock > time { color: #4e5e70; font-size: 15px; font-weight: 550; }
 .route-browser-stops .departure-choice-status > .timetable-difference { order: 2; width: 100%; margin: 0; }
 .route-browser-stops .departure-choice-wait { display: none; }
+.route-numbered-map-stop > span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; border: 2px solid; background: #fff; color: #233746; font: 800 12px/1 Arial, sans-serif; box-shadow: 0 1px 4px #253b4970; }
+.arrival-destination { color: #334b59; font-size: 12px; font-weight: 700; }
 .route-browser-stops .arrival-company { color: #17212b; }
 .route-browser-stops .departure-choice:hover { background: #f1f6fb; }
 .route-browser-stops .departure-choice.is-selected { border-color: #7ab38b; background: #e8f5eb; }
 .route-browser-stops .departure-choice .joint-arrival-remark { width: 100%; }
 .route-browser-map { position: relative; min-height: 0; min-width: 0; }
 .route-browser-map > div { height: 100%; width: 100%; }
+.route-bus-control { position: absolute; top: 12px; right: 12px; z-index: 1000; max-width: calc(100% - 70px); padding: 10px 12px; background: #fffffff5; color: #253e4b; border: 1px solid #cbd7df; border-radius: 12px; box-shadow: 0 2px 10px #122d4326; }
+.route-bus-control label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.route-bus-control input { width: 17px; height: 17px; accent-color: #28892a; }
+.route-bus-control small { display: block; margin-top: 5px; font-size: 11px; }
+.route-bus-control small span { display: block; color: #556876; margin-top: 2px; }
+.route-map-bus { background: none; border: 0; }
+.route-map-bus-icon { position: relative; display: flex; align-items: center; justify-content: center; gap: 3px; height: 38px; width: 64px; border: 2px solid #fff; outline: 1px dashed #344854; border-radius: 12px; box-shadow: 0 2px 7px #17212b73; }
+.route-map-bus-icon strong { font: 800 12px/1 sans-serif; text-shadow: 0 1px 2px #17212b55; }
+.route-map-bus-icon small { position: absolute; right: -4px; top: -7px; font: 700 10px/1 sans-serif; padding: 2px 3px; background: #fff; color: #344854; border: 1px solid #b6c9d3; border-radius: 4px; }
+.route-map-bus-popup { color: #253e4b; min-width: 150px; }
+.route-map-bus-popup p { margin: 6px 0; }
+.route-map-bus-popup button { display: block; text-align: left; color: #216d9a; padding: 5px 0; font-size: 12px; }
+.route-map-bus-popup small { display: block; margin-top: 6px; color: #556876; }
 .route-browser-map > p { position: absolute; bottom: 25px; left: 12px; right: 12px; padding: 9px; background: #fffffff0; z-index: 1000; font-size: 12px; border-radius: 8px; }
 @media (max-width: 700px) {
   .route-browser-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(160px, 32dvh) minmax(0, 1fr); }

@@ -28,7 +28,7 @@ export function LegArrivalBoard({ leg, locale, laterConnection, onSelectDepartur
     const payload = await response.json() as { data: (Omit<LiveDeparture, 'time' | 'minutes'> & { status: 'LIVE' | 'TIMETABLE' | 'UNVERIFIED' | 'NO_UPCOMING'; time: string | null; minutes: number | null })[] };
     if (signal.aborted) return;
     setDepartures(payload.data.filter(row => !isNonOperatingDeparture(row) && (row.status === 'LIVE' || row.status === 'TIMETABLE') && row.time !== null && row.minutes !== null) as LiveDeparture[]);
-    setCancellations(payload.data.filter(row => isNonOperatingDeparture(row)).map(row => ({ departureType: row.departureType === 'MISSED' ? 'MISSED' : 'CANCELLED', operator: row.operator, remark: row.remark ?? '', time: row.time ?? undefined })));
+    setCancellations(payload.data.filter(row => isNonOperatingDeparture(row)).map(row => ({ departureType: row.departureType === 'MISSED' ? 'MISSED' : 'CANCELLED', operator: row.operator, remark: row.remark ?? '', time: row.time ?? undefined, destinationTc: row.destinationTc, destinationEn: row.destinationEn })));
   });
   return <div className="leg-arrivals">
     {laterConnection && <p className="connection-arrivals-note">{copy(locale, '請選可趕及的班次', 'Choose a reachable departure')}</p>}

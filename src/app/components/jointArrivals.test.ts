@@ -8,6 +8,23 @@ import type { LiveDeparture } from '../../data/networkTimetable';
 const row = { id: 'first', routeId: 'joint-104', patternId: 'outbound', stopId: 'stop-A', destination: 'Central',
   operator: 'KMB', networkOperator: 'KMB+CTB', mode: 'BUS' };
 describe('Joint operator arrival displays', () => {
+  it.each(['zh', 'en'] as const)('shows countdown and individual 970 destinations in %s', locale => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-26T09:20:00Z'));
+    try {
+      const html = renderToStaticMarkup(createElement(JointArrivalBoard, {
+        operator: 'CTB', routeNumber: '970', routeStop: 'departure', locale, departures: [
+          { time: '2026-11-26T09:25:00Z', minutes: 5, scheduleMatch: 'MATCHED', destinationTc: '蘇屋邨', destinationEn: 'So Uk Estate' },
+          { time: '2026-11-26T09:33:00Z', minutes: 13, scheduleMatch: 'UNVERIFIED', destinationTc: '旺角（弼街）', destinationEn: 'Mong Kok (Bute Street)', remark: '特別班次 · Special departure' },
+        ],
+      }));
+      expect(html).toMatch(/<strong>5<\/strong>[\s\S]*?>\(17:25\)<\/time>/);
+      expect(html).toContain(locale === 'zh' ? '往 旺角（弼街）' : 'To Mong Kok (Bute Street)');
+      expect(html).toContain(locale === 'zh' ? '往 蘇屋邨' : 'To So Uk Estate');
+      expect(html).toContain(locale === 'zh' ? '特別班次' : 'Special service');
+      expect(html.split('<details')[0]).not.toContain('data-departure-type="ADDITIONAL"');
+      expect(html).not.toContain('joint-arrival-remark');
+    } finally { clock.mockRestore(); }
+  });
   it('labels a different service day so chronological times across midnight are understandable', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-22T16:00:00Z'));
     try {
