@@ -61,7 +61,7 @@ export function parseMacauLive(value: unknown, pattern: MacauPattern, updatedAt 
     etaByStop[target] = { minutes: Math.min(prior?.minutes ?? Infinity, minutes), vehicles: (prior?.vehicles ?? 0) + 1 };
   };
   const lengths = pattern.paths.map(path => project(path[0], path).length);
-  for (const reports of byVehicle.values()) {
+  for (const reports of Array.from(byVehicle.values())) {
     // If the provider lists a vehicle in more than one row, its progress is ambiguous.
     if (reports.length !== 1) continue;
     const bus = reports[0];
