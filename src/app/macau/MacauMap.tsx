@@ -2,15 +2,20 @@
 import { useEffect, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import { macauColour, type MacauPoint } from '../../domain/macau';
+import type { MacauPattern } from '../../domain/macau';
+import type { MacauBusPosition } from '../../domain/macauLive';
 import type { PlaceResult } from '../components/PlaceAutocomplete';
 import { PlannerIcon } from '../components/PlannerIcon';
 export type MapPiece = { operator: string; number: string; paths: MacauPoint[][] };
-export function MacauMap({ pieces, from, to, onPick, position, onGps, gpsEnabled, locale }: {
+export function MacauMap({ pieces, from, to, onPick, position, onGps, gpsEnabled, locale, pattern, buses, onStop }: {
   pieces: MapPiece[]; from: PlaceResult | null; to: PlaceResult | null; onPick: (lat: number, lng: number) => void;
   position: GeolocationPosition | null; onGps: () => void; gpsEnabled: boolean; locale: 'zh' | 'en';
+  pattern?: MacauPattern; buses?: MacauBusPosition[]; onStop: (index: number) => void;
 }) {
   const container = useRef<HTMLDivElement>(null), pick = useRef(onPick);
-  const state = useRef<{ L: typeof Leaflet; map: Leaflet.Map; route: Leaflet.LayerGroup; gps: Leaflet.LayerGroup } | null>(null);
+  const state = useRef<{ L: typeof Leaflet; map: Leaflet.Map; route: Leaflet.LayerGroup; gps: Leaflet.LayerGroup; vehicles: Leaflet.LayerGroup } | null>(null);
+  const selectStop = useRef(onStop);
+  selectStop.current = onStop;
   const [ready, setReady] = useState(false), [error, setError] = useState(false);
   pick.current = onPick;
   useEffect(() => {
@@ -22,7 +27,7 @@ export function MacauMap({ pieces, from, to, onPick, position, onGps, gpsEnabled
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' })
         .on('tileerror', () => setError(true)).on('tileload', () => setError(false)).addTo(map);
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-      state.current = { L, map, route: L.layerGroup().addTo(map), gps: L.layerGroup().addTo(map) };
+      state.current = { L, map, route: L.layerGroup().addTo(map), gps: L.layerGroup().addTo(map), vehicles: L.layerGroup().addTo(map) };
       resize = new ResizeObserver(() => map.invalidateSize()); resize.observe(container.current); setReady(true);
     }).catch(() => setError(true));
     return () => { cancelled = true; resize?.disconnect(); state.current?.map.remove(); state.current = null; };
@@ -38,13 +43,42 @@ export function MacauMap({ pieces, from, to, onPick, position, onGps, gpsEnabled
       L.polyline(path, { color: colour, weight: 5, dashArray: piece.operator === 'walk' ? '5 8' : undefined, interactive: false }).addTo(route); points.push(...path);
     }
     for (const [place, label, colour] of [[from, locale === 'en' ? 'Start' : '起點', '#298d35'], [to, locale === 'en' ? 'End' : '終點', '#b13145']] as const) {
-      if (!place) continue;
+      if (!place || pattern) continue;
       const text = document.createElement('span'); text.textContent = label + ' · ' + place.name;
       const point: MacauPoint = [place.lat, place.lng]; points.push(point);
       L.circleMarker(point, { radius: 7, color: '#fff', weight: 3, fillColor: colour, fillOpacity: 1 }).bindTooltip(text, { permanent: true, direction: 'top' }).addTo(route);
     }
+    pattern?.stops.forEach((stop, index) => {
+      const point: MacauPoint = [stop[3], stop[4]];
+      const number = document.createElement('span');
+      number.textContent = String(index + 1);
+      number.style.borderColor = macauColour(pattern);
+      const title = `${index + 1}. ${stop[locale === 'en' ? 2 : 1]} (${stop[0]})`;
+      const tooltip = document.createElement('span');
+      tooltip.textContent = title;
+      L.marker(point, { title, alt: title, bubblingMouseEvents: false,
+        icon: L.divIcon({ className: 'mo-map-stop', html: number, iconSize: [23, 23], iconAnchor: [11, 11] }),
+      }).bindTooltip(tooltip).on('click', () => selectStop.current(index)).addTo(route);
+      points.push(point);
+    });
     if (points.length) map.fitBounds(L.latLngBounds(points), { padding: [35, 50], maxZoom: 16 });
-  }, [ready, pieces, from, to, locale]);
+  }, [ready, pieces, from, to, locale, pattern]);
+  useEffect(() => {
+    const current = state.current;
+    if (!ready || !current) return;
+    current.vehicles.clearLayers();
+    if (!pattern || !buses) return;
+    const colour = macauColour(pattern);
+    for (const bus of buses) {
+      const icon = document.createElement('span');
+      icon.textContent = bus.fleetNumber ?? pattern.number;
+      icon.style.backgroundColor = colour;
+      const title = `${pattern.number} · ${bus.fleetNumber ?? ''} ${locale === 'en' ? 'Reported bus location' : '來源回報車輛位置'}`;
+      current.L.marker(bus.point, { title, alt: title, zIndexOffset: 400, bubblingMouseEvents: false,
+        icon: current.L.divIcon({ className: 'mo-map-vehicle', html: icon, iconSize: [54, 24], iconAnchor: [27, 12] }),
+      }).addTo(current.vehicles);
+    }
+  }, [ready, pattern, buses, locale]);
   useEffect(() => {
     const current = state.current; if (!ready || !current) return;
     current.gps.clearLayers(); if (!position || !gpsEnabled) return;

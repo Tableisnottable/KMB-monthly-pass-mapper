@@ -70,6 +70,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data, missing: data.filter(row => !row.paths.length).length });
     }
     if (!['journey', 'street'].includes(resource)) throw new Error('Unknown Macau resource.');
+    const searchPhase = p.get('phase');
+    if (resource === 'journey' && searchPhase === 'warmup') return NextResponse.json({ ready: true });
+    if (searchPhase !== null && (resource !== 'journey' || searchPhase !== 'direct')) throw new Error('Invalid search phase.');
     const raw = ['fromLat', 'fromLon', 'toLat', 'toLon'].map(k => p.get(k));
     const v = raw.map(Number);
     if (raw.some(n => !n?.trim()) || !inMacau(v[0], v[1]) || !inMacau(v[2], v[3])) throw new Error('Choose two points within Macau. Hong Kong–Macau cross-border routing is not available.');
@@ -99,8 +102,10 @@ export async function GET(request: NextRequest) {
     if (!Number.isInteger(change) || change < 0 || change > 60) throw new Error('Change time must be 0–60 minutes.');
     const operators = list('operators'), requiredOperators = list('requiredOperators');
     if (requiredOperators?.some(id => operators && !operators.includes(id))) throw new Error('A company cannot be both required and banned.');
+    const limits = parseJourneyLimits(p.get('limits'));
     const data = findMacauJourneys(from, to, time, locale, timeMode === 'arrive', { includeBusEstimates: p.get('busEstimates') === 'true',
-      operators, requiredOperators, payment: payment as MacauPayment, changeMinutes: change, weights: parseRouteWeights(p.get('weights')), limits: parseJourneyLimits(p.get('limits')) });
+      operators, requiredOperators, payment: payment as MacauPayment, changeMinutes: change, weights: parseRouteWeights(p.get('weights')),
+      limits: searchPhase === 'direct' ? { ...limits, transfers: 0 } : limits });
     return NextResponse.json({ data, meta: { city: 'macau', currency: 'MOP', live: false, busEstimates: p.get('busEstimates') === 'true', coverage: macauCoverage } }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid Macau query.' }, { status: 400 }); }
 }

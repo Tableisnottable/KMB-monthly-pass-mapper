@@ -82,6 +82,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   const [limits, setLimits] = useState<JourneyLimits>({ ...DEFAULT_LIMITS }), [change, setChange] = useState(5), [busEstimates, setBusEstimates] = useState(true);
   const [tab, setTab] = useState<'plan' | 'directory'>('plan'), [routes, setRoutes] = useState<MacauJourney[]>([]), [selected, setSelected] = useState<string | null>(null);
   const [searched, setSearched] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [catalogueError, setCatalogueError] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [catalogue, setCatalogue] = useState<CatalogueRow[]>([]), [query, setQuery] = useState(''), [directory, setDirectory] = useState<MacauPattern | null>(null), [directoryBusy, setDirectoryBusy] = useState(false);
   const [imported, setImported] = useState(''), [pieces, setPieces] = useState<MapPiece[]>([]), [geometryNotice, setGeometryNotice] = useState('');
   const [street, setStreet] = useState<Street | null>(null), [streetBusy, setStreetBusy] = useState(false);
@@ -99,7 +100,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   const livePatternId = tab === 'directory' && directory?.mode === 'BUS' ? directory.id
     : tab === 'plan' && nearDeparture && firstLeg?.mode === 'BUS' ? firstLeg.networkPatternId : undefined;
   const liveData = useMacauBusPositions(livePatternId);
-  const invalidate = () => { searchAbort.current?.abort(); streetAbort.current?.abort(); setRoutes([]); setSelected(null); setSearched(false); setBusy(false); setStreetBusy(false); setStreet(null); setError(''); setPieces([]); setGeometryNotice(''); };
+  const invalidate = () => { searchAbort.current?.abort(); streetAbort.current?.abort(); setRoutes([]); setSelected(null); setSearched(false); setBusy(false); setRefining(false); setStreetBusy(false); setStreet(null); setError(''); setPieces([]); setGeometryNotice(''); };
   function choose(field: 'from' | 'to', place: PlaceResult) {
     invalidate(); if (field === 'from') { setFrom(place); setFromText(place.name); setActive('to'); } else { setTo(place); setToText(place.name); }
   }
@@ -109,6 +110,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
     transportFetch('/api/macau?resource=routes', { signal: controller.signal }).then(async r => {
       if (!r.ok) throw new Error('Catalogue unavailable'); const data = await r.json(); setCatalogue(data.data); setImported(data.coverage.importedOn.slice(0, 10));
     }).catch(() => { if (!controller.signal.aborted) setCatalogueError(true); });
+    void transportFetch('/api/macau?resource=journey&phase=warmup').catch(() => undefined);
     return () => { controller.abort(); searchAbort.current?.abort(); dirAbort.current?.abort(); streetAbort.current?.abort(); };
   }, []);
   useEffect(() => {
@@ -137,18 +139,38 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   async function search(event?: FormEvent) {
     event?.preventDefault(); if (!from || !to) { setError(t('請從建議清單或地圖選擇起點及終點。', 'Choose Start and End from suggestions or the map.')); return; }
     searchAbort.current?.abort(); streetAbort.current?.abort(); const controller = new AbortController(); searchAbort.current = controller;
-    setBusy(true); setError(''); setStreet(null); setStreetBusy(false); setRoutes([]); setSelected(null); setTab('plan'); setSearched(false);
+    setBusy(true); setRefining(false); setError(''); setStreet(null); setStreetBusy(false); setRoutes([]); setSelected(null); setTab('plan'); setSearched(false);
     const p = params();
     p.set('resource', 'journey'); p.set('timeMode', timeMode === 'arrive' ? 'arrive' : 'depart');
     p.set('time', timeMode !== 'now' && time ? time + ':00+08:00' : new Date().toISOString());
     p.set('payment', payment); p.set('busEstimates', String(busEstimates)); p.set('changeMinutes', String(change)); p.set('weights', JSON.stringify(weights)); p.set('limits', JSON.stringify(limits));
     p.set('operators', Object.keys(companies).filter(key => companies[key] !== 'ban').join(',')); p.set('requiredOperators', Object.keys(companies).filter(key => companies[key] === 'must').join(','));
+    let preview: MacauJourney[] = [];
+    async function load(query: string): Promise<MacauJourney[]> {
+      const response = await transportFetch('/api/macau?' + query, { signal: controller.signal });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      controller.signal.throwIfAborted();
+      return payload.data;
+    }
     try {
-      const response = await transportFetch('/api/macau?' + p, { signal: controller.signal }), payload = await response.json();
-      if (!response.ok) throw new Error(payload.error); if (controller.signal.aborted) return;
-      setRoutes(payload.data); setSelected(payload.data[0]?.id ?? null); setSearched(true);
-    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : t('搜尋失敗。', 'Search failed.')); }
-    finally { if (!controller.signal.aborted) setBusy(false); }
+      if (limits.transfers !== 0) {
+        preview = await load(p + '&phase=direct');
+        if (preview.length) {
+          setRoutes(preview); setSelected(preview[0].id); setSearched(true); setBusy(false); setRefining(true);
+        }
+      }
+      const completed = await load(p.toString());
+      setRoutes(completed);
+      setSelected(current => completed.some(route => route.id === current) ? current : completed[0]?.id ?? null);
+      setSearched(true);
+    } catch (e) {
+      if (!controller.signal.aborted) setError(preview.length
+        ? t('轉乘方案暫時無法載入。', 'Could not load transfer options.')
+        : e instanceof Error ? e.message : t('搜尋失敗。', 'Search failed.'));
+    } finally {
+      if (!controller.signal.aborted) { setBusy(false); setRefining(false); }
+    }
   }
   async function openRoute(id: string) {
     dirAbort.current?.abort(); const controller = new AbortController(); dirAbort.current = controller; setDirectoryBusy(true); setError(''); setDirectory(null);
@@ -209,7 +231,9 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
       {error && <p role="alert" className="mo-error">{error}</p>}
       {gpsEnabled && <p role="status" className="mo-gps">{gps.status === 'live' ? t('即時 GPS · 精確度約 ', 'Live GPS · accuracy about ') + Math.round(gps.position?.coords.accuracy ?? 0) + ' m' : gps.status === 'denied' ? t('定位權限被拒；請到瀏覽器設定允許。', 'Location permission denied. Allow it in browser settings.') : gps.status === 'unavailable' ? t('GPS 暫時不可用。', 'GPS unavailable.') : gps.status === 'paused' ? t('背景時 GPS 暫停。', 'GPS paused in the background.') : t('正在定位…', 'Locating…')}<button type="button" onClick={() => { pendingGps.current = false; setGpsEnabled(false); }}>{t('停止', 'Stop')}</button></p>}
       {tab === 'plan' ? <section className="mo-results" aria-label={t('行程結果', 'Journey results')} aria-busy={busy}>
-        {searched && <p role="status">{routes.length ? routes.length + t(' 個方案 · 全部為估算', ' options · all estimates') : t('沒有符合設定的行程。嘗試附近車站、放寬限制或開啟巴士估算。', 'No journey matches. Try nearby stops, relax limits or enable bus estimates.')}</p>}
+        {searched && <p role="status">{refining ? t('直達方案 · 搜尋轉乘中…', 'Direct options · finding transfers…')
+          : routes.length ? routes.length + t(' 個方案 · 全部為估算', ' options · all estimates')
+          : t('沒有符合設定的行程。嘗試附近車站或放寬限制。', 'No journey matches. Try nearby stops or relax limits.')}</p>}
         {!searched && !busy && <div className="mo-welcome"><PlannerIcon name="compass" size={32} /><h1>{t('下一站，澳門。', 'Next stop, Macao.')}</h1><p>{t('搜尋地點或點選地圖開始。巴士及輕軌使用獨立的澳門資料。', 'Search places or pick on the map. Buses and light rail use a separate Macao dataset.')}</p></div>}
         {routes.map((route, index) => <article key={route.id} className={'mo-card' + (selected === route.id ? ' is-selected' : '')}>
           <button type="button" className="mo-card-main" aria-pressed={selected === route.id} onClick={() => { streetAbort.current?.abort(); setStreetBusy(false); setStreet(null); setSelected(route.id); }}><div className="mo-card-top"><strong>{index === 0 ? t('推薦', 'Recommended') : t('其他方案', 'Alternative')}</strong><span><b>{routeMinutes(route)}</b> min</span></div><div className="mo-route-chain">{route.legs.map((leg, i) => <span key={leg.id}>{i > 0 && <span className="mo-chain-arrow">›</span>}{badge(leg.operator, leg.routeNumber!)}</span>)}</div>
@@ -250,7 +274,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
           </p>}
           <ol>{directory.stops.map((stop, index) => {
             const eta = liveData?.etaByStop[index];
-            return <li key={stop[0] + ':' + index}>
+            return <li key={stop[0] + ':' + index} id={`mo-route-stop-${index}`}>
               <strong>{stop[locale === 'en' ? 2 : 1]}</strong>
               <small>{stop[0]}{stop[5] ? t(' · 匯入時暫停使用', ' · suspended at import') : ''}</small>
               {eta && <BusArrivalEstimate eta={eta} locale={locale} />}
@@ -267,7 +291,10 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
         <p>{t('學生票需有效合資格卡。此版本不包括渡輪、酒店接駁巴士及跨境行程。不儲存 GPS 軌跡；背景時暫停。', 'Student fares need an eligible valid card. Ferries, hotel shuttles and cross-border trips are not included. No GPS trail is stored; location updates pause in the background.')}</p>
         <ul><li><a href="https://bis.dsat.gov.mo:37812/macauweb/" target="_blank" rel="noreferrer">DSAT {t('巴士報站', 'Bus information')}</a></li><li><a href="https://www.macaotourism.gov.mo/en/travelessential/before-you-travel/local-transportation" target="_blank" rel="noreferrer">MGTO {t('本地交通及票價', 'Local transport & bus fares')}</a></li><li><a href="https://www.mlm.com.mo/en/route.html" target="_blank" rel="noreferrer">Macao LRT {t('路網及服務時間', 'Network & hours')}</a></li><li><a href="https://www.mlm.com.mo/en/general_ticket.html" target="_blank" rel="noreferrer">Macao LRT {t('普通票價', 'General fares')}</a> · <a href="https://www.mlm.com.mo/en/concessionary_ticket.html" target="_blank" rel="noreferrer">{t('優惠票', 'Concessions')}</a></li><li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors (ODbL)</a> · Geofabrik · FOSSGIS / OSRM</li></ul>
       </details>
-    </aside><MacauMap locale={locale} pieces={pieces} from={tab === 'directory' ? directoryPoints.from : from} to={tab === 'directory' ? directoryPoints.to : to} gpsEnabled={gpsEnabled} position={gps.position} onGps={() => { pendingGps.current = false; setGpsEnabled(v => !v); }} onPick={(lat, lng) => {
+    </aside><MacauMap locale={locale} pieces={pieces} from={tab === 'directory' ? directoryPoints.from : from} to={tab === 'directory' ? directoryPoints.to : to} gpsEnabled={gpsEnabled} position={gps.position}
+      pattern={tab === 'directory' ? directory ?? undefined : undefined} buses={tab === 'directory' ? liveData?.vehicles : undefined}
+      onStop={index => document.getElementById(`mo-route-stop-${index}`)?.scrollIntoView({ block: 'nearest' })}
+      onGps={() => { pendingGps.current = false; setGpsEnabled(v => !v); }} onPick={(lat, lng) => {
       if (!inMacau(lat, lng)) { setError(t('請選擇澳門範圍內的位置。', 'Choose a point inside Macao.')); return; } choose(active, mapPlace(lat, lng, t('地圖選點', 'Map location'))); setTab('plan');
     }} /></div>
   </main>;

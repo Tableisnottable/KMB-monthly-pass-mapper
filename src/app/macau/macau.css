@@ -94,6 +94,12 @@
 .mo-directory-detail li button:disabled { color: #aaa; text-decoration: none; }
 .macau-map { position: relative; min-width: 0; min-height: 250px; z-index: 0; background: #e8eddf; }
 .macau-map .map-canvas { position: absolute; inset: 0; }
+.mo-map-stop > span, .mo-map-vehicle > span {
+  display: grid; place-items: center; height: 100%; width: 100%;
+  font: 800 12px/1 Arial, sans-serif; box-shadow: 0 1px 4px #253b4970;
+}
+.mo-map-stop > span { background: #fff; color: #203747; border: 2px solid; border-radius: 50%; }
+.mo-map-vehicle > span { border: 2px solid #fff; border-radius: 7px; color: #fff; text-shadow: 0 1px 2px #111; }
 .macau-map .map-caption { font: 10px/1.6 Arial,sans-serif; }
 @media (max-width: 760px) {
   .macau-app { height: auto; min-height: 100dvh; overflow: visible; }

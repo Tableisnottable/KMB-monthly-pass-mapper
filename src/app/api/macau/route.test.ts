@@ -31,6 +31,18 @@ describe('Macau browser API', () => {
     expect(p.meta).toMatchObject({ city: 'macau', currency: 'MOP', live: false, busEstimates: false });
     expect(p.data.length).toBeGreaterThan(0); expect(p.data.every((r: { unverifiedBus: boolean }) => !r.unverifiedBus)).toBe(true);
   });
+  it('provides a direct preview for Pui Ching Middle School to Rio Hotel', async () => {
+    const params = new URLSearchParams({
+      resource: 'journey', phase: 'direct', busEstimates: 'true',
+      fromLat: '22.201292', fromLon: '113.548199', toLat: '22.192843', toLon: '113.549886',
+      time: '2026-11-26T10:00:00+08:00',
+    });
+    const response = await get(params.toString());
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data[0]).toMatchObject({ currency: 'MOP', transferCount: 0, unverifiedBus: true });
+    expect(payload.data.every((route: { transferCount: number }) => route.transferCount === 0)).toBe(true);
+  });
   it.each(['resource=other', 'resource=route&id=hk:104', 'resource=geometry&legs=[]', 'resource=journey', query + '&time=bad',
     query + '&operators=KMB', query + '&operators=MO_TCM&requiredOperators=MO_LRT', query + '&payment=kmb-pass', query + '&busEstimates=yes',
     query + '&changeMinutes=61', query + '&timeMode=yesterday', query + '&fromLon=114.1', query + '&weights={"ride":-2}', query + '&limits={"walk":-1}',

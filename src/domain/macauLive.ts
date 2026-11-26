@@ -2,9 +2,10 @@ import { inMacau, type MacauPattern } from './macau';
 
 type Point = [number, number];
 export type MacauStopEta = { minutes: number; vehicles: number };
-export type MacauLiveSnapshot = { etaByStop: Record<number, MacauStopEta>; vehicleCount: number; updatedAt: string };
+export type MacauBusPosition = { point: Point; fleetNumber?: string };
+export type MacauLiveSnapshot = { etaByStop: Record<number, MacauStopEta>; vehicles: MacauBusPosition[]; vehicleCount: number; updatedAt: string };
 
-type LiveBus = { index: number; id: string; point: Point; speed: number; atStop: boolean };
+type LiveBus = { index: number; id: string; point: Point; speed: number; atStop: boolean; fleetNumber?: string };
 const distance = (a: Point, b: Point) => {
   const lat = (a[0] + b[0]) / 2 * Math.PI / 180;
   const x = (b[1] - a[1]) * Math.cos(lat) * 111_320, y = (b[0] - a[0]) * 111_320;
@@ -23,7 +24,8 @@ function liveBuses(value: unknown, stopCount: number) {
       const bus = candidate as Record<string, unknown>, lat = Number(bus.lat), lon = Number(bus.lng), speed = Number(bus.speed);
       const id = [bus.plate, bus.ref].find(value => typeof value === 'string' && value.trim());
       if (typeof id === 'string' && inMacau(lat, lon) && Number.isFinite(speed) && speed >= 0 && speed <= 160) {
-        rows.push({ index: Number(key), id, point: [lat, lon], speed, atStop: String(bus.status) === '1' });
+        const fleetNumber = typeof bus.ref === 'string' && /^#?[A-Z0-9-]{1,16}$/i.test(bus.ref) ? bus.ref : undefined;
+        rows.push({ index: Number(key), id, point: [lat, lon], speed, atStop: String(bus.status) === '1', fleetNumber });
       }
     }
   }
@@ -52,7 +54,10 @@ export function parseMacauLive(value: unknown, pattern: MacauPattern, updatedAt 
   const byVehicle = new Map<string, LiveBus[]>();
   for (const bus of rows) byVehicle.set(bus.id, [...(byVehicle.get(bus.id) ?? []), bus]);
   const etaByStop: Record<number, MacauStopEta> = {};
-  const snapshot = { etaByStop, vehicleCount: byVehicle.size, updatedAt };
+  const reportsByVehicle = Array.from(byVehicle.values());
+  const vehicles = reportsByVehicle.flatMap(reports => reports.length === 1
+    ? [{ point: reports[0].point, fleetNumber: reports[0].fleetNumber }] : []);
+  const snapshot = { etaByStop, vehicles, vehicleCount: vehicles.length, updatedAt };
   if (!compatible || pattern.paths.length !== pattern.stops.length - 1 || pattern.paths.some(path => path.length < 2)) return snapshot;
 
   const add = (target: number, minutes: number) => {
@@ -61,7 +66,7 @@ export function parseMacauLive(value: unknown, pattern: MacauPattern, updatedAt 
     etaByStop[target] = { minutes: Math.min(prior?.minutes ?? Infinity, minutes), vehicles: (prior?.vehicles ?? 0) + 1 };
   };
   const lengths = pattern.paths.map(path => project(path[0], path).length);
-  for (const reports of Array.from(byVehicle.values())) {
+  for (const reports of reportsByVehicle) {
     // If the provider lists a vehicle in more than one row, its progress is ambiguous.
     if (reports.length !== 1) continue;
     const bus = reports[0];
