@@ -1,0 +1,51 @@
+.control :global(.choice-body) {
+  padding-top: 0;
+  scrollbar-gutter: stable;
+}
+
+.search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  padding: 12px 0 10px;
+}
+
+.shortcuts { margin: 4px 0 18px; }
+.shortcuts h3 { margin: 0 0 8px; font-size: 13px; color: #3a5349; }
+.shortcuts > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.shortcuts a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid #d8e5dc;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #234d36;
+}
+.shortcuts a:hover, .shortcuts a[aria-current=page] { background: #e5f3e9; border-color: #84af96; }
+
+.browse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid #e2eae4;
+  color: #234138;
+  font-size: 13px;
+  font-weight: 700;
+}
+.browse select {
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid #d8e5dc;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+.group { margin-top: 12px; }
