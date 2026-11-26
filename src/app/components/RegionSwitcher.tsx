@@ -5,7 +5,7 @@ import { ChoiceDialog } from './ChoiceDialog';
 import { PlannerIcon } from './PlannerIcon';
 import styles from './RegionSwitcher.module.css';
 
-const shortcuts = ['HK', 'MO', 'TW', 'JP', 'KR'].flatMap(code => regions.filter(region => region.code === code));
+const shortcuts = ['HK', 'MO', 'JP', 'TW'].flatMap(code => regions.filter(region => region.code === code));
 
 export function RegionSwitcher({ current, locale }: { current: string; locale: 'zh' | 'en' }) {
   const [search, setSearch] = useState('');

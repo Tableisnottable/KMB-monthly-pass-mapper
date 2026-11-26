@@ -77,9 +77,9 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   const [fromText, setFromText] = useState(''), [toText, setToText] = useState('');
   const [active, setActive] = useState<'from' | 'to'>('from'), [payment, setPayment] = useState<MacauPayment>('cash');
   const [walletPayment, setWalletPayment] = useState<PaymentChoice>('adult-octopus'), [passes, setPasses] = useState<OwnedPass[]>([]), [walletReady, setWalletReady] = useState(false);
-  const [timeMode, setTimeMode] = useState('depart'), [time, setTime] = useState('');
+  const [timeMode, setTimeMode] = useState('now'), [time, setTime] = useState('');
   const [companies, setCompanies] = useState(defaultCompanies), [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS });
-  const [limits, setLimits] = useState<JourneyLimits>({ ...DEFAULT_LIMITS }), [change, setChange] = useState(5), [busEstimates, setBusEstimates] = useState(false);
+  const [limits, setLimits] = useState<JourneyLimits>({ ...DEFAULT_LIMITS }), [change, setChange] = useState(5), [busEstimates, setBusEstimates] = useState(true);
   const [tab, setTab] = useState<'plan' | 'directory'>('plan'), [routes, setRoutes] = useState<MacauJourney[]>([]), [selected, setSelected] = useState<string | null>(null);
   const [searched, setSearched] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [catalogueError, setCatalogueError] = useState(false);
   const [catalogue, setCatalogue] = useState<CatalogueRow[]>([]), [query, setQuery] = useState(''), [directory, setDirectory] = useState<MacauPattern | null>(null), [directoryBusy, setDirectoryBusy] = useState(false);
@@ -94,7 +94,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   }, [directory, locale]);
   const result = routes.find(row => row.id === selected);
   const firstLeg = result?.legs[0];
-  const nearDeparture = timeMode === 'depart' && result?.departureTime
+  const nearDeparture = timeMode !== 'arrive' && result?.departureTime
     && Math.abs(Date.parse(result.departureTime) - Date.now()) <= 10 * 60_000;
   const livePatternId = tab === 'directory' && directory?.mode === 'BUS' ? directory.id
     : tab === 'plan' && nearDeparture && firstLeg?.mode === 'BUS' ? firstLeg.networkPatternId : undefined;
@@ -138,7 +138,9 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
     event?.preventDefault(); if (!from || !to) { setError(t('請從建議清單或地圖選擇起點及終點。', 'Choose Start and End from suggestions or the map.')); return; }
     searchAbort.current?.abort(); streetAbort.current?.abort(); const controller = new AbortController(); searchAbort.current = controller;
     setBusy(true); setError(''); setStreet(null); setStreetBusy(false); setRoutes([]); setSelected(null); setTab('plan'); setSearched(false);
-    const p = params(); p.set('resource', 'journey'); p.set('timeMode', timeMode); p.set('time', time ? time + ':00+08:00' : new Date().toISOString());
+    const p = params();
+    p.set('resource', 'journey'); p.set('timeMode', timeMode === 'arrive' ? 'arrive' : 'depart');
+    p.set('time', timeMode !== 'now' && time ? time + ':00+08:00' : new Date().toISOString());
     p.set('payment', payment); p.set('busEstimates', String(busEstimates)); p.set('changeMinutes', String(change)); p.set('weights', JSON.stringify(weights)); p.set('limits', JSON.stringify(limits));
     p.set('operators', Object.keys(companies).filter(key => companies[key] !== 'ban').join(',')); p.set('requiredOperators', Object.keys(companies).filter(key => companies[key] === 'must').join(','));
     try {
@@ -186,17 +188,20 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
           <div className="mo-fields"><PlaceAutocomplete region="macau" label={t('起點', 'Start')} value={fromText} selectedPlace={from} colorClass="origin-label" locale={locale} onFocus={() => setActive('from')} onChange={v => { invalidate(); setFrom(null); setFromText(v); }} onSelect={p => choose('from', p)} />
             <PlaceAutocomplete region="macau" label={t('終點', 'End')} value={toText} selectedPlace={to} colorClass="destination-label" locale={locale} onFocus={() => setActive('to')} onChange={v => { invalidate(); setTo(null); setToText(v); }} onSelect={p => choose('to', p)} /></div>
           <div className="mo-actions"><button type="button" onClick={gpsStart}><PlannerIcon name="locate" size={15} />{t('GPS 起點', 'Use my location')}</button><button type="button" onClick={() => { invalidate(); setFrom(to); setTo(from); setFromText(toText); setToText(fromText); }}><PlannerIcon name="swap" size={15} />{t('交換', 'Swap')}</button><span>{t('地圖選點：', 'Map picks: ')}{active === 'from' ? t('起點', 'Start') : t('終點', 'End')}</span></div>
-          <div className="mo-time"><select aria-label={t('出發或到達', 'Depart or arrive')} value={timeMode} onChange={e => { invalidate(); setTimeMode(e.target.value); }}><option value="depart">{t('出發', 'Depart at')}</option><option value="arrive">{t('到達', 'Arrive by')}</option></select><input type="datetime-local" aria-label={t('澳門時間', 'Macao time')} value={time} onChange={e => { invalidate(); setTime(e.target.value); }} /></div>
-          <small>{t('澳門當地時間（UTC+8）', 'Macao local time (UTC+8)')}</small>
+          <div className="mo-time"><select aria-label={t('出發或到達', 'Depart or arrive')} value={timeMode} onChange={e => {
+            invalidate(); if (timeMode === 'now') setTime(dateInput()); setTimeMode(e.target.value);
+          }}><option value="now">{t('現在出發', 'Leave now')}</option><option value="depart">{t('指定出發時間', 'Depart at')}</option><option value="arrive">{t('指定到達時間', 'Arrive by')}</option></select>
+          {timeMode !== 'now' && <input type="datetime-local" aria-label={t('澳門時間', 'Macao time')} value={time} onChange={e => { invalidate(); setTime(e.target.value); }} />}</div>
+          {timeMode !== 'now' && <small>{t('澳門當地時間（UTC+8）', 'Macao local time (UTC+8)')}</small>}
           <details className="mo-settings"><summary>{t('交通公司、時間上限及重要性', 'Companies, time limits & importance')}</summary><div className="mo-settings-body">
             <h3>{t('交通公司', 'Transport companies')}</h3>{macauOperators.map(op => <label className="mo-setting" key={op.id}><span><i style={{ background: op.colour }} />{op[locale === 'en' ? 'nameEn' : 'nameTc']}</span><select aria-label={op[locale === 'en' ? 'nameEn' : 'nameTc']} value={companies[op.id]} onChange={e => { invalidate(); setCompanies({ ...companies, [op.id]: e.target.value as 'must' | 'normal' | 'ban' }); }}><option value="must">{t('必須', 'Must')}</option><option value="normal">{t('正常', 'Normal')}</option><option value="ban">{t('禁止', 'Ban')}</option></select></label>)}
             <label className="mo-setting">{t('最少轉乘時間', 'Minimum change')}<span><input aria-label={t('最少轉乘時間', 'Minimum change')} type="number" min="0" max="60" value={change} onChange={e => { invalidate(); setChange(Number(e.target.value)); }} /> min</span></label>
             {(Object.keys(limits) as (keyof JourneyLimits)[]).map(key => <label className="mo-setting" key={key}>{({ transfers: t('最多轉乘次數', 'Maximum transfers'), change: t('每次轉乘上限', 'Maximum per change'), walk: t('步行總時間上限', 'Maximum total walking'), wait: t('每次候車上限', 'Maximum per wait'), ride: t('乘車總時間上限', 'Maximum total ride') })[key]}<input type="number" min="0" max={key === 'transfers' ? 3 : 240} placeholder={t('不限', 'Any')} value={limits[key] ?? ''} onChange={e => { invalidate(); setLimits({ ...limits, [key]: e.target.value === '' ? null : Number(e.target.value) }); }} /></label>)}
             <RouteWeightSettings value={weights} onChange={w => { invalidate(); setWeights(w); }} locale={locale} companyAdjustments={false} />
-            <button type="button" className="mo-reset" onClick={() => { invalidate(); setCompanies(defaultCompanies()); setWeights({ ...DEFAULT_WEIGHTS }); setLimits({ ...DEFAULT_LIMITS }); setChange(5); setBusEstimates(false); }}>{t('重設所有篩選', 'Reset all filters')}</button>
+            <button type="button" className="mo-reset" onClick={() => { invalidate(); setCompanies(defaultCompanies()); setWeights({ ...DEFAULT_WEIGHTS }); setLimits({ ...DEFAULT_LIMITS }); setChange(5); setBusEstimates(true); }}>{t('重設所有篩選', 'Reset all filters')}</button>
           </div></details>
-          <label className="mo-bus-opt"><input type="checkbox" checked={busEstimates} onChange={e => { invalidate(); setBusEstimates(e.target.checked); }} /><span>{t('包括巴士估算行程（未核實營運時間）', 'Include estimated bus journeys (hours unverified)')}</span></label>
-          <p className="mo-warning">{busEstimates ? t('巴士班次、候車時間及營運時段未核實；以下為路網估算，不能確認該時段有車。', 'Bus times, waits and operating hours are unverified. Results are network estimates and do not confirm a service is running.') : t('預設只規劃輕軌。巴士路線可在路線目錄查看，或自行開啟估算行程。', 'Light rail planning by default. Browse bus routes in the directory, or opt in to estimates.')}</p>
+          <label className="mo-bus-opt"><input type="checkbox" checked={busEstimates} onChange={e => { invalidate(); setBusEstimates(e.target.checked); }} /><span>{t('搜尋巴士路線', 'Include buses')}</span></label>
+          {busEstimates && <p className="mo-warning">{t('巴士行程按路網估算，營運時段請查官方時間表。', 'Bus journeys use route estimates. Check the official timetable for service hours.')}</p>}
           <button className="mo-search" type="submit" disabled={busy}>{busy ? t('搜尋中…', 'Searching…') : t('搜尋路線', 'Find routes')}<PlannerIcon name="arrow" size={18} /></button>
         </form>}
         {tab === 'directory' && <label className="mo-directory-search">{t('搜尋路線編號或終點', 'Find a route number or terminus')}<input value={query} onChange={e => setQuery(e.target.value)} placeholder="26A, N1A, TAIPA…" /></label>}
@@ -221,7 +226,9 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
                 <div>{badge(leg.operator, leg.routeNumber!)}<strong>{macauOperators.find(o => o.id === leg.operator)?.[locale === 'en' ? 'nameEn' : 'nameTc']}</strong></div>
                 <p>{macauTime(leg.departureTime!)} {leg.originStop?.name} → {macauTime(leg.arrivalTime!)} {leg.destinationStop?.name}</p>
                 <small>{t('乘車 ', 'Ride ')}{leg.journeyTimeMinutes} min · {t('預計候車 ', 'Estimated wait ')}{Math.ceil(leg.scheduledWaitMinutes ?? 0)} min · {t('行程估算', 'Journey estimate')}</small>
-                {eta && <BusArrivalEstimate eta={eta} locale={locale} />}
+                {eta ? <BusArrivalEstimate eta={eta} locale={locale} />
+                  : i === 0 && route.id === selected && livePatternId && <small>{liveData === undefined
+                    ? t('正在讀取巴士位置…', 'Loading bus positions…') : t('暫無此站到站推算。', 'No arrival estimate for this stop right now.')}</small>}
               </div>;
             })}
             <p>{t('下車後步行 ', 'Walk after alighting ')}{route.destinationWalkMinutes} min</p><small>{t('排序分數 ', 'Ranking score ')}{route.finalScore} · {t('分數不是分鐘', 'scores are not minutes')}</small>
