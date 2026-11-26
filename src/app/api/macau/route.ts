@@ -8,6 +8,7 @@ import { routeOnStreets } from '../../../data/streetRouting';
 import { findMacauJourneys } from '../../../engine/macauJourney';
 import { parseJourneyLimits } from '../../../domain/journeyLimits';
 import { parseRouteWeights } from '../../../engine/routeWeights';
+import { parseMacauLive } from '../../../domain/macauLive';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -27,6 +28,19 @@ export async function GET(request: NextRequest) {
       const row = macauPatternById.get(p.get('id') ?? '');
       if (!row) throw new Error('Unknown Macau route.');
       return NextResponse.json({ data: row });
+    }
+    if (resource === 'live') {
+      const pattern = macauPatternById.get(p.get('id') ?? '');
+      if (!pattern || pattern.mode !== 'BUS') throw new Error('Choose a Macao bus route.');
+      const url = new URL('https://motransportinfo.com/its/getRealTime.php');
+      url.search = new URLSearchParams({ id: pattern.number, dir: pattern.direction }).toString();
+      try {
+        const response = await fetch(url, { headers: { Accept: 'application/json,text/plain,*/*' }, signal: AbortSignal.timeout(10000), redirect: 'error' });
+        if (!response.ok) throw new Error('Bus positions unavailable');
+        return NextResponse.json({ data: parseMacauLive(await response.json(), pattern) }, { headers: { 'Cache-Control': 'no-store' } });
+      } catch {
+        return NextResponse.json({ error: 'Live bus positions are temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+      }
     }
     if (resource === 'places') {
       const q = (p.get('q') ?? '').trim();

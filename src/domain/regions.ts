@@ -1,9 +1,9 @@
 import worldRegions from './worldRegions.json';
 /** Geographic browsing regions. An entry never implies nationwide routing coverage. */
 export type BrowseCity = { name: string; en: string; lat: number; lon: number };
-export type BrowseRegion = { id: string; code: string; zh: string; en: string; group: string; cities: BrowseCity[]; planner?: string };
+export type BrowseRegion = { id: string; code: string; zh: string; en: string; group: string; cities: BrowseCity[]; planner?: string; unStatus: string };
 const city = (name: string, en: string, lat: number, lon: number): BrowseCity => ({ name, en, lat, lon });
-const asianRegions: BrowseRegion[] = [
+const asianRegions: Omit<BrowseRegion, 'unStatus'>[] = [
   { id: 'hong-kong', code: 'HK', zh: '香港', en: 'Hong Kong', group: 'east', planner: '/', cities: [city('中環', 'Central', 22.282, 114.158)] },
   { id: 'macau', code: 'MO', zh: '澳門', en: 'Macao', group: 'east', planner: '/macau', cities: [city('澳門', 'Macao', 22.194, 113.541)] },
   { id: 'taiwan', code: 'TW', zh: '台灣', en: 'Taiwan', group: 'east', cities: [city('台北', 'Taipei', 25.0478, 121.517), city('新北', 'New Taipei', 25.014, 121.463), city('桃園', 'Taoyuan', 24.989, 121.314), city('台中', 'Taichung', 24.137, 120.686), city('台南', 'Tainan', 22.997, 120.212), city('高雄', 'Kaohsiung', 22.639, 120.302), city('花蓮', 'Hualien', 23.993, 121.601)] },
@@ -58,12 +58,37 @@ const asianRegions: BrowseRegion[] = [
   { id: 'russia', code: 'RU', zh: '俄羅斯', en: 'Russia', group: 'north', cities: [city('海參崴', 'Vladivostok', 43.115, 131.886), city('新西伯利亞', 'Novosibirsk', 55.031, 82.921)] },
 ];
 /** Country centres are labelled honestly; existing city shortcuts and IDs stay stable. */
-export const regions: BrowseRegion[] = [...asianRegions, ...worldRegions.filter(r => !asianRegions.some(a => a.code === r.code)).map(r => ({
+export const regions: BrowseRegion[] = [...asianRegions.map(r => ({ ...r, unStatus: worldRegions.find(source => source.code === r.code)?.unStatus ?? 'other' })), ...worldRegions.filter(r => !asianRegions.some(a => a.code === r.code)).map(r => ({
   id: r.code.toLowerCase(), code: r.code, zh: r.zh, en: r.en, group: r.group,
-  cities: [city('國家／地區中心', 'Country / territory centre', r.lat, r.lon)],
+  cities: [city('國家／地區中心', 'Country / territory centre', r.lat, r.lon)], unStatus: r.unStatus,
 }))];
+export const countries = regions.filter(r => r.unStatus === 'member' || r.unStatus === 'observer');
 export const regionGroups = [['east', '東亞', 'East Asia'], ['southeast', '東南亞', 'Southeast Asia'], ['south', '南亞', 'South Asia'], ['central', '中亞', 'Central Asia'], ['west', '西亞', 'West Asia'], ['north', '北亞', 'North Asia'], ['europe', '歐洲', 'Europe'], ['africa', '非洲', 'Africa'], ['americas', '美洲', 'Americas'], ['oceania', '大洋洲', 'Oceania'], ['antarctic', '南極洲', 'Antarctica']] as const;
-export function regionHref(region: BrowseRegion, locale: 'zh' | 'en') {
+export function regionHref(region: BrowseRegion, locale: 'zh' | 'en', selectedCity?: BrowseCity) {
+  if (region.id === 'macau') return 'https://kmb-monthly-pass-mapper-macau-v2-preview.tableisnottable.workers.dev/macau' + (locale === 'en' ? '/en' : '');
   const path = region.planner ?? (['taiwan', 'japan'].includes(region.id) ? '/' + region.id : '/world');
-  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (path === '/world' ? '?region=' + region.id : '');
+  const params = new URLSearchParams();
+  if (path === '/world') params.set('region', region.id);
+  if (!region.planner && selectedCity && region.cities.includes(selectedCity)) params.set('city', selectedCity.en);
+  return path + (locale === 'en' ? path === '/' ? 'en' : '/en' : '') + (params.size ? '?' + params : '');
+}
+
+const aliases: Record<string, string[]> = { 'hong-kong': ['香港', 'hongkong'], macau: ['澳门', '澳門', 'macao', 'macau'], taiwan: ['台湾', '台灣'], japan: ['日本'],
+  va: ['Holy See', '教廷', '梵蒂冈'], palestine: ['State of Palestine', '巴勒斯坦國', '巴勒斯坦国'],
+  gb: ['UK', 'Britain', '英国'], us: ['USA', 'America', '美国'], 'south-korea': ['Korea', '韩国'], china: ['中国', '中國'], uae: ['UAE'], au: ['Australia', '澳大利亚'], nz: ['New Zealand', '新西蘭'] };
+export const regionSearchText = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\s.'’_-]+/g, '');
+export function matchingRegions(search: string) {
+  const query = regionSearchText(search);
+  const exact = query && regions.filter(r => [r.code, ...(aliases[r.id] ?? [])].some(text => regionSearchText(text) === query));
+  if (exact && exact.length) return exact;
+  return regions.filter(r => [r.zh, r.en, r.code, ...(aliases[r.id] ?? []), ...r.cities.flatMap(c => [c.name, c.en])].some(text => regionSearchText(text).includes(query)));
+}
+export function matchingRegionCity(region: BrowseRegion, search: string) {
+  const query = regionSearchText(search);
+  return query ? region.cities.find(c => [c.name, c.en].some(text => regionSearchText(text).includes(query))) : undefined;
+}
+export function browseLocation(params: URLSearchParams, fallback: string) {
+  const region = regions.find(r => r.id === params.get('region')) ?? regions.find(r => r.id === fallback) ?? regions[0];
+  const selectedCity = region.cities.find(c => c.en === params.get('city')) ?? region.cities[0];
+  return { region, city: selectedCity };
 }

@@ -40,6 +40,22 @@ describe('Free-hosting public provider proxy', () => {
     expect(safeProviderUrl('https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=x')).toBeUndefined();
     expect(safeProviderUrl('https://www.map.gov.hk/admin?q=Harbour')).toBeUndefined();
   });
+  it('allows only the public Macao live bus feed', () => {
+    const live = safeProviderUrl('https://motransportinfo.com/its/getRealTime.php?id=1A&dir=0');
+    expect(live).toBeDefined(); expect(providerCacheSeconds(live!)).toBe(10);
+    expect(safeProviderUrl('https://motransportinfo.com/its/getRealTime.php?id=1A%26url=https://example.com&dir=0')).toBeUndefined();
+    expect(safeProviderUrl('https://motransportinfo.com/its/getRealTime.php?id=1A&id=2&dir=0')).toBeUndefined();
+    expect(safeProviderUrl('https://motransportinfo.com/zh/rss/adjust')).toBeUndefined();
+    expect(safeProviderUrl('https://motransportinfo.com/admin/export')).toBeUndefined();
+  });
+  it('serves mislabeled Macao JSON as JSON and rejects upstream HTML', async () => {
+    const request = new Request('https://planner.example/api/upstream?url=' + encodeURIComponent('https://motransportinfo.com/its/getRealTime.php?id=1A&dir=0'));
+    const fetcher = (body: string) => vi.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/html' } }));
+    const data = await proxyProvider(request, fetcher('{"0":{"bus":[]}}'));
+    expect(data.headers.get('Content-Type')).toContain('application/json');
+    expect(await data.json()).toEqual({ 0: { bus: [] } });
+    expect((await proxyProvider(request, fetcher('<html>Not available</html>'))).status).toBe(502);
+  });
   it('does not follow upstream redirects or forward user credentials', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response('', { status: 302, headers: { Location: 'https://example.com' } }));
     const response = await proxyProvider(new Request('https://planner.example/api/upstream?url=' + encodeURIComponent('https://data.etabus.gov.hk/v1/transport/kmb/stop/'),

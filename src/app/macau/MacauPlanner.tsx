@@ -12,6 +12,7 @@ import { readPaymentPreferences, type OwnedPass, type PaymentChoice } from '../.
 import { RouteWeightSettings } from '../components/RouteWeightSettings';
 import { useLiveLocation } from '../components/useLiveLocation';
 import { MacauMap, type MapPiece } from './MacauMap';
+import type { MacauLiveSnapshot } from '../../domain/macauLive';
 
 type CatalogueRow = Omit<MacauPattern, 'paths'> & { stopCount: number };
 type Street = { paths: [number, number][][]; mode: string; minutes: number | null; distanceMetres?: number; fare: number | null; source: string };
@@ -20,6 +21,55 @@ const routeMinutes = (route: MacauJourney) => Math.ceil((Date.parse(route.arriva
 const defaultCompanies = () => Object.fromEntries(macauOperators.map(o => [o.id, 'normal'])) as Record<string, 'must' | 'normal' | 'ban'>;
 function mapPlace(lat: number, lng: number, name: string, type = 'map'): PlaceResult {
   return { id: `MO:${type}:${lat}:${lng}`, name, address: `${lat.toFixed(5)}, ${lng.toFixed(5)} · Macao`, lat, lng, type, googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` };
+}
+
+function useMacauBusPositions(patternId?: string) {
+  const [live, setLive] = useState<{ id: string; data: MacauLiveSnapshot | null }>();
+  useEffect(() => {
+    if (!patternId) return;
+    const id = patternId;
+    let active = true;
+    let request: AbortController | undefined;
+    let timer: number | undefined;
+    setLive(undefined);
+    async function refresh() {
+      if (!active || document.hidden || request) return;
+      request = new AbortController();
+      try {
+        const params = new URLSearchParams({ resource: 'live', id });
+        const response = await transportFetch('/api/macau?' + params, { signal: request.signal });
+        if (!response.ok) throw new Error('Live positions unavailable');
+        const payload = await response.json();
+        if (active && !document.hidden) setLive({ id, data: payload.data });
+      } catch {
+        if (active && !document.hidden) setLive({ id, data: null });
+      } finally {
+        request = undefined;
+        if (active) timer = window.setTimeout(refresh, 15_000);
+      }
+    }
+    const onVisible = () => {
+      window.clearTimeout(timer);
+      if (document.hidden) setLive(undefined);
+      else void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    void refresh();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      request?.abort();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [patternId]);
+  return patternId && live?.id === patternId ? live.data : undefined;
+}
+
+function BusArrivalEstimate({ eta, locale }: { eta: NonNullable<MacauLiveSnapshot['etaByStop'][number]>; locale: 'zh' | 'en' }) {
+  const minutes = eta.minutes;
+  return <small className="mo-stop-live-eta">{locale === 'en'
+    ? `${minutes === 0 ? 'At stop' : `~${minutes} min · From bus location`} · ${eta.vehicles} bus${eta.vehicles === 1 ? '' : 'es'}`
+    : `${minutes === 0 ? '已到站' : `約 ${minutes} 分 · 位置推算`} · ${eta.vehicles} 部車`}</small>;
 }
 export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   const t = (zh: string, en: string) => locale === 'en' ? en : zh;
@@ -43,6 +93,12 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
     return { from: place(directory.stops[0]), to: place(directory.stops.at(-1)!) };
   }, [directory, locale]);
   const result = routes.find(row => row.id === selected);
+  const firstLeg = result?.legs[0];
+  const nearDeparture = timeMode === 'depart' && result?.departureTime
+    && Math.abs(Date.parse(result.departureTime) - Date.now()) <= 10 * 60_000;
+  const livePatternId = tab === 'directory' && directory?.mode === 'BUS' ? directory.id
+    : tab === 'plan' && nearDeparture && firstLeg?.mode === 'BUS' ? firstLeg.networkPatternId : undefined;
+  const liveData = useMacauBusPositions(livePatternId);
   const invalidate = () => { searchAbort.current?.abort(); streetAbort.current?.abort(); setRoutes([]); setSelected(null); setSearched(false); setBusy(false); setStreetBusy(false); setStreet(null); setError(''); setPieces([]); setGeometryNotice(''); };
   function choose(field: 'from' | 'to', place: PlaceResult) {
     invalidate(); if (field === 'from') { setFrom(place); setFromText(place.name); setActive('to'); } else { setTo(place); setToText(place.name); }
@@ -157,7 +213,17 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
             {route.selectedFare === null && <small>{t('巴士卡類優惠未核實；不猜測折扣。', 'Bus card concessions unverified; no discount assumed.')}</small>}
           </button>
           <details open={selected === route.id} className="mo-legs"><summary>{t('站點、步行及時間詳情', 'Stops, walking & times')}</summary><p>{t('前往上車站步行 ', 'Walk to boarding stop ')}{route.originWalkMinutes} min</p>
-            {route.legs.map((leg, i) => <div className="mo-leg" key={leg.id}>{i > 0 && <small>{t('轉乘步行 ', 'Transfer walk ')}{leg.accessWalkMinutes ?? 0} min</small>}<div>{badge(leg.operator, leg.routeNumber!)}<strong>{macauOperators.find(o => o.id === leg.operator)?.[locale === 'en' ? 'nameEn' : 'nameTc']}</strong></div><p>{macauTime(leg.departureTime!)} {leg.originStop?.name} → {macauTime(leg.arrivalTime!)} {leg.destinationStop?.name}</p><small>{t('乘車 ', 'Ride ')}{leg.journeyTimeMinutes} min · {t('預計候車 ', 'Estimated wait ')}{Math.ceil(leg.scheduledWaitMinutes ?? 0)} min · {t('估算 · 非即時', 'Estimate · not live')}</small></div>)}
+            {route.legs.map((leg, i) => {
+              const eta = i === 0 && route.id === selected && leg.mode === 'BUS' && leg.boardingIndex !== undefined
+                ? liveData?.etaByStop[leg.boardingIndex] : undefined;
+              return <div className="mo-leg" key={leg.id}>
+                {i > 0 && <small>{t('轉乘步行 ', 'Transfer walk ')}{leg.accessWalkMinutes ?? 0} min</small>}
+                <div>{badge(leg.operator, leg.routeNumber!)}<strong>{macauOperators.find(o => o.id === leg.operator)?.[locale === 'en' ? 'nameEn' : 'nameTc']}</strong></div>
+                <p>{macauTime(leg.departureTime!)} {leg.originStop?.name} → {macauTime(leg.arrivalTime!)} {leg.destinationStop?.name}</p>
+                <small>{t('乘車 ', 'Ride ')}{leg.journeyTimeMinutes} min · {t('預計候車 ', 'Estimated wait ')}{Math.ceil(leg.scheduledWaitMinutes ?? 0)} min · {t('行程估算', 'Journey estimate')}</small>
+                {eta && <BusArrivalEstimate eta={eta} locale={locale} />}
+              </div>;
+            })}
             <p>{t('下車後步行 ', 'Walk after alighting ')}{route.destinationWalkMinutes} min</p><small>{t('排序分數 ', 'Ranking score ')}{route.finalScore} · {t('分數不是分鐘', 'scores are not minutes')}</small>
           </details></article>)}
         {from && to && <details className="mo-streets"><summary>{t('步行、單車、的士及駕駛', 'Walking, cycling, taxi & driving')}</summary><div className="mo-actions">{[['walk', '步行', 'Walk'], ['cycle', '單車', 'Cycle'], ['taxi', '的士', 'Taxi'], ['drive', '駕駛', 'Drive']].map(([mode, zh, en]) => <button key={mode} type="button" disabled={streetBusy} onClick={() => streetRoute(mode)}>{t(zh, en)}</button>)}</div>
@@ -166,7 +232,25 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
       </section> : <section className="mo-directory" aria-label={t('路線目錄', 'Route directory')}>
         {catalogueError ? <p role="alert">{t('路線目錄載入失敗，請重新整理。', 'Route directory could not load. Please refresh.')}</p> : !catalogue.length ? <p role="status">{t('正在載入路線…', 'Loading routes…')}</p> : <p>{t('90 條巴士線 · 3 條輕軌線 · 按方向列出', '90 bus routes · 3 light rail lines · listed by direction')}</p>}
         {directoryBusy && <p role="status">{t('正在載入站點…', 'Loading stops…')}</p>}
-        {directory && <article className="mo-directory-detail"><button type="button" className="mo-back" onClick={() => setDirectory(null)}>‹ {t('返回所有路線', 'All routes')}</button><h2>{badge(directory.operator, directory.number)} {directory.stops[0][locale === 'en' ? 2 : 1]} → {directory.stops.at(-1)![locale === 'en' ? 2 : 1]}</h2><a className="mo-timetable-link" href={macauTimetableUrl(directory)} target="_blank" rel="noreferrer">{t("官方時間表 ↗", "Official timetable ↗")}</a><p className="mo-warning">{t('車站狀態只反映匯入日期；班次時間及即時到站未接入。', 'Stop status reflects the import date. Timetables and live arrivals are not connected.')}</p><ol>{directory.stops.map((s, i) => <li key={s[0] + ':' + i}><strong>{s[locale === 'en' ? 2 : 1]}</strong><small>{s[0]}{s[5] ? t(' · 匯入時暫停使用', ' · suspended at import') : ''}</small><div><button type="button" disabled={s[5]} onClick={() => useStop(s, 'from')}>{t('設為起點', 'Start here')}</button><button type="button" disabled={s[5]} onClick={() => useStop(s, 'to')}>{t('設為終點', 'End here')}</button></div></li>)}</ol></article>}
+        {directory && <article className="mo-directory-detail"><button type="button" className="mo-back" onClick={() => setDirectory(null)}>‹ {t('返回所有路線', 'All routes')}</button><h2>{badge(directory.operator, directory.number)} {directory.stops[0][locale === 'en' ? 2 : 1]} → {directory.stops.at(-1)![locale === 'en' ? 2 : 1]}</h2><a className="mo-timetable-link" href={macauTimetableUrl(directory)} target="_blank" rel="noreferrer">{t("官方時間表 ↗", "Official timetable ↗")}</a>
+          {directory.mode === 'BUS' && <p className="mo-live-summary" role="status">
+            {liveData === undefined ? t('正在讀取巴士位置…', 'Loading bus positions…')
+              : liveData === null ? t('即時位置暫時無法讀取。', 'Live positions are temporarily unavailable.')
+              : Object.keys(liveData.etaByStop).length ? t('到站時間按巴士位置推算', 'Arrivals estimated from bus locations')
+              : t('目前未有可匹配的到站預測。', 'No matching arrival estimates right now.')}
+            <small><a href={`https://motransportinfo.com/${locale}/route/${directory.number}/${directory.direction}`} target="_blank" rel="noreferrer">{t('澳門交通資訊網 ↗', 'Macao Transport Information ↗')}</a>
+              {liveData && ` · ${macauTime(liveData.updatedAt)}`}</small>
+          </p>}
+          <ol>{directory.stops.map((stop, index) => {
+            const eta = liveData?.etaByStop[index];
+            return <li key={stop[0] + ':' + index}>
+              <strong>{stop[locale === 'en' ? 2 : 1]}</strong>
+              <small>{stop[0]}{stop[5] ? t(' · 匯入時暫停使用', ' · suspended at import') : ''}</small>
+              {eta && <BusArrivalEstimate eta={eta} locale={locale} />}
+              <div><button type="button" disabled={stop[5]} onClick={() => useStop(stop, 'from')}>{t('設為起點', 'Start here')}</button>
+                <button type="button" disabled={stop[5]} onClick={() => useStop(stop, 'to')}>{t('設為終點', 'End here')}</button></div>
+            </li>;
+          })}</ol></article>}
         {!directory && catalogue.filter(p => [p.number, p.stops[0][1], p.stops[0][2], p.stops.at(-1)![1], p.stops.at(-1)![2]].join(' ').toLowerCase().includes(query.trim().toLowerCase())).map(p => <button type="button" className="mo-directory-row" key={p.id} onClick={() => openRoute(p.id)}>{badge(p.operator, p.number)}<span><strong>{p.stops[0][locale === 'en' ? 2 : 1]} → {p.stops.at(-1)![locale === 'en' ? 2 : 1]}</strong><small>{macauOperators.find(o => o.id === p.operator)?.[locale === 'en' ? 'nameEn' : 'nameTc']} · {p.stopCount}{t(' 站', ' stops')}</small></span><PlannerIcon name="chevron" size={16} /></button>)}
       </section>}
       {geometryNotice && <p role="status" className="mo-geometry-note">{geometryNotice}</p>}
