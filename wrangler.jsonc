@@ -4,6 +4,9 @@
   "minify": true,
   "main": ".free-worker/worker.js",
   "compatibility_date": "2026-11-13",
+  "vars": {
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAGTksLwmKChZIq-s"
+  },
   "durable_objects": { "bindings": [{ "name": "JOURNEY_NOTIFICATIONS", "class_name": "JourneyNotifications" }] },
   "migrations": [{ "tag": "v1-boarding-notifications", "new_sqlite_classes": ["JourneyNotifications"] }],
   "ratelimits": [

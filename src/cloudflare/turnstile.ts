@@ -66,8 +66,8 @@ export async function turnstileResponse(request: Request, env: TurnstileBindings
   const protectedApi = url.pathname === '/api/upstream' || url.pathname === '/api/open-map' || (url.pathname === '/api/notifications' && request.method === 'POST');
   if (!page && !protectedApi) return;
   const { TURNSTILE_SITE_KEY: siteKey, TURNSTILE_SECRET_KEY: secret } = env;
-  if (!siteKey && !secret) return;
-  if (!siteKey || !/^[A-Za-z0-9_-]{1,100}$/.test(siteKey) || !secret) {
+  if (!secret) return;
+  if (!siteKey || !/^[A-Za-z0-9_-]{1,100}$/.test(siteKey)) {
     return new Response('Verification configuration is incomplete.', { status: 503, headers: noStore });
   }
   const english = /(?:^|\/)en(?:\.html|\/|$)/.test(url.pathname) || url.searchParams.get('lang') === 'en';
@@ -95,7 +95,7 @@ export async function turnstileResponse(request: Request, env: TurnstileBindings
     });
     if (response.ok) {
       const verified: { success?: boolean; hostname?: string; action?: string } = await response.json();
-      if (verified.success && verified.hostname === url.hostname && verified.action === action) {
+      if (verified.success === true && verified.hostname === url.hostname && verified.action === action) {
         return new Response(null, { status: 303, headers: { ...noStore, Location: url.pathname + url.search,
           'Set-Cookie': await signedCookie(url.hostname, secret) } });
       }

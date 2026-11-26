@@ -14,7 +14,8 @@ describe('Turnstile access verification', () => {
   it('keeps development and unrelated requests available and fails closed on incomplete settings', async () => {
     expect(await turnstileResponse(new Request(origin + '/macau'), {})).toBeUndefined();
     expect(await turnstileResponse(new Request(origin + '/_next/static/example.js'), env)).toBeUndefined();
-    expect((await turnstileResponse(new Request(origin + '/macau'), { TURNSTILE_SITE_KEY: 'only' }))?.status).toBe(503);
+    expect(await turnstileResponse(new Request(origin + '/macau'), { TURNSTILE_SITE_KEY: 'public-key' })).toBeUndefined();
+    expect((await turnstileResponse(new Request(origin + '/macau'), { TURNSTILE_SECRET_KEY: 'fixture-only' }))?.status).toBe(503);
     expect(await turnstileResponse(new Request(origin + '/api/notifications', { method: 'DELETE' }), env)).toBeUndefined();
   });
   it('serves a private challenge for the planner and denies an unverified provider API request', async () => {
@@ -52,5 +53,7 @@ describe('Turnstile access verification', () => {
     expect((await turnstileResponse(submit(), env, proof('preview.example', 'different')))?.status).toBe(403);
     const rejected = vi.fn<typeof fetch>(async () => Response.json({ success: false }));
     expect((await turnstileResponse(submit(), env, rejected))?.headers.get('Set-Cookie')).toBeNull();
+    const invalid = vi.fn<typeof fetch>(async () => Response.json({ success: 'true', hostname: 'preview.example', action: 'planner_access' }));
+    expect((await turnstileResponse(submit(), env, invalid))?.status).toBe(403);
   });
 });

@@ -480,7 +480,7 @@ data stays explicitly unavailable; scheduled boarding estimates are labelled sep
 
 ### Upcoming releases / 下兩個版本
 
-1. **Turnstile.** The unified site includes server-side verification. To activate it, create a Managed Cloudflare Widget for the unified hostname and add both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` as encrypted Worker secrets. A successful verification grants a 24-hour session.
+1. **Turnstile.** The unified site uses the existing Managed widget for its production hostname. The public `TURNSTILE_SITE_KEY` is in `wrangler.jsonc`. To enable verification, store the matching widget secret as the encrypted `TURNSTILE_SECRET_KEY` binding on the production Worker. A successful verification grants a 24-hour session.
 2. **Hong Kong vehicle locations.** The next Hong Kong location release will use Macau's position-to-route method where a public feed provides vehicle coordinates, route and direction. The checked KMB and Citybus feeds supply arrival times and destinations. Current Hong Kong bus markers use the timetable.
 
 Recommended next steps / 建議後續工作：
