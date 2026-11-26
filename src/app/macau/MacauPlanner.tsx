@@ -79,7 +79,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
   const [walletPayment, setWalletPayment] = useState<PaymentChoice>('adult-octopus'), [passes, setPasses] = useState<OwnedPass[]>([]), [walletReady, setWalletReady] = useState(false);
   const [timeMode, setTimeMode] = useState('now'), [time, setTime] = useState('');
   const [companies, setCompanies] = useState(defaultCompanies), [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS });
-  const [limits, setLimits] = useState<JourneyLimits>({ ...DEFAULT_LIMITS }), [change, setChange] = useState(5), [busEstimates, setBusEstimates] = useState(true);
+  const [limits, setLimits] = useState<JourneyLimits>({ ...DEFAULT_LIMITS }), [change, setChange] = useState(5);
   const [tab, setTab] = useState<'plan' | 'directory'>('plan'), [routes, setRoutes] = useState<MacauJourney[]>([]), [selected, setSelected] = useState<string | null>(null);
   const [searched, setSearched] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [catalogueError, setCatalogueError] = useState(false);
   const [refining, setRefining] = useState(false);
@@ -143,7 +143,7 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
     const p = params();
     p.set('resource', 'journey'); p.set('timeMode', timeMode === 'arrive' ? 'arrive' : 'depart');
     p.set('time', timeMode !== 'now' && time ? time + ':00+08:00' : new Date().toISOString());
-    p.set('payment', payment); p.set('busEstimates', String(busEstimates)); p.set('changeMinutes', String(change)); p.set('weights', JSON.stringify(weights)); p.set('limits', JSON.stringify(limits));
+    p.set('payment', payment); p.set('busEstimates', 'true'); p.set('changeMinutes', String(change)); p.set('weights', JSON.stringify(weights)); p.set('limits', JSON.stringify(limits));
     p.set('operators', Object.keys(companies).filter(key => companies[key] !== 'ban').join(',')); p.set('requiredOperators', Object.keys(companies).filter(key => companies[key] === 'must').join(','));
     let preview: MacauJourney[] = [];
     async function load(query: string): Promise<MacauJourney[]> {
@@ -220,10 +220,8 @@ export function MacauPlanner({ locale }: { locale: 'zh' | 'en' }) {
             <label className="mo-setting">{t('最少轉乘時間', 'Minimum change')}<span><input aria-label={t('最少轉乘時間', 'Minimum change')} type="number" min="0" max="60" value={change} onChange={e => { invalidate(); setChange(Number(e.target.value)); }} /> min</span></label>
             {(Object.keys(limits) as (keyof JourneyLimits)[]).map(key => <label className="mo-setting" key={key}>{({ transfers: t('最多轉乘次數', 'Maximum transfers'), change: t('每次轉乘上限', 'Maximum per change'), walk: t('步行總時間上限', 'Maximum total walking'), wait: t('每次候車上限', 'Maximum per wait'), ride: t('乘車總時間上限', 'Maximum total ride') })[key]}<input type="number" min="0" max={key === 'transfers' ? 3 : 240} placeholder={t('不限', 'Any')} value={limits[key] ?? ''} onChange={e => { invalidate(); setLimits({ ...limits, [key]: e.target.value === '' ? null : Number(e.target.value) }); }} /></label>)}
             <RouteWeightSettings value={weights} onChange={w => { invalidate(); setWeights(w); }} locale={locale} companyAdjustments={false} />
-            <button type="button" className="mo-reset" onClick={() => { invalidate(); setCompanies(defaultCompanies()); setWeights({ ...DEFAULT_WEIGHTS }); setLimits({ ...DEFAULT_LIMITS }); setChange(5); setBusEstimates(true); }}>{t('重設所有篩選', 'Reset all filters')}</button>
+            <button type="button" className="mo-reset" onClick={() => { invalidate(); setCompanies(defaultCompanies()); setWeights({ ...DEFAULT_WEIGHTS }); setLimits({ ...DEFAULT_LIMITS }); setChange(5); }}>{t('重設所有篩選', 'Reset all filters')}</button>
           </div></details>
-          <label className="mo-bus-opt"><input type="checkbox" checked={busEstimates} onChange={e => { invalidate(); setBusEstimates(e.target.checked); }} /><span>{t('搜尋巴士路線', 'Include buses')}</span></label>
-          {busEstimates && <p className="mo-warning">{t('巴士行程按路網估算，營運時段請查官方時間表。', 'Bus journeys use route estimates. Check the official timetable for service hours.')}</p>}
           <button className="mo-search" type="submit" disabled={busy}>{busy ? t('搜尋中…', 'Searching…') : t('搜尋路線', 'Find routes')}<PlannerIcon name="arrow" size={18} /></button>
         </form>}
         {tab === 'directory' && <label className="mo-directory-search">{t('搜尋路線編號或終點', 'Find a route number or terminus')}<input value={query} onChange={e => setQuery(e.target.value)} placeholder="26A, N1A, TAIPA…" /></label>}

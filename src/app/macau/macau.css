@@ -31,9 +31,6 @@
 .mo-setting input { width: 68px; }
 .mo-settings h3 { font-weight: 700; font-size: 14px; margin-block: 12px 7px; }
 .mo-reset { color: #257624; font-weight: 700; text-decoration: underline; font-size: 13px; }
-.mo-bus-opt { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; font-weight: 700; margin: 16px 0 8px; line-height: 1.5; }
-.mo-bus-opt input { margin-top: 3px; flex-shrink: 0; accent-color: #2e9127; }
-.mo-warning { font-size: 11px; color: #785c25; background: #fff8e9; border-left: 3px solid #dbad53; padding: 9px; line-height: 1.65; }
 .mo-search { display: flex; width: 100%; align-items: center; justify-content: center; gap: 10px; background: #2e9127; color: #fff; border-radius: 6px; padding: 12px; font-weight: 800; font-size: 15px; margin-top: 12px; }
 .mo-search:disabled { opacity: .65; }
 .mo-results, .mo-directory { padding: 14px; }
