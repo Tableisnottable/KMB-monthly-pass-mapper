@@ -480,7 +480,7 @@ data stays explicitly unavailable; scheduled boarding estimates are labelled sep
 
 ### Upcoming releases / 下兩個版本
 
-1. **Turnstile.** The [Turnstile branch](https://github.com/Tableisnottable/KMB-monthly-pass-mapper/tree/codex/macau-turnstile) implements server-side verification for the preview. Activation on the unified site requires adding its hostname to the Cloudflare Widget, integrating the branch and configuring the Worker bindings `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. Store the secret in Cloudflare. The unified site currently opens without the challenge.
+1. **Turnstile.** The unified site includes server-side verification. To activate it, create a Managed Cloudflare Widget for the unified hostname and add both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` as encrypted Worker secrets. A successful verification grants a 24-hour session.
 2. **Hong Kong vehicle locations.** The next Hong Kong location release will use Macau's position-to-route method where a public feed provides vehicle coordinates, route and direction. The checked KMB and Citybus feeds supply arrival times and destinations. Current Hong Kong bus markers use the timetable.
 
 Recommended next steps / 建議後續工作：

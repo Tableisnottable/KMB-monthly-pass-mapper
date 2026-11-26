@@ -1,7 +1,10 @@
 import { proxyProvider, safeProviderUrl } from './upstreamProxy';
+import { turnstileResponse } from './turnstile';
 import { openMapResponse } from '../data/openMapProvider';
 export { JourneyNotifications } from './journeyNotifications';
 interface Environment {
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
   RATE_LIMITER?: { limit(value: { key: string }): Promise<{ success: boolean }> };
   JOURNEY_NOTIFICATIONS?: { idFromName(name: string): unknown; get(id: unknown): { fetch(request: Request): Promise<Response> } };
@@ -11,6 +14,8 @@ type WorkerCache = { match(request: Request): Promise<Response | undefined>; put
 export default {
   async fetch(request: Request, env: Environment, ctx: Execution): Promise<Response> {
     const url = new URL(request.url);
+    const verification = await turnstileResponse(request, env);
+    if (verification) return verification;
     if (url.pathname === '/api/open-map') {
       if (env.RATE_LIMITER && !(await env.RATE_LIMITER.limit({ key: 'open-map:' + (request.headers.get('cf-connecting-ip') ?? 'unknown') })).success) return Response.json({ error: 'Please try again shortly.' }, { status: 429, headers: { 'Retry-After': '60' } });
       const cache = (caches as unknown as { default: WorkerCache }).default;
